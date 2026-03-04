@@ -14,7 +14,7 @@ i18n = I18nAuto()
 SUBTITLE_PRESETS = {
 
     "MrBeast Clean Hook": {
-        "font_name": "Montserrat-ExtraBold",
+        "font_name": "Arial",
         "font_size": 32,
         "base_color": "#FFFFFF",
         "highlight_color": "#FFD700",
@@ -38,7 +38,7 @@ SUBTITLE_PRESETS = {
     },
 
     "Hormozi (Classic)": {
-        "font_name": "Montserrat-ExtraBold",
+        "font_name": "Arial",
         "font_size": 30,
         "base_color": "#FFFFFF",
         "highlight_color": "#00FF00",
@@ -86,7 +86,7 @@ SUBTITLE_PRESETS = {
     },
 
     "Word Killer (TikTok)": {
-        "font_name": "Impact",
+        "font_name": "Arial",
         "font_size": 38,
         "base_color": "#FF0000",
         "highlight_color": "#FF0000",
@@ -110,7 +110,7 @@ SUBTITLE_PRESETS = {
     },
 
     "Rapid Fire (Sprint)": {
-        "font_name": "Impact",
+        "font_name": "Arial",
         "font_size": 36,
         "base_color": "#FFFF00",
         "highlight_color": "#FFFF00",
@@ -134,7 +134,7 @@ SUBTITLE_PRESETS = {
     },
 
     "Educational Fast": {
-        "font_name": "Roboto-Bold",
+        "font_name": "Arial",
         "font_size": 28,
         "base_color": "#FFFFFF",
         "highlight_color": "#00BFFF",
@@ -254,7 +254,7 @@ SUBTITLE_PRESETS = {
     },
 
     "Retro Pixel": {
-        "font_name": "Consolas",
+        "font_name": "Arial",
         "font_size": 26,
         "base_color": "#00FF00",
         "highlight_color": "#00FF00",
