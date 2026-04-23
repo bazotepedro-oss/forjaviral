@@ -7,7 +7,7 @@ whisperx
 mediapipe
 google-genai
 insightface
-gradio
+gradio==6.6.0
 opencv-python
 psutil
 fastapi
