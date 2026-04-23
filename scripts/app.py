@@ -457,7 +457,7 @@ import license_gate
 import license_client
 
 # License gate (best default)
-_LICENSE_SERVER = os.environ.get('FORJA_LICENSE_SERVER', 'https://web-production-35388.up.railway.app').rstrip('/')
+_LICENSE_SERVER = os.environ.get('FORJA_LICENSE_SERVER', 'https://optimistic-mindfulness-production-7010.up.railway.app').rstrip('/')
 _gate = license_gate.LicenseGate(base_url=_LICENSE_SERVER, app_version='1.0.0')
 
 # ---------------------------
