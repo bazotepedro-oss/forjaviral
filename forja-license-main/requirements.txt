@@ -1,0 +1,4 @@
+fastapi
+uvicorn
+cryptography
+psycopg2-binary

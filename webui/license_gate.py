@@ -295,7 +295,7 @@ class LicenseGate:
             base_url_txt = gr.Textbox(
                 label="Servidor de licença",
                 value=self.base_url,
-                placeholder="http://127.0.0.1:8787",
+                placeholder="https://forja-license-production.up.railway.app",
                 scale=2,
             )
             license_key_txt = gr.Textbox(
