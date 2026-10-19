@@ -13,7 +13,7 @@ const Schema = z.object({
   phone: z.string().optional(),
 });
 
-export function calculateProgressivePrice(credits: number) {
+function calculateProgressivePrice(credits: number) {
   const c = Math.max(5, Math.min(1000, Math.floor(credits)));
   let unit = 1.30;
   let discount = 0;

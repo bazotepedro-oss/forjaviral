@@ -1184,14 +1184,26 @@ export function AdminShell({
   events,
   railwayLicenses = [],
 }: AdminShellProps) {
-  const [activeTab, setActiveTab] = useState<TabId>('customers');
+  const [activeTab, setActiveTab] = useState<TabId>('licenses');
+  const [syncing, setSyncing] = useState(false);
   const router = useRouter();
+  const [, startTransition] = useTransition();
 
   const paidOrders = orders.filter((o) => o.status === 'paid').length;
   const activeSubs = subscriptions.filter((s) => s.status === 'active').length;
   const revenue = orders
     .filter((o) => o.status === 'paid')
     .reduce((acc, o) => acc + o.amount, 0);
+
+  async function handleSync() {
+    setSyncing(true);
+    try {
+      await fetch('/api/admin/sync', { method: 'POST' });
+      startTransition(() => router.refresh());
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function logout() {
     await fetch('/api/admin/logout', { method: 'POST' });
@@ -1229,15 +1241,27 @@ export function AdminShell({
             <ChevronRight className="w-4 h-4 text-text-secondary" />
             <span className="text-text-secondary text-sm">Admin & CRM</span>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={logout}
-            className="text-text-secondary hover:text-error"
-          >
-            <LogOut className="w-4 h-4" />
-            Sair
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={syncing}
+              onClick={handleSync}
+              className="text-xs h-8 border border-brand/30"
+            >
+              <RefreshCcw className={cn('w-3.5 h-3.5 mr-1.5 text-brand', syncing && 'animate-spin')} />
+              {syncing ? 'Sincronizando...' : 'Sincronizar AbacatePay'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={logout}
+              className="text-text-secondary hover:text-error text-xs h-8"
+            >
+              <LogOut className="w-3.5 h-3.5 mr-1" />
+              Sair
+            </Button>
+          </div>
         </div>
       </header>
 

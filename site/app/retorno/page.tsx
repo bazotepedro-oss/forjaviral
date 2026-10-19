@@ -1,37 +1,42 @@
 import { Suspense } from 'react';
+import Link from 'next/link';
 import { Navbar } from '@/components/navbar';
 import { Footer } from '@/components/footer';
+import { CheckCircle2, ArrowRight, Zap } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { syncAbacatePay } from '@/lib/sync-abacatepay';
 
 export const revalidate = 0;
 
-export default function RetornoPage() {
+export default async function RetornoPage() {
+  // Sincroniza pagamentos da AbacatePay (v2) instantaneamente
+  await syncAbacatePay().catch((e) => console.error('Erro ao sincronizar retorno:', e));
+
   return (
-    <div className="min-h-screen bg-background text-text-primary">
+    <div className="min-h-screen bg-background text-text-primary flex flex-col justify-between">
       <Navbar />
-      <main className="mx-auto w-full max-w-3xl px-4 py-20 text-center">
-        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-brand/15 text-brand">
-          <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
+      <main className="mx-auto w-full max-w-2xl px-4 py-20 text-center flex-1 flex flex-col justify-center">
+        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 shadow-xl">
+          <CheckCircle2 className="h-10 w-10 text-emerald-400" />
         </div>
-        <h1 className="font-display text-3xl font-bold text-text-primary md:text-4xl">
-          Processando seu <span className="text-brand">pagamento</span>
+        <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-text-primary">
+          Pagamento <span className="text-emerald-400">Confirmado!</span>
         </h1>
-        <p className="mx-auto mt-3 max-w-xl text-text-secondary">
-          Aguardando confirmação da AbacatePay. Assim que aprovado, seu acesso será gerado automaticamente.
+        <p className="mx-auto mt-3 max-w-lg text-text-secondary text-sm sm:text-base">
+          Seus créditos foram creditados diretamente no servidor da Forja Viral. Se você comprou um novo acesso, suas credenciais já estão prontas.
         </p>
-        <div className="mt-8 space-y-4">
-          <div className="mx-auto h-2 w-48 overflow-hidden rounded-full bg-surface">
-            <div className="h-full w-1/3 animate-pulse bg-brand-gradient" />
-          </div>
-          <div className="pt-4">
-            <a
-              href="/acesso"
-              className="inline-flex items-center justify-center rounded-xl bg-brand px-6 py-3 text-sm font-bold text-white hover:bg-brand/90 transition-all shadow-lg shadow-brand/20"
-            >
-              Ver minhas credenciais e aulas →
-            </a>
-          </div>
+
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <Button asChild size="lg" className="w-full sm:w-auto font-bold bg-brand hover:bg-brand/90 text-white shadow-lg shadow-brand/20">
+            <Link href="/acesso">
+              <Zap className="h-4 w-4 mr-2" /> Ver Minha Licença & Acesso
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="lg" className="w-full sm:w-auto border-border">
+            <Link href="/">
+              Voltar ao Início <ArrowRight className="h-4 w-4 ml-2" />
+            </Link>
+          </Button>
         </div>
       </main>
       <Footer />
