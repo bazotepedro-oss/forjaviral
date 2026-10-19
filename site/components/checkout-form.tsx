@@ -4,13 +4,13 @@ import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { Loader2, CheckCircle2, ShieldCheck, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 const schema = z.object({
-  slug: z.enum(['mensal', 'trimestral', 'anual']),
+  slug: z.enum(['pack_teste', 'pack_criador', 'pack_escala', 'mensal', 'trimestral', 'anual']),
   name: z.string().min(2, 'Nome muito curto').max(120),
   email: z.string().email('E-mail inválido'),
   phone: z.string().max(30).optional(),
@@ -20,10 +20,10 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 interface CheckoutFormProps {
-  defaultSlug?: 'mensal' | 'trimestral' | 'anual';
+  defaultSlug?: 'pack_teste' | 'pack_criador' | 'pack_escala' | 'mensal' | 'trimestral' | 'anual';
 }
 
-export function CheckoutForm({ defaultSlug = 'trimestral' }: CheckoutFormProps) {
+export function CheckoutForm({ defaultSlug = 'pack_criador' }: CheckoutFormProps) {
   const {
     register,
     handleSubmit,
@@ -50,7 +50,7 @@ export function CheckoutForm({ defaultSlug = 'trimestral' }: CheckoutFormProps) 
         return;
       }
       setDone(true);
-      setToast({ message: 'Redirecionando para o checkout...', variant: 'info' });
+      setToast({ message: 'Redirecionando para o pagamento Pix...', variant: 'info' });
       window.location.href = json.checkoutURL;
     } catch {
       setToast({ message: 'Erro de conexão. Tente novamente.', variant: 'error' });
@@ -61,8 +61,8 @@ export function CheckoutForm({ defaultSlug = 'trimestral' }: CheckoutFormProps) 
     return (
       <div className="flex flex-col items-center justify-center py-10 text-center">
         <CheckCircle2 className="h-12 w-12 text-success" />
-        <p className="mt-4 font-semibold text-text-primary">Checkout criado com sucesso!</p>
-        <p className="text-sm text-text-secondary">Você será redirecionado em instantes...</p>
+        <p className="mt-4 font-semibold text-text-primary">Pedido gerado com sucesso!</p>
+        <p className="text-sm text-text-secondary">Você será redirecionado para o pagamento Pix...</p>
       </div>
     );
   }
@@ -71,33 +71,33 @@ export function CheckoutForm({ defaultSlug = 'trimestral' }: CheckoutFormProps) 
     <div className="relative">
       <form onSubmit={handleSubmit(onSubmit as Parameters<typeof handleSubmit>[0])} className="space-y-4">
         <div>
-          <Label htmlFor="slug">Plano</Label>
+          <Label htmlFor="slug">Pacote de Créditos</Label>
           <select
             id="slug"
-            className="mt-1 h-11 w-full rounded-xl border border-border bg-background px-4 text-sm text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            className="mt-1 h-11 w-full rounded-xl border border-border bg-background px-4 text-sm text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand font-medium"
             {...register('slug')}
           >
-            <option value="mensal">Mensal</option>
-            <option value="trimestral">Trimestral</option>
-            <option value="anual">Anual</option>
+            <option value="pack_teste">Pack Teste (15 Vídeos) — R$ 19,90</option>
+            <option value="pack_criador">Pack Criador (50 Vídeos) — R$ 39,90 [Recomendado]</option>
+            <option value="pack_escala">Pack Escala (120 Vídeos) — R$ 79,90 [Melhor Custo]</option>
           </select>
         </div>
 
         <div>
-          <Label htmlFor="name">Nome completo</Label>
-          <Input id="name" {...register('name')} />
+          <Label htmlFor="name">Seu Nome</Label>
+          <Input id="name" placeholder="Ex: Lucas Silva" {...register('name')} />
           {errors.name && <p className="mt-1 text-xs text-error">{errors.name.message}</p>}
         </div>
 
         <div>
-          <Label htmlFor="email">E-mail</Label>
-          <Input id="email" type="email" {...register('email')} />
+          <Label htmlFor="email">E-mail (onde receberá a chave e o curso)</Label>
+          <Input id="email" type="email" placeholder="Ex: lucas@gmail.com" {...register('email')} />
           {errors.email && <p className="mt-1 text-xs text-error">{errors.email.message}</p>}
         </div>
 
         <div>
-          <Label htmlFor="phone">Telefone (opcional)</Label>
-          <Input id="phone" {...register('phone')} />
+          <Label htmlFor="phone">WhatsApp / Telefone (para suporte do CRM)</Label>
+          <Input id="phone" placeholder="Ex: 11999999999" {...register('phone')} />
         </div>
 
         <div className="flex items-start gap-2 pt-1">
@@ -107,34 +107,30 @@ export function CheckoutForm({ defaultSlug = 'trimestral' }: CheckoutFormProps) 
             className="mt-1 h-4 w-4 rounded border-border bg-background accent-brand"
             {...register('consent')}
           />
-          <Label htmlFor="consent" className="font-normal">
-            Concordo com os{' '}
-            <a href="/termos" className="text-brand hover:underline">
-              termos de uso
-            </a>{' '}
-            e{' '}
-            <a href="/privacidade" className="text-brand hover:underline">
-              política de privacidade
-            </a>.
+          <Label htmlFor="consent" className="font-normal text-xs text-text-secondary">
+            Concordo com os <a href="/termos" className="text-brand hover:underline">termos de uso</a>. Compreendo que este é um pagamento único de créditos pré-pagos sem cobrança recorrente no cartão.
           </Label>
         </div>
-        {errors.consent && <p className="-mt-2 text-xs text-error">{errors.consent.message}</p>}
+        {errors.consent && <p className="mt-1 text-xs text-error">{errors.consent.message}</p>}
 
-        <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
-          {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Ir para o checkout'}
+        <Button type="submit" className="w-full bg-brand-gradient hover:brightness-110 shadow-glow font-bold py-3 text-base" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" /> Gerando Pix...
+            </span>
+          ) : (
+            <span className="flex items-center gap-2">
+              <Zap className="h-4 w-4" /> Finalizar Pedido no Pix
+            </span>
+          )}
         </Button>
       </form>
 
       {toast && (
-        <div className="fixed bottom-4 right-4 z-50 w-full max-w-sm">
-          <div className={cn('flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm shadow-card', toast.variant === 'error' ? 'border-error/30 bg-error/10 text-error' : toast.variant === 'success' ? 'border-success/30 bg-success/10 text-success' : 'border-brand/30 bg-brand/10 text-brand-soft')}>
-            <span>{toast.message}</span>
-            <button onClick={() => setToast(null)} className="text-current hover:opacity-70">✕</button>
-          </div>
+        <div className={`mt-4 p-3 rounded-xl text-xs font-semibold ${toast.variant === 'error' ? 'bg-rose-500/15 border border-rose-500/30 text-rose-400' : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'}`}>
+          {toast.message}
         </div>
       )}
     </div>
   );
 }
-
-import { cn } from '@/lib/utils';

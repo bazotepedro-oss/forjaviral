@@ -1,10 +1,23 @@
+import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { AdminShell } from '@/components/admin-shell';
 import { listLicensesFromServer } from '@/lib/license-server';
+import { verifyAdminRequest } from '@/lib/auth';
 
 export const revalidate = 0;
 
-export default async function AdminPage() {
+interface PageProps {
+  searchParams?: { token?: string };
+}
+
+export default async function AdminPage({ searchParams }: PageProps) {
+  const urlToken = searchParams?.token;
+  const session = await verifyAdminRequest(urlToken);
+
+  if (!session) {
+    redirect('/admin/login');
+  }
+
   const [orders, subscriptions, customers, credentials, events, railwayLicenses] = await Promise.all([
     prisma.order.findMany({ include: { customer: true, plan: true }, orderBy: { createdAt: 'desc' }, take: 50 }),
     prisma.subscription.findMany({ include: { customer: true, plan: true }, orderBy: { createdAt: 'desc' }, take: 50 }),

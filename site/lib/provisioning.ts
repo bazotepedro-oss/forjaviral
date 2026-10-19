@@ -62,13 +62,16 @@ export function appBaseUrl(): string {
 
 function getPlanSpecs(planSlug: string): { credits: number; days: number } {
   const s = (planSlug || '').toLowerCase();
-  if (s.includes('anual')) {
-    return { credits: 1500, days: 365 };
+  if (s.includes('teste') || s.includes('15')) {
+    return { credits: 15, days: 365 };
   }
-  if (s.includes('trimestral')) {
-    return { credits: 350, days: 90 };
+  if (s.includes('criador') || s.includes('50') || s.includes('mensal')) {
+    return { credits: 50, days: 365 };
   }
-  return { credits: 100, days: 30 };
+  if (s.includes('escala') || s.includes('120') || s.includes('trimestral') || s.includes('anual')) {
+    return { credits: 120, days: 365 };
+  }
+  return { credits: 50, days: 365 };
 }
 
 export async function provision(input: ProvisionInput): Promise<ProvisionResult> {

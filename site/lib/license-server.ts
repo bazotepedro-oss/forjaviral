@@ -163,6 +163,59 @@ export async function toggleLicenseOnServer(licenseKey: string): Promise<{ ok: b
 }
 
 /**
+ * Estende a validade da licença em N dias no servidor Railway.
+ */
+export async function extendDaysOnServer(licenseKey: string, days: number): Promise<{ ok: boolean; message?: string }> {
+  const url = `${getLicenseServerUrl()}/admin/action?token=${encodeURIComponent(getLicenseAdminToken())}`;
+  const body = new URLSearchParams({
+    action: 'extend_days',
+    license_key: licenseKey,
+    days: String(days),
+  });
+
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: body.toString(),
+      redirect: 'manual',
+    });
+
+    return { ok: true, message: `+${days} dias adicionados com sucesso` };
+  } catch (err: any) {
+    return { ok: false, message: err?.message || 'Erro ao estender validade' };
+  }
+}
+
+/**
+ * Deleta permanentemente uma licença no servidor Railway.
+ */
+export async function deleteLicenseOnServer(licenseKey: string): Promise<{ ok: boolean; message?: string }> {
+  const url = `${getLicenseServerUrl()}/admin/action?token=${encodeURIComponent(getLicenseAdminToken())}`;
+  const body = new URLSearchParams({
+    action: 'delete',
+    license_key: licenseKey,
+  });
+
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: body.toString(),
+      redirect: 'manual',
+    });
+
+    return { ok: true, message: 'Licença removida com sucesso do Railway' };
+  } catch (err: any) {
+    return { ok: false, message: err?.message || 'Erro ao deletar licença' };
+  }
+}
+
+/**
  * Gera uma chave de licença no padrão Forja Viral: FV-XXXXX-XXXXX
  */
 export function generateLicenseKey(): string {

@@ -1,71 +1,85 @@
 'use client';
 
 import { useState } from 'react';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff, ShieldCheck, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Toast } from '@/components/ui/toast';
 
-const schema = z.object({
-  email: z.string().email('E-mail inválido'),
-  password: z.string().min(1, 'Senha obrigatória'),
-});
-
-type FormData = z.infer<typeof schema>;
-
 export default function AdminLoginPage() {
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>();
+  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [showPass, setShowPass] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' | 'info' } | null>(null);
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setToast(null);
+
+    if (!password.trim()) {
+      setToast({ message: 'Digite a senha ou token de admin', variant: 'error' });
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          password: password.trim(),
+          email: email.trim() || undefined,
+        }),
         credentials: 'include',
       });
+
       if (!res.ok) {
-        setToast({ message: 'Credenciais inválidas', variant: 'error' });
+        setToast({ message: 'Senha ou Token de admin inválido', variant: 'error' });
         return;
       }
-      setToast({ message: 'Login realizado!', variant: 'success' });
+
+      setToast({ message: 'Acesso autorizado! Redirecionando...', variant: 'success' });
       window.location.href = '/admin';
     } catch {
-      setToast({ message: 'Erro de conexão', variant: 'error' });
+      setToast({ message: 'Erro de conexão com o servidor', variant: 'error' });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md border-border/80 bg-surface/90 shadow-2xl backdrop-blur-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-gradient">
-            <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15l-8 4h16l-8-4z" />
-            </svg>
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-gradient shadow-lg shadow-brand/20">
+            <ShieldCheck className="h-7 w-7 text-white" />
           </div>
-          <CardTitle>Área Administrativa</CardTitle>
-          <CardDescription>Entre com suas credenciais de admin.</CardDescription>
+          <CardTitle className="text-2xl font-bold">Painel Forja Viral</CardTitle>
+          <CardDescription>
+            Insira sua Senha de Administrador ou Token de Acesso (Railway).
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={onSubmit} className="space-y-5">
             <div>
-              <Label htmlFor="email">E-mail</Label>
-              <Input id="email" type="email" {...register('email')} />
-              {errors.email && <p className="mt-1 text-xs text-error">{errors.email.message}</p>}
-            </div>
-            <div>
-              <Label htmlFor="password">Senha</Label>
-              <div className="relative">
-                <Input id="password" type={showPass ? 'text' : 'password'} {...register('password')} />
+              <Label htmlFor="password" className="text-sm font-semibold flex items-center gap-1.5">
+                <KeyRound className="h-4 w-4 text-brand" />
+                Senha Mestra ou Token
+              </Label>
+              <div className="relative mt-1">
+                <Input
+                  id="password"
+                  type={showPass ? 'text' : 'password'}
+                  placeholder="Ex: FV291125 ou admin123"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="pr-10 h-11 border-border/80 bg-background/50 text-base"
+                />
                 <button
                   type="button"
                   onClick={() => setShowPass((v) => !v)}
@@ -75,14 +89,49 @@ export default function AdminLoginPage() {
                   {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-              {errors.password && <p className="mt-1 text-xs text-error">{errors.password.message}</p>}
             </div>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Entrar'}
+
+            {showAdvanced && (
+              <div>
+                <Label htmlFor="email" className="text-xs text-text-secondary">E-mail (opcional)</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="admin@forjaviral.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="mt-1 h-9 border-border/80 bg-background/50 text-xs"
+                />
+              </div>
+            )}
+
+            <div className="flex justify-between items-center text-xs">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((v) => !v)}
+                className="text-text-secondary hover:text-brand underline"
+              >
+                {showAdvanced ? 'Ocultar e-mail' : 'Opções avançadas'}
+              </button>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full h-11 text-base font-bold bg-brand hover:bg-brand/90 text-white shadow-lg shadow-brand/20"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Entrando...
+                </>
+              ) : (
+                'Entrar no Painel'
+              )}
             </Button>
           </form>
         </CardContent>
       </Card>
+
       {toast && (
         <div className="fixed bottom-4 right-4 z-50 w-full max-w-sm">
           <Toast message={toast.message} variant={toast.variant} onDismiss={() => setToast(null)} />

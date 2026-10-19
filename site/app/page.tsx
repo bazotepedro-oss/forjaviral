@@ -12,7 +12,7 @@ import { CTAFinal } from '@/components/sections/cta-final';
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const plans = await prisma.plan.findMany({ where: { active: true }, orderBy: { slug: 'asc' } });
+  const plans = await prisma.plan.findMany({ where: { active: true }, orderBy: { price: 'asc' } });
 
   return (
     <div className="min-h-screen bg-background text-text-primary">

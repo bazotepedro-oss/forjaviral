@@ -90,6 +90,10 @@ export async function POST(req: Request) {
       try {
         await addCreditsOnServer(meta.licenseKey, Number(meta.creditsToAdd));
         console.log(`[Webhook] Recarga automática de ${meta.creditsToAdd} créditos para a chave ${meta.licenseKey}`);
+        await prisma.accessCredentials.updateMany({
+          where: { licenseKey: meta.licenseKey },
+          data: { credits: { increment: Number(meta.creditsToAdd) } },
+        });
       } catch (e: any) {
         console.error('[Webhook] Falha na recarga de créditos:', e?.message);
       }
@@ -116,19 +120,22 @@ export async function POST(req: Request) {
       });
     }
 
-    const customer = await prisma.customer.findUnique({ where: { id: order.customerId } });
-    const plan = await prisma.plan.findUnique({ where: { id: order.planId } });
-    if (customer && plan) {
-      try {
-        await provision({
-          customerId: customer.id,
-          orderId: order.id,
-          subscriptionId: subscription.id,
-          email: customer.email,
-          plan: plan.slug,
-        });
-      } catch (e: any) {
-        console.error('provision error:', e.message);
+    // Apenas provisiona nova credencial se NÃO for uma recarga
+    if (!meta.isRecharge) {
+      const customer = await prisma.customer.findUnique({ where: { id: order.customerId } });
+      const plan = await prisma.plan.findUnique({ where: { id: order.planId } });
+      if (customer && plan) {
+        try {
+          await provision({
+            customerId: customer.id,
+            orderId: order.id,
+            subscriptionId: subscription.id,
+            email: customer.email,
+            plan: plan.slug,
+          });
+        } catch (e: any) {
+          console.error('provision error:', e.message);
+        }
       }
     }
   } else if (status === 'canceled' || status === 'refunded') {

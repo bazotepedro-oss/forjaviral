@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Navbar } from '@/components/navbar';
 import { Footer } from '@/components/footer';
@@ -9,42 +9,65 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Zap, Coins, CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
+import {
+  Coins,
+  CheckCircle2,
+  Loader2,
+  ArrowRight,
+  Sparkles,
+  Zap,
+  TrendingDown,
+  ShieldCheck,
+  QrCode,
+} from 'lucide-react';
 
-const PACKAGES = [
-  {
-    slug: 'recarga-100',
-    name: '100 Créditos',
-    credits: 100,
-    price: 'R$ 29,90',
-    cents: 2990,
-    desc: 'Ideal para finalizar vídeos rápidos ou testes.',
-    badge: null,
-  },
-  {
-    slug: 'recarga-300',
-    name: '300 Créditos',
-    credits: 300,
-    price: 'R$ 59,90',
-    cents: 5990,
-    desc: 'O mais escolhido. Mais de 30 vídeos virais completos.',
-    badge: 'Mais Popular',
-  },
-  {
-    slug: 'recarga-600',
-    name: '600 Créditos',
-    credits: 600,
-    price: 'R$ 99,90',
-    cents: 9990,
-    desc: 'Máximo poder para agências e criadores frequentes.',
-    badge: 'Melhor Custo',
-  },
+const PRESETS = [
+  { credits: 15, label: '15 Créditos', badge: 'Teste' },
+  { credits: 30, label: '30 Créditos', badge: '27% OFF' },
+  { credits: 50, label: '50 Créditos', badge: 'Mais Vendido 🔥' },
+  { credits: 100, label: '100 Créditos', badge: '49% OFF 🚀' },
+  { credits: 120, label: '120 Créditos', badge: 'Atacado' },
 ];
+
+function calculatePricing(credits: number) {
+  const c = Math.max(5, Math.min(1000, Math.floor(credits || 5)));
+  let unit = 1.30;
+  let discount = 0;
+  let tierLabel = 'Preço Normal';
+
+  if (c >= 100) {
+    unit = 0.66;
+    discount = 49;
+    tierLabel = 'Desconto Máximo de Atacado (49% OFF)';
+  } else if (c >= 50) {
+    unit = 0.79;
+    discount = 39;
+    tierLabel = 'Super Desconto Criador (39% OFF)';
+  } else if (c >= 30) {
+    unit = 0.95;
+    discount = 27;
+    tierLabel = 'Desconto Progressivo (27% OFF)';
+  }
+
+  const total = c * unit;
+  const normalTotal = c * 1.30;
+  const economy = normalTotal - total;
+
+  return {
+    credits: c,
+    unitPrice: unit,
+    total,
+    normalTotal,
+    economy,
+    discount,
+    tierLabel,
+  };
+}
 
 function RecargaForm() {
   const searchParams = useSearchParams();
-  const [selectedPkg, setSelectedPkg] = useState('recarga-300');
-  const [licenseKey, setLicenseKey] = useState('');
+  const [credits, setCredits] = useState<number>(50);
+  const [identifier, setIdentifier] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -52,19 +75,26 @@ function RecargaForm() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const k = searchParams.get('key');
-    if (k) setLicenseKey(k);
+    const k = searchParams.get('key') || searchParams.get('user') || searchParams.get('email');
+    if (k) setIdentifier(k);
+    const c = searchParams.get('credits');
+    if (c && !isNaN(Number(c))) {
+      setCredits(Math.max(5, Math.min(1000, Number(c))));
+    }
   }, [searchParams]);
+
+  const pricing = useMemo(() => calculatePricing(credits), [credits]);
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!licenseKey.trim()) {
-      setError('Por favor, informe a sua chave de licença.');
+
+    if (!identifier.trim()) {
+      setError('Por favor, informe sua Chave de Licença (FV-...), Usuário ou E-mail.');
       return;
     }
-    if (!email.trim() || !name.trim()) {
-      setError('Por favor, preencha seu nome e e-mail.');
+    if (!name.trim() || !email.trim()) {
+      setError('Por favor, preencha seu nome e e-mail para emissão do Pix.');
       return;
     }
 
@@ -74,8 +104,8 @@ function RecargaForm() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          licenseKey: licenseKey.trim(),
-          packageSlug: selectedPkg,
+          identifier: identifier.trim(),
+          credits: pricing.credits,
           name: name.trim(),
           email: email.trim(),
           phone: phone.trim() || undefined,
@@ -84,7 +114,7 @@ function RecargaForm() {
 
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Erro ao gerar recarga.');
+        setError(data.error || 'Erro ao gerar Pix de recarga.');
         return;
       }
 
@@ -92,7 +122,7 @@ function RecargaForm() {
         window.location.href = data.checkoutURL;
       }
     } catch {
-      setError('Erro de conexão ao processar recarga.');
+      setError('Falha de conexão ao gerar recarga.');
     } finally {
       setLoading(false);
     }
@@ -100,81 +130,203 @@ function RecargaForm() {
 
   return (
     <form onSubmit={handleCheckout} className="space-y-8">
-      {/* 1. Escolha do Pacote */}
-      <div className="space-y-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary">
-          1. Escolha o pacote de créditos
-        </h2>
-        <div className="grid gap-4 md:grid-cols-3">
-          {PACKAGES.map((pkg) => {
-            const isSelected = selectedPkg === pkg.slug;
-            return (
-              <div
-                key={pkg.slug}
-                onClick={() => setSelectedPkg(pkg.slug)}
-                className={`cursor-pointer rounded-2xl border p-5 transition-all relative flex flex-col justify-between ${
-                  isSelected
-                    ? 'border-brand bg-brand/5 ring-2 ring-brand/50 shadow-lg'
-                    : 'border-border bg-surface hover:border-brand/30'
-                }`}
-              >
-                {pkg.badge && (
-                  <span className="absolute -top-3 right-4 rounded-full bg-brand px-3 py-0.5 text-xs font-bold text-white shadow">
-                    {pkg.badge}
-                  </span>
-                )}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-base text-text-primary">{pkg.name}</span>
-                    <Zap className={`h-4 w-4 ${isSelected ? 'text-brand' : 'text-text-secondary'}`} />
-                  </div>
-                  <div className="text-2xl font-extrabold text-brand">{pkg.price}</div>
-                  <p className="text-xs text-text-secondary">{pkg.desc}</p>
-                </div>
-                <div className="pt-4 mt-2 border-t border-border/50 flex items-center gap-1.5 text-xs font-medium text-text-primary">
-                  <CheckCircle2 className="h-4 w-4 text-brand" />
-                  +{pkg.credits} créditos automáticos
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 2. Dados da Licença e Cliente */}
-      <Card className="border-border bg-surface">
+      {/* 1. Escolha de Quantidade e Desconto Progressivo */}
+      <Card className="border-border/80 bg-surface/90 shadow-xl backdrop-blur-sm">
         <CardHeader>
-          <CardTitle className="text-lg">2. Seus dados e Chave de Licença</CardTitle>
-          <CardDescription>
-            Informe a chave onde os créditos serão depositados automaticamente.
-          </CardDescription>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <CardTitle className="text-xl flex items-center gap-2">
+                <Coins className="h-5 w-5 text-brand" />
+                1. Quantos créditos você quer recarregar?
+              </CardTitle>
+              <CardDescription>
+                Cada crédito equivale a 1 corte de vídeo viral completo com legendas e renderização.
+              </CardDescription>
+            </div>
+            <Badge variant="outline" className="border-brand/40 bg-brand/10 text-brand font-semibold px-3 py-1">
+              {pricing.tierLabel}
+            </Badge>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
+          {/* Quick presets */}
           <div>
-            <Label htmlFor="licenseKey">Chave de Licença (FV-...)</Label>
-            <Input
-              id="licenseKey"
-              placeholder="Ex: FV-ABC12-XYZ34"
-              value={licenseKey}
-              onChange={(e) => setLicenseKey(e.target.value.toUpperCase())}
-              required
-              className="font-mono uppercase font-bold"
-            />
+            <Label className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-2 block">
+              Escolha rápida ou selecione abaixo:
+            </Label>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+              {PRESETS.map((p) => {
+                const isSelected = credits === p.credits;
+                return (
+                  <button
+                    key={p.credits}
+                    type="button"
+                    onClick={() => setCredits(p.credits)}
+                    className={`relative rounded-xl border p-3 text-center transition-all ${
+                      isSelected
+                        ? 'border-brand bg-brand/15 text-text-primary ring-2 ring-brand/50 shadow-md font-bold'
+                        : 'border-border bg-background/60 text-text-secondary hover:border-brand/40 hover:text-text-primary'
+                    }`}
+                  >
+                    <div className="text-sm font-semibold">{p.label}</div>
+                    <div className="mt-1 text-[11px] font-medium text-brand">{p.badge}</div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          {/* Slider and direct input */}
+          <div className="rounded-2xl border border-border/60 bg-background/50 p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <Label htmlFor="customCredits" className="font-semibold text-text-primary">
+                  Quantidade personalizada:
+                </Label>
+                <p className="text-xs text-text-secondary">Arraste a barra ou digite o número exato</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="customCredits"
+                  type="number"
+                  min={5}
+                  max={1000}
+                  value={credits}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setCredits(isNaN(val) ? 5 : val);
+                  }}
+                  className="w-28 text-center text-lg font-bold font-mono h-11 border-brand/40 bg-surface focus:ring-brand"
+                />
+                <span className="text-sm font-medium text-text-secondary">créditos</span>
+              </div>
+            </div>
+
+            <input
+              type="range"
+              min={5}
+              max={250}
+              step={1}
+              value={credits > 250 ? 250 : credits}
+              onChange={(e) => setCredits(Number(e.target.value))}
+              className="w-full h-2 bg-border rounded-lg appearance-none cursor-pointer accent-brand"
+            />
+
+            {/* Discount Scale visual bar */}
+            <div className="grid grid-cols-3 gap-2 pt-2 text-xs">
+              <div
+                className={`rounded-lg p-2.5 border text-center transition-all ${
+                  credits >= 30 && credits < 50
+                    ? 'border-brand bg-brand/10 font-semibold text-brand'
+                    : 'border-border/60 text-text-secondary'
+                }`}
+              >
+                <div className="font-bold">30 a 49 créditos</div>
+                <div>R$ 0,95 / un (27% OFF)</div>
+              </div>
+              <div
+                className={`rounded-lg p-2.5 border text-center transition-all ${
+                  credits >= 50 && credits < 100
+                    ? 'border-brand bg-brand/10 font-semibold text-brand'
+                    : 'border-border/60 text-text-secondary'
+                }`}
+              >
+                <div className="font-bold">50 a 99 créditos</div>
+                <div>R$ 0,79 / un (39% OFF) 🔥</div>
+              </div>
+              <div
+                className={`rounded-lg p-2.5 border text-center transition-all ${
+                  credits >= 100
+                    ? 'border-brand bg-brand/10 font-semibold text-brand'
+                    : 'border-border/60 text-text-secondary'
+                }`}
+              >
+                <div className="font-bold">100+ créditos</div>
+                <div>R$ 0,66 / un (49% OFF) 🚀</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Pricing Summary Box */}
+          <div className="rounded-2xl border border-brand/30 bg-gradient-to-br from-brand/10 via-surface to-surface p-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <span className="text-xs uppercase tracking-wider font-semibold text-brand flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5" /> Total do Pix a Pagar
+                </span>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-3xl sm:text-4xl font-extrabold text-text-primary">
+                    {pricing.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                  {pricing.economy > 0 && (
+                    <span className="text-sm line-through text-text-secondary">
+                      {pricing.normalTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-text-secondary flex items-center gap-1">
+                  Equivale a{' '}
+                  <strong className="text-brand">
+                    {pricing.unitPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </strong>{' '}
+                  por vídeo completo.
+                </p>
+              </div>
+
+              {pricing.economy > 0 && (
+                <div className="flex items-center gap-2 rounded-xl bg-brand/15 px-4 py-2.5 border border-brand/30 text-brand text-xs font-bold">
+                  <TrendingDown className="h-4 w-4" />
+                  Economia de {pricing.economy.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} ({pricing.discount}% OFF)
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 2. Identificação da Licença e Usuário */}
+      <Card className="border-border/80 bg-surface/90 shadow-xl backdrop-blur-sm">
+        <CardHeader>
+          <CardTitle className="text-xl flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-brand" />
+            2. Onde devemos creditar seus créditos?
+          </CardTitle>
+          <CardDescription>
+            Identifique sua conta do Forja Viral. Pode ser sua chave de licença, e-mail de compra ou nome de usuário.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div>
+            <Label htmlFor="identifier" className="font-semibold text-sm">
+              Sua Chave de Licença (FV-...), Usuário ou E-mail cadastrado
+            </Label>
+            <Input
+              id="identifier"
+              placeholder="Ex: FV-9A1B2-C3D4E ou seu_usuario ou seu@email.com"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              required
+              className="mt-1 font-mono font-medium text-base h-11 border-border/80 bg-background/50 focus:ring-brand"
+            />
+            <p className="text-[12px] text-text-secondary mt-1.5">
+              O sistema verifica no servidor da Railway e credita instantaneamente após a confirmação do Pix.
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="name">Seu Nome</Label>
+              <Label htmlFor="name" className="text-sm">Seu Nome</Label>
               <Input
                 id="name"
                 placeholder="Nome completo"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
+                className="mt-1 h-10 border-border/80 bg-background/50"
               />
             </div>
             <div>
-              <Label htmlFor="email">Seu E-mail</Label>
+              <Label htmlFor="email" className="text-sm">Seu E-mail (para envio do comprovante)</Label>
               <Input
                 id="email"
                 type="email"
@@ -182,33 +334,55 @@ function RecargaForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="mt-1 h-10 border-border/80 bg-background/50"
               />
             </div>
           </div>
 
           <div>
-            <Label htmlFor="phone">WhatsApp / Telefone (opcional para suporte)</Label>
+            <Label htmlFor="phone" className="text-sm">WhatsApp / Telefone (opcional para suporte)</Label>
             <Input
               id="phone"
               placeholder="(11) 99999-9999"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
+              className="mt-1 h-10 border-border/80 bg-background/50"
             />
           </div>
 
-          {error && <p className="text-sm text-error bg-error/10 p-3 rounded-xl border border-error/20">{error}</p>}
+          {error && (
+            <div className="text-sm text-error bg-error/10 p-4 rounded-xl border border-error/20 flex items-center gap-2">
+              <span className="font-bold">Aviso:</span> {error}
+            </div>
+          )}
 
-          <Button type="submit" size="lg" className="w-full text-base font-bold" disabled={loading}>
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full text-base font-bold h-12 shadow-lg shadow-brand/20 bg-brand hover:bg-brand/90 text-white"
+            disabled={loading}
+          >
             {loading ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin mr-2" /> Gerando Pix na AbacatePay...
               </>
             ) : (
               <>
-                Recarregar Agora com Pix <ArrowRight className="h-5 w-5 ml-2" />
+                <QrCode className="h-5 w-5 mr-2" />
+                Gerar Pix de {pricing.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} (+{pricing.credits} Créditos)
+                <ArrowRight className="h-5 w-5 ml-2" />
               </>
             )}
           </Button>
+
+          <div className="flex flex-wrap items-center justify-center gap-6 pt-2 text-xs text-text-secondary">
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className="h-4 w-4 text-brand" /> Pix com liberação automática em 5s
+            </span>
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="h-4 w-4 text-brand" /> Processado com segurança pela AbacatePay
+            </span>
+          </div>
         </CardContent>
       </Card>
     </form>
@@ -217,18 +391,18 @@ function RecargaForm() {
 
 export default function RecargaPage() {
   return (
-    <div className="min-h-screen bg-background text-text-primary">
+    <div className="min-h-screen bg-background text-text-primary flex flex-col">
       <Navbar />
-      <main className="mx-auto w-full max-w-4xl px-4 py-16">
-        <div className="text-center space-y-3 mb-12">
+      <main className="mx-auto w-full max-w-4xl px-4 py-12 flex-1">
+        <div className="text-center space-y-3 mb-10">
           <Badge variant="brand" className="mb-2">
-            <Coins className="h-3.5 w-3.5 mr-1" /> Recarga Instantânea
+            <Zap className="h-3.5 w-3.5 mr-1" /> Recarga Instantânea via Pix
           </Badge>
-          <h1 className="font-display text-3xl md:text-4xl font-bold">
-            Recarregue seus créditos do <span className="text-brand">Forja Viral</span>
+          <h1 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight">
+            Recarregue seus créditos no <span className="text-brand">Forja Viral</span>
           </h1>
-          <p className="text-text-secondary max-w-xl mx-auto text-sm md:text-base">
-            Seus créditos caem automaticamente na sua licença assim que o Pix for aprovado pela AbacatePay.
+          <p className="text-text-secondary max-w-xl mx-auto text-sm sm:text-base">
+            Desconto progressivo automático: quanto mais créditos você adicionar, mais barato fica cada vídeo cortado.
           </p>
         </div>
 

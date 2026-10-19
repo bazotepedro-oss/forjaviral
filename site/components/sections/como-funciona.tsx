@@ -1,22 +1,22 @@
-import { CheckCircle2, Rocket, CreditCard, Unlock, Headphones } from 'lucide-react';
+import { Coins, Zap, Unlock, Headphones } from 'lucide-react';
 
 const STEPS = [
-  { icon: CreditCard, title: 'Escolha um plano', description: 'Mensal, trimestral ou anual. Escolha o que melhor se encaixa no seu ritmo.' },
-  { icon: Rocket, title: 'Pague com AbacatePay', description: 'Checkout seguro via PIX ou cartão. Em minutos você confirma.' },
-  { icon: Unlock, title: 'Acesso gerado automaticamente', description: 'Nossa IA provisiona suas credenciais e link de acesso instantaneamente.' },
-  { icon: Headphones, title: 'Faça login e corte', description: 'Acesse a ferramenta no Railway e transforme vídeos em cortes virais.' },
+  { icon: Coins, title: 'Escolha seu Pacote', description: '15, 50 ou 120 créditos. Pague apenas uma vez, sem assinaturas recorrentes.' },
+  { icon: Zap, title: 'Pix Instantâneo', description: 'Checkout seguro via AbacatePay com aprovação imediata no Pix.' },
+  { icon: Unlock, title: 'Chave e Acesso Imediatos', description: 'Nossa integração provisiona sua chave de licença no Railway com seus créditos na hora.' },
+  { icon: Headphones, title: 'Corte e Viralize', description: 'Insira sua chave no Forja Viral, assista ao tutorial exclusivo e gere seus cortes prontos.' },
 ];
 
 export function ComoFunciona() {
   return (
-    <section id="como-funcion" className="border-y border-border bg-surface">
+    <section id="como-funciona" className="border-y border-border bg-surface">
       <div className="mx-auto w-full max-w-6xl px-4 py-20">
         <div className="text-center">
           <h2 className="font-display text-3xl font-bold text-text-primary md:text-4xl">
             Como funciona em <span className="text-brand">4 passos</span>
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-text-secondary">
-            Do checkout ao primeiro corte, tudo é automático.
+            Do Pix ao primeiro corte viral renderizado, tudo é 100% automático.
           </p>
         </div>
         <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">

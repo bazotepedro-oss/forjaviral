@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { createAdminSession, setAdminCookieHeader } from '@/lib/auth';
 
 const Schema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().optional(),
+  password: z.string().min(1, 'Senha obrigatória'),
 });
 
 export async function POST(req: Request) {
@@ -14,10 +14,12 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'Credenciais inválidas' }, { status: 400 });
   }
+
   const token = await createAdminSession(parsed.data.email, parsed.data.password);
   if (!token) {
-    return NextResponse.json({ error: 'Credenciais inválidas' }, { status: 401 });
+    return NextResponse.json({ error: 'Senha ou Token inválido' }, { status: 401 });
   }
+
   return NextResponse.json(
     { ok: true },
     { headers: { 'Set-Cookie': setAdminCookieHeader(token) } }

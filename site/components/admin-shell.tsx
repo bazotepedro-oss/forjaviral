@@ -24,6 +24,8 @@ import {
   Copy,
   PlusCircle,
   Search,
+  CalendarPlus,
+  Trash2,
 } from 'lucide-react';
 import type { RailwayLicense } from '@/lib/license-server';
 
@@ -220,17 +222,75 @@ function RailwayLicensesPanel({ licenses }: { licenses: RailwayLicense[] }) {
     }
   }
 
-  async function handleAddCredits(licenseKey: string) {
+  async function handleAddCredits(licenseKey: string, amount?: number) {
+    let creds = amount;
+    if (!creds) {
+      const input = window.prompt('Quantos créditos deseja adicionar à licença?', '100');
+      if (!input) return;
+      creds = parseInt(input, 10);
+      if (isNaN(creds) || creds <= 0) return;
+    }
+
     setWorkingKey(licenseKey);
     setMsg(null);
     try {
       const res = await fetch('/api/admin/licenses/add-credits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ licenseKey, credits: 100 }),
+        body: JSON.stringify({ licenseKey, credits: creds }),
       });
       const data = await res.json();
-      setMsg({ key: licenseKey, text: data.message || '+100 créditos', ok: res.ok });
+      setMsg({ key: licenseKey, text: data.message || `+${creds} créditos`, ok: res.ok });
+      if (res.ok) startTransition(() => router.refresh());
+    } catch {
+      setMsg({ key: licenseKey, text: 'Erro de conexão', ok: false });
+    } finally {
+      setWorkingKey(null);
+    }
+  }
+
+  async function handleExtendDays(licenseKey: string, daysToAdd?: number) {
+    let days = daysToAdd;
+    if (!days) {
+      const input = window.prompt('Quantos dias deseja adicionar à validade?', '30');
+      if (!input) return;
+      days = parseInt(input, 10);
+      if (isNaN(days) || days <= 0) return;
+    }
+
+    setWorkingKey(licenseKey);
+    setMsg(null);
+    try {
+      const res = await fetch('/api/admin/licenses/extend-days', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ licenseKey, days }),
+      });
+      const data = await res.json();
+      setMsg({ key: licenseKey, text: data.message || `+${days} dias`, ok: res.ok });
+      if (res.ok) startTransition(() => router.refresh());
+    } catch {
+      setMsg({ key: licenseKey, text: 'Erro de conexão', ok: false });
+    } finally {
+      setWorkingKey(null);
+    }
+  }
+
+  async function handleDelete(licenseKey: string) {
+    if (!window.confirm(`Tem certeza que deseja DELETAR permanentemente a licença ${licenseKey} do Railway?`)) {
+      return;
+    }
+
+    setWorkingKey(licenseKey);
+    setMsg(null);
+    try {
+      const res = await fetch('/api/admin/licenses/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ licenseKey }),
+      });
+      const data = await res.json();
+      setMsg({ key: licenseKey, text: data.message || 'Licença deletada', ok: res.ok });
       if (res.ok) startTransition(() => router.refresh());
     } catch {
       setMsg({ key: licenseKey, text: 'Erro de conexão', ok: false });
@@ -479,27 +539,49 @@ function RailwayLicensesPanel({ licenses }: { licenses: RailwayLicense[] }) {
                           disabled={workingKey === l.license_key}
                           onClick={() => handleAddCredits(l.license_key)}
                           className="text-xs h-7 px-2"
+                          title="Adicionar Créditos (Personalizado ou Padrão)"
                         >
-                          <PlusCircle className="h-3 w-3 mr-1 text-brand" /> +100
+                          <PlusCircle className="h-3 w-3 mr-1 text-brand" /> +Créditos
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={workingKey === l.license_key}
+                          onClick={() => handleExtendDays(l.license_key, 30)}
+                          className="text-xs h-7 px-2 text-text-secondary hover:text-text-primary border border-white/5"
+                          title="Estender Validade em +30 Dias"
+                        >
+                          <CalendarPlus className="h-3 w-3 mr-1 text-sky-400" /> +30d
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
                           disabled={workingKey === l.license_key}
                           onClick={() => handleUnbind(l.license_key)}
-                          className="text-xs h-7 px-2 text-text-secondary hover:text-text-primary"
-                          title="Desvincular HWID / Trocar de Máquina"
+                          className="text-xs h-7 px-2 text-text-secondary hover:text-text-primary border border-white/5"
+                          title="Desvincular HWID / Liberar para Trocar de PC"
                         >
                           <RotateCcw className="h-3 w-3 mr-1" /> Unbind
+                        </Button>
+                        <Button
+                          variant={l.status === 'blocked' ? 'secondary' : 'ghost'}
+                          size="sm"
+                          disabled={workingKey === l.license_key}
+                          onClick={() => handleToggle(l.license_key)}
+                          className="text-xs h-7 px-2 border border-white/5"
+                          title={l.status === 'blocked' ? 'Desbloquear Licença' : 'Bloquear Licença'}
+                        >
+                          <ShieldOff className="h-3 w-3 text-amber-400" />
                         </Button>
                         <Button
                           variant="danger"
                           size="sm"
                           disabled={workingKey === l.license_key}
-                          onClick={() => handleToggle(l.license_key)}
+                          onClick={() => handleDelete(l.license_key)}
                           className="text-xs h-7 px-2"
+                          title="Deletar Licença Permanentemente do Railway"
                         >
-                          <ShieldOff className="h-3 w-3" />
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
                       {msg?.key === l.license_key && (

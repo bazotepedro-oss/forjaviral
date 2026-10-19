@@ -34,11 +34,17 @@ export function Navbar() {
               {item.label}
             </Link>
           ))}
+          <Link href="/recarga" className="text-sm font-semibold text-brand hover:text-brand/80 transition-colors flex items-center gap-1">
+            <span>⚡ Recarregar</span>
+          </Link>
         </nav>
 
         <div className="flex items-center gap-2">
+          <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex border-brand/40 text-brand hover:bg-brand/10">
+            <Link href="/recarga">Recarregar</Link>
+          </Button>
           <Button asChild size="sm" className="hidden sm:inline-flex">
-            <Link href="#planos">Começar agora</Link>
+            <Link href="/#planos">Começar agora</Link>
           </Button>
           <button
             className="inline-flex md:hidden"
