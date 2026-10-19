@@ -47,7 +47,7 @@ APP_ID = "forja-viral"
 
 # Put your Ed25519 PUBLIC KEY (base64) here (32 bytes).
 # Example (placeholder): "M0X3...=="
-PUBLIC_KEY_B64 = "tcS+ltV825xY+xAejyE8TSBDok0nfi6YI4lMUws87Mg="
+PUBLIC_KEY_B64 = "/PbGBV7fZJwKUjJTcMLRrkmiIkg++Wx3gJ6q2bGGXAs="
 
 # If you want to rotate keys later, you can add a list of keys and accept any.
 PUBLIC_KEYS_B64 = [PUBLIC_KEY_B64]
