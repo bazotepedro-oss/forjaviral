@@ -8,7 +8,7 @@ import { getPlanId, createCheckout } from '@/lib/abacatepay';
 import { generateId, parsePlanIds } from '@/lib/utils';
 
 const Schema = z.object({
-  slug: z.enum(['pack_teste', 'pack_criador', 'pack_escala', 'mensal', 'trimestral', 'anual']),
+  slug: z.string().min(1, 'Plano obrigatório'),
   name: z.string().min(2, 'Nome muito curto').max(120),
   email: z.string().email('E-mail inválido'),
   phone: z.string().max(30).optional(),

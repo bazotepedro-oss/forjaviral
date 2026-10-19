@@ -26,6 +26,7 @@ import {
   Search,
   CalendarPlus,
   Trash2,
+  Edit2,
 } from 'lucide-react';
 import type { RailwayLicense } from '@/lib/license-server';
 
@@ -733,6 +734,77 @@ function CustomersPanel({ customers }: { customers: Customer[] }) {
   const [msg, setMsg] = useState<{ key: string; text: string; ok: boolean } | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+  // Edit state
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editLicenseKey, setEditLicenseKey] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [clearingCrm, setClearingCrm] = useState(false);
+
+  function startEdit(c: Customer) {
+    setEditingCustomer(c);
+    setEditName(c.name);
+    setEditEmail(c.email);
+    setEditPhone(c.phone || '');
+    setEditLicenseKey(c.credentials?.[0]?.licenseKey || '');
+  }
+
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingCustomer) return;
+    setSavingEdit(true);
+    try {
+      const res = await fetch('/api/admin/customers/edit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId: editingCustomer.id,
+          name: editName,
+          email: editEmail,
+          phone: editPhone,
+          licenseKey: editLicenseKey || undefined,
+        }),
+      });
+      if (res.ok) {
+        setEditingCustomer(null);
+        startTransition(() => router.refresh());
+      }
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function handleDeleteCustomer(customerId: string, customerName: string) {
+    if (!window.confirm(`Tem certeza que deseja remover o cliente "${customerName}" do CRM?`)) {
+      return;
+    }
+    try {
+      const res = await fetch('/api/admin/customers/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId }),
+      });
+      if (res.ok) startTransition(() => router.refresh());
+    } catch {
+      alert('Erro ao excluir cliente');
+    }
+  }
+
+  async function handleClearCrm() {
+    if (!window.confirm('ATENÇÃO: Deseja realmente LIMPAR TODO O CRM? Todos os clientes, pedidos e credenciais locais serão apagados.')) {
+      return;
+    }
+    setClearingCrm(true);
+    try {
+      const res = await fetch('/api/admin/customers/clear', { method: 'POST' });
+      if (res.ok) startTransition(() => router.refresh());
+    } finally {
+      setClearingCrm(false);
+    }
+  }
+
   const filtered = customers.filter((c) => {
     const term = q.toLowerCase();
     const lk = c.credentials?.[0]?.licenseKey?.toLowerCase() || '';
@@ -809,7 +881,7 @@ function CustomersPanel({ customers }: { customers: Customer[] }) {
 
   return (
     <div className="space-y-4">
-      {/* Barra de Busca do CRM */}
+      {/* Barra de Busca do CRM e Limpar CRM */}
       <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-surface/50 p-4 rounded-xl border border-border">
         <div className="relative w-full sm:w-96">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-secondary" />
@@ -821,10 +893,90 @@ function CustomersPanel({ customers }: { customers: Customer[] }) {
             className="w-full pl-9 pr-4 py-2 text-sm bg-background border border-border rounded-lg text-text-primary placeholder:text-text-secondary focus:outline-none focus:border-brand"
           />
         </div>
-        <div className="text-xs text-text-secondary w-full sm:w-auto text-right">
-          Total de Clientes no CRM: <strong className="text-text-primary">{filtered.length}</strong>
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+          <span className="text-xs text-text-secondary">
+            Clientes: <strong className="text-text-primary">{filtered.length}</strong>
+          </span>
+          <Button
+            variant="danger"
+            size="sm"
+            disabled={clearingCrm || customers.length === 0}
+            onClick={handleClearCrm}
+            className="text-xs h-8"
+            title="Apagar todos os clientes e pedidos de teste"
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-1" />
+            {clearingCrm ? 'Limpando...' : 'Limpar Todo o CRM'}
+          </Button>
         </div>
       </div>
+
+      {/* Modal / Formulário de Edição */}
+      {editingCustomer && (
+        <form onSubmit={handleSaveEdit} className="p-4 rounded-xl border border-brand/50 bg-surface/90 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
+              <Edit2 className="w-4 h-4 text-brand" /> Editar Cliente: {editingCustomer.name}
+            </h4>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setEditingCustomer(null)}
+              className="text-xs h-7 px-2"
+            >
+              Cancelar
+            </Button>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-4">
+            <div>
+              <label className="text-xs text-text-secondary block mb-1">Nome Completo</label>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                required
+                className="w-full px-3 py-1.5 text-sm bg-background border border-border rounded-lg text-text-primary"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-text-secondary block mb-1">E-mail</label>
+              <input
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                required
+                className="w-full px-3 py-1.5 text-sm bg-background border border-border rounded-lg text-text-primary"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-text-secondary block mb-1">WhatsApp / Telefone</label>
+              <input
+                type="text"
+                value={editPhone}
+                onChange={(e) => setEditPhone(e.target.value)}
+                placeholder="DDD + Número"
+                className="w-full px-3 py-1.5 text-sm bg-background border border-border rounded-lg text-text-primary"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-text-secondary block mb-1">Chave de Licença</label>
+              <input
+                type="text"
+                value={editLicenseKey}
+                onChange={(e) => setEditLicenseKey(e.target.value.toUpperCase())}
+                placeholder="FV-XXXXX-XXXXX"
+                className="w-full px-3 py-1.5 text-sm bg-background border border-border rounded-lg text-text-primary font-mono uppercase"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end pt-1">
+            <Button type="submit" size="sm" disabled={savingEdit} className="text-xs font-bold">
+              {savingEdit ? 'Salvando...' : 'Salvar Alterações'}
+            </Button>
+          </div>
+        </form>
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -842,7 +994,7 @@ function CustomersPanel({ customers }: { customers: Customer[] }) {
             {filtered.length === 0 && (
               <tr>
                 <td colSpan={6} className="py-12 text-center text-text-secondary">
-                  Nenhum cliente encontrado.
+                  Nenhum cliente no CRM.
                 </td>
               </tr>
             )}
@@ -915,55 +1067,77 @@ function CustomersPanel({ customers }: { customers: Customer[] }) {
 
                   {/* Ações CRM */}
                   <td className="py-3 px-4">
-                    {lk ? (
-                      <div className="flex flex-col gap-1.5">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {/* Adicionar +100 Créditos */}
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            disabled={workingKey === lk}
-                            onClick={() => handleAddCredits(lk)}
-                            className="text-xs h-7 px-2"
-                            title="Recarregar +100 créditos no servidor Railway"
-                          >
-                            <PlusCircle className="h-3 w-3 mr-1 text-brand" /> +100 Créditos
-                          </Button>
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {lk && (
+                          <>
+                            {/* Adicionar +100 Créditos */}
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              disabled={workingKey === lk}
+                              onClick={() => handleAddCredits(lk)}
+                              className="text-xs h-7 px-2"
+                              title="Recarregar +100 créditos no servidor Railway"
+                            >
+                              <PlusCircle className="h-3 w-3 mr-1 text-brand" /> +100
+                            </Button>
 
-                          {/* Resetar HWID (Unbind PC) */}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={workingKey === lk}
-                            onClick={() => handleUnbind(lk)}
-                            className="text-xs h-7 px-2 text-text-secondary hover:text-text-primary"
-                            title="Desvincular HWID / Trocar de Computador"
-                          >
-                            <RotateCcw className="h-3 w-3 mr-1" /> Resetar PC
-                          </Button>
+                            {/* Resetar HWID (Unbind PC) */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={workingKey === lk}
+                              onClick={() => handleUnbind(lk)}
+                              className="text-xs h-7 px-2 text-text-secondary hover:text-text-primary border border-white/5"
+                              title="Desvincular HWID / Trocar de Computador"
+                            >
+                              <RotateCcw className="h-3 w-3 mr-1" /> Unbind
+                            </Button>
 
-                          {/* Bloquear / Ativar */}
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            disabled={workingKey === lk}
-                            onClick={() => handleToggle(lk)}
-                            className="text-xs h-7 px-2"
-                            title="Bloquear ou reativar licença"
-                          >
-                            <ShieldOff className="h-3 w-3" />
-                          </Button>
-                        </div>
-
-                        {msg?.key === lk && (
-                          <span className={`text-[11px] ${msg.ok ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {msg.text}
-                          </span>
+                            {/* Bloquear / Ativar */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={workingKey === lk}
+                              onClick={() => handleToggle(lk)}
+                              className="text-xs h-7 px-2 border border-white/5"
+                              title="Bloquear ou reativar licença"
+                            >
+                              <ShieldOff className="h-3 w-3 text-amber-400" />
+                            </Button>
+                          </>
                         )}
+
+                        {/* Editar Cliente */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startEdit(c)}
+                          className="text-xs h-7 px-2 text-sky-400 hover:text-sky-300 border border-sky-400/20 hover:bg-sky-400/10"
+                          title="Editar dados do cliente"
+                        >
+                          <Edit2 className="h-3 w-3 mr-1" /> Editar
+                        </Button>
+
+                        {/* Excluir do CRM */}
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => handleDeleteCustomer(c.id, c.name)}
+                          className="text-xs h-7 px-2"
+                          title="Remover cliente do CRM"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                       </div>
-                    ) : (
-                      <span className="text-xs text-text-secondary">—</span>
-                    )}
+
+                      {msg && msg.key === lk && (
+                        <span className={`text-[11px] ${msg.ok ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {msg.text}
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

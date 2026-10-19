@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 const schema = z.object({
-  slug: z.enum(['pack_teste', 'pack_criador', 'pack_escala', 'mensal', 'trimestral', 'anual']),
+  slug: z.string().min(1, 'Selecione um plano'),
   name: z.string().min(2, 'Nome muito curto').max(120),
   email: z.string().email('E-mail inválido'),
   phone: z.string().max(30).optional(),
@@ -20,7 +20,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 interface CheckoutFormProps {
-  defaultSlug?: 'pack_teste' | 'pack_criador' | 'pack_escala' | 'mensal' | 'trimestral' | 'anual';
+  defaultSlug?: string;
 }
 
 export function CheckoutForm({ defaultSlug = 'pack_criador' }: CheckoutFormProps) {
@@ -78,8 +78,10 @@ export function CheckoutForm({ defaultSlug = 'pack_criador' }: CheckoutFormProps
             {...register('slug')}
           >
             <option value="pack_teste">Pack Teste (15 Vídeos) — R$ 19,90</option>
-            <option value="pack_criador">Pack Criador (50 Vídeos) — R$ 39,90 [Recomendado]</option>
+            <option value="pack_iniciante">Pack Iniciante (30 Vídeos) — R$ 29,90</option>
+            <option value="pack_criador">Pack Criador (50 Vídeos) — R$ 39,90 [Mais Popular 🔥]</option>
             <option value="pack_escala">Pack Escala (120 Vídeos) — R$ 79,90 [Melhor Custo]</option>
+            <option value="pack_pro">Pack Agência / Pro (250 Vídeos) — R$ 139,90</option>
           </select>
         </div>
 
