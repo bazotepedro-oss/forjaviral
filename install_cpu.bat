@@ -1,5 +1,6 @@
 @echo off
 setlocal ENABLEDELAYEDEXPANSION
+cd /d "%~dp0"
 
 echo ===============================
 echo Forja Viral - Install (CPU)
@@ -18,7 +19,7 @@ echo Installing Torch CPU...
 pip install torch==2.3.1+cpu torchaudio==2.3.1+cpu --index-url https://download.pytorch.org/whl/cpu
 
 echo Installing common requirements (locked)...
-pip install -r requirements_common.txt -c constraints.txt
+pip install -r "%~dp0requirements_common.txt" -c "%~dp0constraints.txt"
 
 echo Done.
 pause

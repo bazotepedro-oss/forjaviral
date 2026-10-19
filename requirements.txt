@@ -1,4 +1,4 @@
-# Outras dependencias essenciais
+# Dependencias essenciais do Forja Viral
 numpy<2.1.0
 g4f[all]
 yt-dlp
@@ -14,5 +14,6 @@ fastapi
 uvicorn
 deep-translator
 tqdm
-onnxruntime-gpu
 google-generativeai
+requests
+cryptography

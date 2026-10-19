@@ -1,4 +1,8 @@
 @echo off
+setlocal
+cd /d "%~dp0"
+set "PATH=%USERPROFILE%\.local\bin;%LOCALAPPDATA%\uv;%PATH%"
+
 echo ==========================================
 echo Instalando uv (Gerenciador de pacotes rapido Python)...
 echo ==========================================
@@ -8,7 +12,6 @@ echo.
 echo ==========================================
 echo Criando ambiente virtual (.venv)...
 echo ==========================================
-:: Tenta usar o uv do PATH. Se falhar, pode ser necessario reiniciar o terminal.
 uv venv
 
 echo.
@@ -41,7 +44,7 @@ echo ==========================================
 echo Instalando TODAS as dependencias (INCLUINDO MODELOS LOCAIS LLM)
 echo Atenção: Processo mais demorado. Requer C++ Build Tools.
 echo ==========================================
-uv pip install -r requirements.txt
+uv pip install -r "%~dp0requirements.txt"
 
 echo.
 echo ==========================================
