@@ -18,6 +18,33 @@ export function getLicenseAdminToken(): string {
   return process.env.FORJA_LICENSE_ADMIN_TOKEN || 'FV291125';
 }
 
+export interface RailwayLicense {
+  license_key: string;
+  hwid?: string | null;
+  exp: number;
+  credits: number;
+  plan: string;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Busca todas as licenças diretamente do PostgreSQL do Railway via JSON API.
+ */
+export async function listLicensesFromServer(): Promise<RailwayLicense[]> {
+  const url = `${getLicenseServerUrl()}/admin/api/licenses?token=${encodeURIComponent(getLicenseAdminToken())}`;
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json.licenses || [];
+  } catch (e) {
+    console.error('Falha ao listar licenças do Railway:', e);
+    return [];
+  }
+}
+
 /**
  * Cria uma nova licença no servidor Railway com créditos e dias de validade.
  */

@@ -25,6 +25,7 @@ import {
   PlusCircle,
   Search,
 } from 'lucide-react';
+import type { RailwayLicense } from '@/lib/license-server';
 
 // ── Types (mirrored from Prisma) ──────────────────────────────────────────────
 
@@ -105,6 +106,7 @@ interface AdminShellProps {
   customers: Customer[];
   credentials: Credential[];
   events: WebhookEvent[];
+  railwayLicenses?: RailwayLicense[];
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -144,16 +146,378 @@ function StatusBadge({ status }: { status: string }) {
 // ── Tab config ────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'orders',        label: 'Pedidos',         Icon: ShoppingCart },
-  { id: 'subscriptions', label: 'Assinaturas',     Icon: RefreshCcw   },
-  { id: 'customers',     label: 'CRM & WhatsApp',  Icon: Users        },
-  { id: 'credentials',   label: 'Credenciais',     Icon: Key          },
-  { id: 'events',        label: 'Webhooks',        Icon: Webhook      },
+  { id: 'customers',     label: 'CRM & WhatsApp',     Icon: Users        },
+  { id: 'licenses',      label: 'Licenças Railway',    Icon: Key          },
+  { id: 'orders',        label: 'Pedidos',            Icon: ShoppingCart },
+  { id: 'subscriptions', label: 'Assinaturas',        Icon: RefreshCcw   },
+  { id: 'credentials',   label: 'Credenciais',        Icon: Key          },
+  { id: 'events',        label: 'Webhooks',           Icon: Webhook      },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
 
-// ── Sub-panels ────────────────────────────────────────────────────────────────
+function RailwayLicensesPanel({ licenses }: { licenses: RailwayLicense[] }) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  const [q, setQ] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createMsg, setCreateMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  // Form state
+  const [formKey, setFormKey] = useState('');
+  const [formCredits, setFormCredits] = useState('100');
+  const [formDays, setFormDays] = useState('30');
+  const [formPlan, setFormPlan] = useState('pro');
+  const [formName, setFormName] = useState('');
+  const [formEmail, setFormEmail] = useState('');
+  const [formPhone, setFormPhone] = useState('');
+
+  const [workingKey, setWorkingKey] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ key: string; text: string; ok: boolean } | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const filtered = licenses.filter((l) => {
+    const term = q.toLowerCase();
+    return (
+      l.license_key.toLowerCase().includes(term) ||
+      (l.plan || '').toLowerCase().includes(term) ||
+      (l.hwid || '').toLowerCase().includes(term)
+    );
+  });
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setCreating(true);
+    setCreateMsg(null);
+    try {
+      const res = await fetch('/api/admin/licenses/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          licenseKey: formKey.trim() || undefined,
+          credits: Number(formCredits) || 100,
+          days: Number(formDays) || 30,
+          plan: formPlan,
+          name: formName.trim() || undefined,
+          email: formEmail.trim() || undefined,
+          phone: formPhone.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      setCreateMsg({ text: data.message || (res.ok ? 'Criada!' : data.error), ok: res.ok });
+      if (res.ok) {
+        setFormKey('');
+        setFormName('');
+        setFormEmail('');
+        setFormPhone('');
+        startTransition(() => router.refresh());
+      }
+    } catch {
+      setCreateMsg({ text: 'Erro de conexão', ok: false });
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleAddCredits(licenseKey: string) {
+    setWorkingKey(licenseKey);
+    setMsg(null);
+    try {
+      const res = await fetch('/api/admin/licenses/add-credits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ licenseKey, credits: 100 }),
+      });
+      const data = await res.json();
+      setMsg({ key: licenseKey, text: data.message || '+100 créditos', ok: res.ok });
+      if (res.ok) startTransition(() => router.refresh());
+    } catch {
+      setMsg({ key: licenseKey, text: 'Erro de conexão', ok: false });
+    } finally {
+      setWorkingKey(null);
+    }
+  }
+
+  async function handleUnbind(licenseKey: string) {
+    setWorkingKey(licenseKey);
+    setMsg(null);
+    try {
+      const res = await fetch('/api/admin/licenses/unbind', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ licenseKey }),
+      });
+      const data = await res.json();
+      setMsg({ key: licenseKey, text: data.message || 'HWID resetado', ok: res.ok });
+      if (res.ok) startTransition(() => router.refresh());
+    } catch {
+      setMsg({ key: licenseKey, text: 'Erro de conexão', ok: false });
+    } finally {
+      setWorkingKey(null);
+    }
+  }
+
+  async function handleToggle(licenseKey: string) {
+    setWorkingKey(licenseKey);
+    setMsg(null);
+    try {
+      const res = await fetch('/api/admin/licenses/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ licenseKey }),
+      });
+      const data = await res.json();
+      setMsg({ key: licenseKey, text: data.message || 'Status alterado', ok: res.ok });
+      if (res.ok) startTransition(() => router.refresh());
+    } catch {
+      setMsg({ key: licenseKey, text: 'Erro de conexão', ok: false });
+    } finally {
+      setWorkingKey(null);
+    }
+  }
+
+  const copyToClipboard = (key: string) => {
+    navigator.clipboard.writeText(key);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  return (
+    <div className="space-y-4 p-4">
+      {/* Top action bar */}
+      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <div className="relative w-full sm:w-96">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-secondary" />
+          <input
+            type="text"
+            placeholder="Buscar por chave, plano ou HWID..."
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-sm bg-background border border-border rounded-lg text-text-primary placeholder:text-text-secondary focus:outline-none focus:border-brand"
+          />
+        </div>
+        <Button onClick={() => setShowCreate(!showCreate)} size="sm">
+          <PlusCircle className="w-4 h-4 mr-1.5" />
+          {showCreate ? 'Fechar Formulário' : '+ Criar Nova Chave'}
+        </Button>
+      </div>
+
+      {/* Formulário de criação de chave */}
+      {showCreate && (
+        <form onSubmit={handleCreate} className="p-5 rounded-xl border border-brand/40 bg-surface/80 space-y-4">
+          <h3 className="font-bold text-sm text-text-primary flex items-center gap-2">
+            <Key className="w-4 h-4 text-brand" />
+            Criar Nova Licença no Railway (+ Cadastrar no CRM)
+          </h3>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label className="text-xs text-text-secondary block mb-1">Chave Personalizada (opcional)</label>
+              <input
+                type="text"
+                placeholder="Deixe vazio para gerar FV-XXXX"
+                value={formKey}
+                onChange={(e) => setFormKey(e.target.value.toUpperCase())}
+                className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg text-text-primary font-mono uppercase"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-text-secondary block mb-1">Créditos</label>
+              <input
+                type="number"
+                value={formCredits}
+                onChange={(e) => setFormCredits(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg text-text-primary"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-xs text-text-secondary block mb-1">Validade (dias)</label>
+              <input
+                type="number"
+                value={formDays}
+                onChange={(e) => setFormDays(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg text-text-primary"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-4">
+            <div>
+              <label className="text-xs text-text-secondary block mb-1">Plano</label>
+              <select
+                value={formPlan}
+                onChange={(e) => setFormPlan(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg text-text-primary"
+              >
+                <option value="mensal">Mensal</option>
+                <option value="trimestral">Trimestral</option>
+                <option value="anual">Anual</option>
+                <option value="pro">Pro</option>
+                <option value="custom">Personalizado</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-text-secondary block mb-1">Nome do Cliente (para CRM)</label>
+              <input
+                type="text"
+                placeholder="Ex: Pedro Silva"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg text-text-primary"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-text-secondary block mb-1">E-mail do Cliente</label>
+              <input
+                type="email"
+                placeholder="Ex: pedro@gmail.com"
+                value={formEmail}
+                onChange={(e) => setFormEmail(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg text-text-primary"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-text-secondary block mb-1">WhatsApp / Telefone</label>
+              <input
+                type="text"
+                placeholder="Ex: 11999999999"
+                value={formPhone}
+                onChange={(e) => setFormPhone(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg text-text-primary"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-2">
+            {createMsg && (
+              <span className={`text-xs ${createMsg.ok ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {createMsg.text}
+              </span>
+            )}
+            <Button type="submit" size="sm" disabled={creating} className="ml-auto">
+              {creating ? 'Criando no Railway...' : 'Criar Licença Agora'}
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {/* Tabela de Licenças */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-white/10 text-text-secondary text-xs uppercase tracking-wider">
+              <th className="text-left py-3 px-4 font-medium">Chave de Licença</th>
+              <th className="text-left py-3 px-4 font-medium">Plano</th>
+              <th className="text-left py-3 px-4 font-medium">Créditos</th>
+              <th className="text-left py-3 px-4 font-medium">HWID / Máquina</th>
+              <th className="text-left py-3 px-4 font-medium">Status</th>
+              <th className="text-left py-3 px-4 font-medium">Validade</th>
+              <th className="text-left py-3 px-4 font-medium">Ações (Railway)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={7} className="py-12 text-center text-text-secondary">
+                  Nenhuma licença encontrada no servidor Railway.
+                </td>
+              </tr>
+            )}
+            {filtered.map((l) => {
+              const expDate = l.exp ? new Date(l.exp * 1000).toLocaleDateString('pt-BR') : '—';
+              const isExpired = l.exp ? l.exp * 1000 < Date.now() : false;
+
+              return (
+                <tr key={l.license_key} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-2">
+                      <code className="font-mono text-xs text-brand font-bold bg-brand/10 px-2 py-0.5 rounded border border-brand/20">
+                        {l.license_key}
+                      </code>
+                      <button
+                        onClick={() => copyToClipboard(l.license_key)}
+                        title="Copiar chave"
+                        className="text-text-secondary hover:text-text-primary"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                      {copiedKey === l.license_key && <span className="text-[10px] text-emerald-400">Copiada!</span>}
+                    </div>
+                  </td>
+                  <td className="py-3 px-4 capitalize text-text-primary">{l.plan}</td>
+                  <td className="py-3 px-4 font-bold text-text-primary">
+                    <span className="inline-flex items-center gap-1">
+                      <Zap className="h-3.5 w-3.5 text-brand" />
+                      {l.credits}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 font-mono text-[11px] text-text-secondary">
+                    {l.hwid ? (
+                      <span className="truncate max-w-[120px] inline-block" title={l.hwid}>
+                        {l.hwid.slice(0, 12)}...
+                      </span>
+                    ) : (
+                      <span className="text-emerald-400 font-sans text-xs">Livre (sem amarração)</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4">
+                    {isExpired ? (
+                      <Badge variant="outline">Expirado</Badge>
+                    ) : (
+                      <StatusBadge status={l.status} />
+                    )}
+                  </td>
+                  <td className="py-3 px-4 text-xs text-text-secondary">{expDate}</td>
+                  <td className="py-3 px-4">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={workingKey === l.license_key}
+                          onClick={() => handleAddCredits(l.license_key)}
+                          className="text-xs h-7 px-2"
+                        >
+                          <PlusCircle className="h-3 w-3 mr-1 text-brand" /> +100
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={workingKey === l.license_key}
+                          onClick={() => handleUnbind(l.license_key)}
+                          className="text-xs h-7 px-2 text-text-secondary hover:text-text-primary"
+                          title="Desvincular HWID / Trocar de Máquina"
+                        >
+                          <RotateCcw className="h-3 w-3 mr-1" /> Unbind
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          disabled={workingKey === l.license_key}
+                          onClick={() => handleToggle(l.license_key)}
+                          className="text-xs h-7 px-2"
+                        >
+                          <ShieldOff className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      {msg?.key === l.license_key && (
+                        <span className={`text-[11px] ${msg.ok ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {msg.text}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 function OrdersPanel({ orders }: { orders: Order[] }) {
   const router = useRouter();
@@ -736,8 +1100,9 @@ export function AdminShell({
   customers,
   credentials,
   events,
+  railwayLicenses = [],
 }: AdminShellProps) {
-  const [activeTab, setActiveTab] = useState<TabId>('orders');
+  const [activeTab, setActiveTab] = useState<TabId>('customers');
   const router = useRouter();
 
   const paidOrders = orders.filter((o) => o.status === 'paid').length;
@@ -752,17 +1117,19 @@ export function AdminShell({
   }
 
   const panels: Record<TabId, React.ReactNode> = {
+    customers: <CustomersPanel customers={customers} />,
+    licenses: <RailwayLicensesPanel licenses={railwayLicenses || []} />,
     orders: <OrdersPanel orders={orders} />,
     subscriptions: <SubscriptionsPanel subscriptions={subscriptions} />,
-    customers: <CustomersPanel customers={customers} />,
     credentials: <CredentialsPanel credentials={credentials} />,
     events: <EventsPanel events={events} />,
   };
 
   const counts: Record<TabId, number> = {
+    customers: customers.length,
+    licenses: (railwayLicenses || []).length,
     orders: orders.length,
     subscriptions: subscriptions.length,
-    customers: customers.length,
     credentials: credentials.length,
     events: events.length,
   };
@@ -778,7 +1145,7 @@ export function AdminShell({
             </div>
             <span className="font-bold text-text-primary">Forja Viral</span>
             <ChevronRight className="w-4 h-4 text-text-secondary" />
-            <span className="text-text-secondary text-sm">Admin</span>
+            <span className="text-text-secondary text-sm">Admin & CRM</span>
           </div>
           <Button
             variant="ghost"
@@ -794,11 +1161,12 @@ export function AdminShell({
 
       <main className="max-w-screen-xl mx-auto px-6 py-8 space-y-8">
         {/* Stats row */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <section className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <StatCard label="Receita (pagos)" value={formatPrice(revenue)} icon={ShoppingCart} accent />
+          <StatCard label="Licenças Railway" value={(railwayLicenses || []).length} icon={Key} />
+          <StatCard label="Clientes CRM" value={customers.length} icon={Users} />
           <StatCard label="Pedidos pagos" value={paidOrders} icon={CheckCircle2} />
           <StatCard label="Assinaturas ativas" value={activeSubs} icon={RefreshCcw} />
-          <StatCard label="Clientes" value={customers.length} icon={Users} />
         </section>
 
         {/* Tab panel */}

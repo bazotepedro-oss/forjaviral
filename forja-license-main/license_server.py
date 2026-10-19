@@ -484,6 +484,37 @@ async def admin(req: Request) -> HTMLResponse:
     return HTMLResponse(_admin_page_html(tok, q, limit, items, meta))
 
 
+@app.get("/admin/api/licenses")
+async def admin_api_licenses(req: Request) -> JSONResponse:
+    tok = _require_admin(req)
+    q = (req.query_params.get("q") or "").strip().lower()
+    limit = int(req.query_params.get("limit") or 1000)
+
+    with _db() as con:
+        with con.cursor() as cur:
+            if q:
+                cur.execute(
+                    "SELECT license_key, hwid, exp, credits, plan, status, created_at, updated_at FROM licenses "
+                    "WHERE lower(license_key) LIKE %s OR lower(coalesce(hwid,'')) LIKE %s "
+                    "ORDER BY created_at DESC LIMIT %s",
+                    (f"%{q}%", f"%{q}%", limit),
+                )
+            else:
+                cur.execute(
+                    "SELECT license_key, hwid, exp, credits, plan, status, created_at, updated_at FROM licenses "
+                    "ORDER BY created_at DESC LIMIT %s",
+                    (limit,),
+                )
+            rows = [dict(x) for x in (cur.fetchall() or [])]
+            for r in rows:
+                if r.get("created_at"):
+                    r["created_at"] = str(r["created_at"])
+                if r.get("updated_at"):
+                    r["updated_at"] = str(r["updated_at"])
+
+    return JSONResponse({"ok": True, "licenses": rows})
+
+
 @app.post("/admin/action")
 async def admin_action(req: Request) -> RedirectResponse:
     tok = _require_admin(req)

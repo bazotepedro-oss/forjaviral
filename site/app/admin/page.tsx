@@ -1,10 +1,11 @@
 import { prisma } from '@/lib/db';
 import { AdminShell } from '@/components/admin-shell';
+import { listLicensesFromServer } from '@/lib/license-server';
 
 export const revalidate = 0;
 
 export default async function AdminPage() {
-  const [orders, subscriptions, customers, credentials, events] = await Promise.all([
+  const [orders, subscriptions, customers, credentials, events, railwayLicenses] = await Promise.all([
     prisma.order.findMany({ include: { customer: true, plan: true }, orderBy: { createdAt: 'desc' }, take: 50 }),
     prisma.subscription.findMany({ include: { customer: true, plan: true }, orderBy: { createdAt: 'desc' }, take: 50 }),
     prisma.customer.findMany({
@@ -17,6 +18,7 @@ export default async function AdminPage() {
     }),
     prisma.accessCredentials.findMany({ include: { customer: true, order: true }, orderBy: { createdAt: 'desc' }, take: 50 }),
     prisma.webhookEvent.findMany({ orderBy: { createdAt: 'desc' }, take: 50 }),
+    listLicensesFromServer(),
   ]);
 
   return (
@@ -26,6 +28,7 @@ export default async function AdminPage() {
       customers={customers}
       credentials={credentials}
       events={events}
+      railwayLicenses={railwayLicenses}
     />
   );
 }
