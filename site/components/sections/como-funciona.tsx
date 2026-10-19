@@ -1,10 +1,10 @@
 import { Coins, Zap, Unlock, Headphones } from 'lucide-react';
 
 const STEPS = [
-  { icon: Coins, title: 'Escolha seu Pacote', description: '15, 50 ou 120 créditos. Pague apenas uma vez, sem assinaturas recorrentes.' },
-  { icon: Zap, title: 'Pix Instantâneo', description: 'Checkout seguro via AbacatePay com aprovação imediata no Pix.' },
-  { icon: Unlock, title: 'Chave e Acesso Imediatos', description: 'Nossa integração provisiona sua chave de licença no Railway com seus créditos na hora.' },
-  { icon: Headphones, title: 'Corte e Viralize', description: 'Insira sua chave no Forja Viral, assista ao tutorial exclusivo e gere seus cortes prontos.' },
+  { icon: Coins, title: 'Escolha seu Pacote', description: 'De 15 até 250 créditos ou monte uma quantidade avulsa sob medida. Sem assinatura no cartão.' },
+  { icon: Zap, title: 'Pix Instantâneo', description: 'Checkout seguro com QR Code Pix via AbacatePay e aprovação em menos de 5 segundos.' },
+  { icon: Unlock, title: 'Chave e Acesso Imediatos', description: 'Nossa integração com o Railway provisiona sua licença e créditos instantaneamente na tela e no e-mail.' },
+  { icon: Headphones, title: 'Corte e Viralize', description: 'Cole o link do podcast no PC ou Google Colab Nuvem e receba os cortes verticais com legendas em minutos.' },
 ];
 
 export function ComoFunciona() {

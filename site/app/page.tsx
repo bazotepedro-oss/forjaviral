@@ -4,6 +4,7 @@ import { Footer } from '@/components/footer';
 import { Hero } from '@/components/sections/hero';
 import { ComoFunciona } from '@/components/sections/como-funciona';
 import { Recursos } from '@/components/sections/recursos';
+import { ComparativoSection } from '@/components/sections/comparativo';
 import { Depoimentos } from '@/components/sections/depoimentos';
 import { PlanosSection } from '@/components/sections/planos-section';
 import { FAQSection } from '@/components/sections/faq-section';
@@ -20,6 +21,7 @@ export default async function HomePage() {
       <Hero />
       <ComoFunciona />
       <Recursos />
+      <ComparativoSection />
       <Depoimentos />
       <PlanosSection plans={plans} />
       <FAQSection />
