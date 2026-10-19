@@ -51,6 +51,22 @@ uv pip install -r "%~dp0requirements.txt" --extra-index-url https://download.pyt
 
 echo.
 echo ==========================================
+echo Verificando FFmpeg...
+echo ==========================================
+if exist "%USERPROFILE%\.local\bin\ffmpeg.exe" (
+    copy /y "%USERPROFILE%\.local\bin\ff*.exe" ".venv\Scripts\" >nul 2>&1
+) else (
+    where ffmpeg >nul 2>&1
+    if %ERRORLEVEL% NEQ 0 (
+        echo Instalando FFmpeg...
+        winget install --id Gyan.FFmpeg.Essentials -e --accept-source-agreements --accept-package-agreements >nul 2>&1
+        copy /y "%LOCALAPPDATA%\Microsoft\WinGet\Packages\Gyan.FFmpeg.Essentials*\*\bin\ff*.exe" "%USERPROFILE%\.local\bin\" >nul 2>&1
+        copy /y "%LOCALAPPDATA%\Microsoft\WinGet\Packages\Gyan.FFmpeg.Essentials*\*\bin\ff*.exe" ".venv\Scripts\" >nul 2>&1
+    )
+)
+
+echo.
+echo ==========================================
 echo Concluido!
 echo ==========================================
 pause

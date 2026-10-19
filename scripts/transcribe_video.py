@@ -263,15 +263,13 @@ def transcribe(input_file, model_name='large-v3', project_folder='tmp'):
             model = whisperx.load_model(
                 model_name, 
                 device, 
-                compute_type="float16",
-                language="pt",
-                asr_options={"hotwords": None},
-                vad_method="silero"
+                compute_type=compute_type,
+                asr_options={"hotwords": None}
             )
 
             result = model.transcribe(
                 audio, 
-                batch_size=4, 
+                batch_size=16, 
                 chunk_size=10
             )
             
