@@ -139,12 +139,12 @@ Write-Host ""
 Write-Host "[Passo 5/6] Instalando PyTorch e aceleradores de IA..." -ForegroundColor Cyan
 if ($choice -eq "1") {
     Write-Host " - Modo GPU: Instalando PyTorch com aceleracao CUDA 12.1..." -ForegroundColor Yellow
-    & uv pip install torch==2.3.1+cu121 torchaudio==2.3.1+cu121 --index-url https://download.pytorch.org/whl/cu121
-    & uv pip install onnxruntime-gpu
+    & uv pip install --link-mode=copy torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+    & uv pip install --link-mode=copy onnxruntime-gpu
 } else {
     Write-Host " - Modo CPU: Instalando PyTorch para processador..." -ForegroundColor Yellow
-    & uv pip install torch==2.3.1+cpu torchaudio==2.3.1+cpu --index-url https://download.pytorch.org/whl/cpu
-    & uv pip install onnxruntime
+    & uv pip install --link-mode=copy torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+    & uv pip install --link-mode=copy onnxruntime
 }
 Write-Host " [OK] PyTorch instalado com sucesso!" -ForegroundColor Green
 Write-Host ""
@@ -153,9 +153,9 @@ Write-Host ""
 Write-Host "[Passo 6/6] Instalando dependencias (WhisperX, MediaPipe, Gradio, etc)..." -ForegroundColor Cyan
 $reqFile = Join-Path $projectRoot "requirements.txt"
 if ($choice -eq "1") {
-    & uv pip install -r $reqFile --extra-index-url https://download.pytorch.org/whl/cu121
+    & uv pip install --link-mode=copy -r $reqFile --extra-index-url https://download.pytorch.org/whl/cu121
 } else {
-    & uv pip install -r $reqFile --extra-index-url https://download.pytorch.org/whl/cpu
+    & uv pip install --link-mode=copy -r $reqFile --extra-index-url https://download.pytorch.org/whl/cpu
 }
 Write-Host " [OK] Todas as dependencias foram instaladas!" -ForegroundColor Green
 Write-Host ""
