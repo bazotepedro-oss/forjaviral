@@ -15,7 +15,7 @@ export function CTAFinal() {
         </div>
 
         <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold text-text-primary tracking-tight">
-          Pronto para forjar seus primeiros{' '}
+          Pronto para produzir seus primeiros{' '}
           <span className="bg-gradient-to-r from-brand via-brand-soft to-orange-400 bg-clip-text text-transparent">
             cortes virais
           </span>

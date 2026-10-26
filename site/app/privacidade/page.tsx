@@ -27,7 +27,7 @@ export default function PrivacidadePage() {
           </section>
           <section>
             <h2 className="font-display text-xl font-semibold text-text-primary">4. Contato</h2>
-            <p className="mt-2">E-mail: contato@forjaviral.com (placeholder).</p>
+            <p className="mt-2">E-mail: contato@fabricadecortes.com</p>
           </section>
         </div>
       </main>

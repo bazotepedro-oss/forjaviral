@@ -1,11 +1,13 @@
 import Link from 'next/link';
-import { Flame, Twitter, Instagram, Youtube, Mail, Github } from 'lucide-react';
+import { Flame, Mail } from 'lucide-react';
 
 const LINKS = [
-  { label: 'Recursos', href: '#recursos' },
-  { label: 'Como funciona', href: '#como-funcion' },
-  { label: 'Planos', href: '#planos' },
-  { label: 'FAQ', href: '#faq' },
+  { label: 'Recursos', href: '/#recursos' },
+  { label: 'Como funciona', href: '/#como-funciona' },
+  { label: 'Planos & Preços', href: '/#planos' },
+  { label: 'Recarregar Créditos', href: '/recarga' },
+  { label: 'Recuperar Meu Acesso', href: '/acesso' },
+  { label: 'Dúvidas Frequentes', href: '/#faq' },
 ];
 
 const LEGAL = [
@@ -20,26 +22,28 @@ export function Footer() {
     <footer className="border-t border-border bg-surface">
       <div className="mx-auto w-full max-w-6xl px-4 py-12">
         <div className="grid gap-8 md:grid-cols-4">
-          <div className="space-y-3">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-gradient">
-                <Flame className="h-5 w-5 text-white" />
-              </div>
+          <div className="space-y-3 md:col-span-2">
+            <Link href="/" className="flex items-center gap-2.5 group">
+              <img
+                src="/logo.png"
+                alt="Fábrica de Cortes"
+                className="h-9 w-9 rounded-xl object-contain shadow-[0_0_15px_rgba(255,92,0,0.3)] group-hover:scale-105 transition-transform"
+              />
               <span className="font-display text-lg font-bold text-text-primary">
-                Forja <span className="text-brand">Viral</span>
+                Fábrica de <span className="text-brand">Cortes</span>
               </span>
             </Link>
-            <p className="text-sm text-text-secondary">
-              Corte vídeos longos em cortes virais com IA em segundos.
+            <p className="text-sm text-text-secondary max-w-sm">
+              Corte vídeos longos em virais com IA em segundos. Legendas dinâmicas estilo TikTok e enquadramento automático de rostos no <span className="text-brand font-semibold">fabricadecortes.com</span>.
             </p>
           </div>
 
           <div>
-            <h4 className="mb-3 text-sm font-semibold text-text-primary">Produtos</h4>
+            <h4 className="mb-3 text-sm font-semibold text-text-primary">Acesso & Produtos</h4>
             <ul className="space-y-2">
               {LINKS.map((l) => (
                 <li key={l.href}>
-                  <Link href={l.href} className="text-sm text-text-secondary hover:text-text-primary">
+                  <Link href={l.href} className="text-sm text-text-secondary hover:text-text-primary transition-colors">
                     {l.label}
                   </Link>
                 </li>
@@ -48,37 +52,21 @@ export function Footer() {
           </div>
 
           <div>
-            <h4 className="mb-3 text-sm font-semibold text-text-primary">Legal</h4>
+            <h4 className="mb-3 text-sm font-semibold text-text-primary">Ajuda & Legal</h4>
             <ul className="space-y-2">
               {LEGAL.map((l) => (
                 <li key={l.href}>
-                  <Link href={l.href} className="text-sm text-text-secondary hover:text-text-primary">
+                  <Link href={l.href} className="text-sm text-text-secondary hover:text-text-primary transition-colors">
                     {l.label}
                   </Link>
                 </li>
               ))}
             </ul>
-          </div>
-
-          <div>
-            <h4 className="mb-3 text-sm font-semibold text-text-primary">Redes</h4>
-            <div className="flex gap-3">
-              {[Twitter, Instagram, Youtube, Mail, Github].map((Icon, i) => (
-                <a
-                  key={i}
-                  href="#"
-                  aria-label="Rede social"
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-background text-text-secondary transition-colors hover:border-brand/50 hover:text-brand"
-                >
-                  <Icon className="h-4 w-4" />
-                </a>
-              ))}
-            </div>
           </div>
         </div>
 
         <div className="mt-8 border-t border-border pt-6 text-center text-xs text-text-secondary">
-          © {new Date().getFullYear()} Forja Viral. Todos os direitos reservados.
+          © {new Date().getFullYear()} Fábrica de Cortes (<a href="https://fabricadecortes.com" className="text-brand hover:underline">fabricadecortes.com</a>). Todos os direitos reservados.
         </div>
       </div>
     </footer>

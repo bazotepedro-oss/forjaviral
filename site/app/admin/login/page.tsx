@@ -55,12 +55,14 @@ export default function AdminLoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md border-border/80 bg-surface/90 shadow-2xl backdrop-blur-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-gradient shadow-lg shadow-brand/20">
-            <ShieldCheck className="h-7 w-7 text-white" />
-          </div>
-          <CardTitle className="text-2xl font-bold">Painel Forja Viral</CardTitle>
+          <img
+            src="/logo.png"
+            alt="Fábrica de Cortes"
+            className="mx-auto mb-3 h-14 w-14 rounded-2xl object-contain shadow-xl shadow-brand/20"
+          />
+          <CardTitle className="text-2xl font-bold">Painel Fábrica de Cortes</CardTitle>
           <CardDescription>
-            Insira sua Senha de Administrador ou Token de Acesso (Railway).
+            Área restrita. Digite sua senha para acessar o painel de gerenciamento.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -68,13 +70,13 @@ export default function AdminLoginPage() {
             <div>
               <Label htmlFor="password" className="text-sm font-semibold flex items-center gap-1.5">
                 <KeyRound className="h-4 w-4 text-brand" />
-                Senha Mestra ou Token
+                Senha de Administrador
               </Label>
               <div className="relative mt-1">
                 <Input
                   id="password"
                   type={showPass ? 'text' : 'password'}
-                  placeholder="Ex: FV291125 ou admin123"
+                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -93,11 +95,11 @@ export default function AdminLoginPage() {
 
             {showAdvanced && (
               <div>
-                <Label htmlFor="email" className="text-xs text-text-secondary">E-mail (opcional)</Label>
+                <Label htmlFor="email" className="text-xs text-text-secondary">E-mail administrativo (opcional)</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@forjaviral.com"
+                  placeholder="admin@fabricadecortes.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="mt-1 h-9 border-border/80 bg-background/50 text-xs"

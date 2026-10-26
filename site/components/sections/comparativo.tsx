@@ -69,7 +69,7 @@ export function ComparativoSection() {
             <TrendingDown className="h-3.5 w-3.5 mr-1" /> Comparativo Real de Mercado
           </Badge>
           <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold text-text-primary">
-            Por que a <span className="text-brand">Forja Viral</span> humilha as ferramentas gringas?
+            Por que a <span className="text-brand">Fábrica de Cortes</span> humilha as ferramentas gringas?
           </h2>
           <p className="text-text-secondary max-w-2xl mx-auto text-sm sm:text-base">
             Compare você mesmo: ferramentas como Opus Clip e Submagic cobram caro em dólar e apagam seus minutos se você não usar no mês.
@@ -84,7 +84,7 @@ export function ComparativoSection() {
                 <th className="py-4 px-6 font-bold">Funcionalidade / Vantagem</th>
                 <th className="py-4 px-6 font-extrabold text-brand bg-brand/10 border-x border-brand/20">
                   <div className="flex items-center gap-1.5">
-                    <Zap className="h-4 w-4 text-brand" /> Forja Viral (Brasil)
+                    <Zap className="h-4 w-4 text-brand" /> Fábrica de Cortes (Brasil)
                   </div>
                 </th>
                 <th className="py-4 px-6 font-semibold">Opus Clip (Gringo)</th>
@@ -126,7 +126,7 @@ export function ComparativoSection() {
           <div className="text-left">
             <span className="text-xs uppercase tracking-wider font-bold text-brand block">Economia Comprovada</span>
             <p className="text-sm font-semibold text-text-primary">
-              Com o valor de 1 único mês do Opus Clip (R$ 150), você compra mais de <strong>200 cortes na Forja Viral</strong> que duram 1 ano inteiro.
+              Com o valor de 1 único mês do Opus Clip (R$ 150), você compra mais de <strong>200 cortes na Fábrica de Cortes</strong> que duram 1 ano inteiro.
             </p>
           </div>
           <a href="#planos" className="shrink-0 inline-flex items-center justify-center rounded-xl bg-brand px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-brand/20 hover:bg-brand/90 transition-all">

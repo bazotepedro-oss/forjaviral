@@ -5,6 +5,7 @@ import {
   createLicenseOnServer,
 } from './license-server';
 import { provision } from './provisioning';
+import { sendRechargeEmail } from './email';
 
 /**
  * Sincroniza pagamentos da AbacatePay (v2) diretamente com o banco local e Railway.
@@ -91,6 +92,14 @@ export async function syncAbacatePay(): Promise<{ synced: number; processed: str
             expiresAt: new Date(Date.now() + 365 * 86400000),
           },
         });
+
+        // Envia e-mail de recarga confirmada
+        await sendRechargeEmail({
+          to: order.customer.email,
+          name: order.customer.name,
+          licenseKey: key,
+          creditsAdded: credits,
+        }).catch((err) => console.error('[Sync AbacatePay] Falha ao enviar e-mail de recarga:', err));
       } else if (!isRecharge) {
         // Compra de plano novo
         let subscription = await prisma.subscription.findFirst({

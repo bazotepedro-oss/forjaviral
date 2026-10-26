@@ -6,6 +6,7 @@ import { verifyWebhookSignature, parseWebhookEvent, mapStatus } from '@/lib/abac
 import { generateId } from '@/lib/utils';
 import { provision, revokeCredential } from '@/lib/provisioning';
 import { addCreditsOnServer } from '@/lib/license-server';
+import { sendRechargeEmail } from '@/lib/email';
 
 export const runtime = 'nodejs';
 
@@ -94,6 +95,16 @@ export async function POST(req: Request) {
           where: { licenseKey: meta.licenseKey },
           data: { credits: { increment: Number(meta.creditsToAdd) } },
         });
+
+        const customer = await prisma.customer.findUnique({ where: { id: order.customerId } });
+        if (customer) {
+          await sendRechargeEmail({
+            to: customer.email,
+            name: customer.name,
+            licenseKey: meta.licenseKey,
+            creditsAdded: Number(meta.creditsToAdd),
+          }).catch((err) => console.error('[Webhook] Falha ao enviar e-mail de recarga:', err));
+        }
       } catch (e: any) {
         console.error('[Webhook] Falha na recarga de créditos:', e?.message);
       }

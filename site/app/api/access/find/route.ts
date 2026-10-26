@@ -55,7 +55,7 @@ export async function GET(req: Request) {
     accessUrl: cred.accessUrl,
     courseUrl: cred.courseUrl || courseUrl(),
     colabUrl: colabUrl(),
-    planName: cred.order?.plan?.name || 'Forja Viral',
+    planName: cred.order?.plan?.name || 'Fábrica de Cortes',
     status: cred.status,
     expiresAt: cred.expiresAt,
   });

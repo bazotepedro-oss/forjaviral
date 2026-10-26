@@ -557,7 +557,7 @@ def _render_blocked_banner() -> tuple[str, bool]:
         msg = "Não foi possível validar agora. Verifique sua internet e tente novamente."
 
     support_msg = (
-        "Olá! Quero renovar minha licença do Forja Viral.\\n"
+        "Olá! Quero renovar minha licença da Fábrica de Cortes (fabricadecortes.com).\\n"
         f"Chave: {lk or '[sua-chave]'}\\n"
         f"Motivo: {reason}\\n"
         f"Créditos: {credits}\\n"
@@ -586,7 +586,7 @@ _gate.load_local()
 _gate.check_on_start()
 
 
-with gr.Blocks(title="Forja Viral", theme=gr.themes.Default(primary_hue="orange", neutral_hue="slate"), css=css) as demo:
+with gr.Blocks(title="Fábrica de Cortes", theme=gr.themes.Default(primary_hue="orange", neutral_hue="slate"), css=css) as demo:
     # Header
     gr.HTML(header.description)
     topbar_html = gr.HTML(value=_render_topbar_html())

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -10,11 +11,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 const schema = z.object({
-  slug: z.string().min(1, 'Selecione um plano'),
-  name: z.string().min(2, 'Nome muito curto').max(120),
-  email: z.string().email('E-mail inválido'),
+  slug: z.string({ required_error: 'Selecione um pacote' }).min(1, 'Selecione um pacote'),
+  name: z.string({ required_error: 'Informe seu nome completo' }).min(2, 'Nome muito curto').max(120),
+  email: z.string({ required_error: 'Informe seu e-mail' }).email('E-mail inválido'),
   phone: z.string().max(30).optional(),
-  consent: z.literal(true, { message: 'Você precisa aceitar os termos' }),
+  consent: z.literal(true, {
+    errorMap: () => ({ message: 'Você precisa aceitar os termos' }),
+  }),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -24,14 +27,30 @@ interface CheckoutFormProps {
 }
 
 export function CheckoutForm({ defaultSlug = 'pack_criador' }: CheckoutFormProps) {
+  const searchParams = useSearchParams();
+  const planFromUrl = searchParams.get('plan') || searchParams.get('slug');
+
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { slug: defaultSlug, consent: true },
+    defaultValues: {
+      slug: planFromUrl || defaultSlug,
+      name: '',
+      email: '',
+      phone: '',
+      consent: true,
+    },
   });
+
+  useEffect(() => {
+    if (planFromUrl) {
+      setValue('slug', planFromUrl);
+    }
+  }, [planFromUrl, setValue]);
 
   const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' | 'info' } | null>(null);
   const [done, setDone] = useState(false);

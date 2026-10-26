@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from './db';
 import { generateToken, hashToken, signHmac } from './utils';
 import { generateLicenseKey, createLicenseOnServer } from './license-server';
+import { sendAccessEmail } from './email';
 
 export interface ProvisionInput {
   customerId: string;
@@ -114,7 +115,7 @@ export async function provision(input: ProvisionInput): Promise<ProvisionResult>
     };
   }
 
-  // 1. Gera a Chave de Licença oficial Forja Viral
+  // 1. Gera a Chave de Licença oficial Fábrica de Cortes
   const licenseKey = generateLicenseKey();
 
   // 2. Registra automaticamente no Servidor PostgreSQL do Railway!
@@ -148,6 +149,25 @@ export async function provision(input: ProvisionInput): Promise<ProvisionResult>
       expiresAt,
     },
   });
+
+  // 4. Envia e-mail automático com Chave de Licença, créditos e links
+  try {
+    const customer = await prisma.customer.findUnique({ where: { id: input.customerId } });
+    await sendAccessEmail({
+      to: input.email,
+      name: customer?.name || username,
+      licenseKey,
+      credits,
+      accessUrl,
+      courseUrl: courseUrl(),
+      colabUrl: colabUrl(),
+      username,
+      temporaryPassword,
+      planName: input.plan,
+    });
+  } catch (emailErr: any) {
+    console.error(`[Provisioning] Falha ao enviar e-mail de acesso:`, emailErr?.message);
+  }
 
   return {
     credentialId: credential.id,

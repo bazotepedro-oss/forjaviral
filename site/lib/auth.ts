@@ -39,9 +39,9 @@ export function verifySession(token: string): AdminSession | null {
 }
 
 export async function verifyAdminRequest(urlToken?: string): Promise<AdminSession | null> {
-  const masterToken = process.env.FORJA_LICENSE_ADMIN_TOKEN || 'FV291125';
-  if (urlToken && (urlToken === masterToken || urlToken === 'FV291125')) {
-    return { adminId: 'admin_master', email: process.env.ADMIN_EMAIL || 'admin@forjaviral.com' };
+  const masterToken = process.env.FORJA_LICENSE_ADMIN_TOKEN;
+  if (urlToken && masterToken && urlToken === masterToken) {
+    return { adminId: 'admin_master', email: process.env.ADMIN_EMAIL || 'admin@fabricadecortes.com' };
   }
 
   const cookieStore = cookies();
@@ -51,16 +51,16 @@ export async function verifyAdminRequest(urlToken?: string): Promise<AdminSessio
 }
 
 export async function createAdminSession(email?: string, password?: string): Promise<string | null> {
-  const masterPass = process.env.ADMIN_PASSWORD || 'admin123';
-  const masterToken = process.env.FORJA_LICENSE_ADMIN_TOKEN || 'FV291125';
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@forjaviral.com';
+  const masterPass = process.env.ADMIN_PASSWORD;
+  const masterToken = process.env.FORJA_LICENSE_ADMIN_TOKEN;
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@fabricadecortes.com';
 
   const pass = (password || '').trim();
+  if (!pass) return null;
+
   const isValidPass =
-    pass === masterPass ||
-    pass === masterToken ||
-    pass === 'FV291125' ||
-    pass === 'admin123';
+    (masterPass && pass === masterPass) ||
+    (masterToken && pass === masterToken);
 
   if (!isValidPass) return null;
 

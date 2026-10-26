@@ -99,7 +99,7 @@ async function getOrCreateV2Product(
       name,
       price: priceInCents,
       currency: 'BRL',
-      description: `Forja Viral - ${name}`,
+      description: `Fábrica de Cortes - ${name}`,
     }),
   });
 
@@ -169,7 +169,7 @@ export async function createCheckout(
   // ── 1. Tenta API v2 Nativa ──
   try {
     const prodExternalId = `${input.planSlug}_${input.amount}`;
-    const prodName = input.appName || 'Pacote de Créditos Forja Viral';
+    const prodName = input.appName || 'Pacote de Créditos Fábrica de Cortes';
     const productId = await getOrCreateV2Product(key, base, prodExternalId, prodName, input.amount);
 
     const customerId = await getOrCreateV2Customer(key, base, input.customer);
@@ -212,7 +212,7 @@ export async function createCheckout(
     products: [
       {
         externalId: input.planSlug,
-        name: input.appName || 'Forja Viral',
+        name: input.appName || 'Fábrica de Cortes',
         quantity: 1,
         price: input.amount,
       },

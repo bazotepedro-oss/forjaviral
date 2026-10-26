@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -32,15 +33,30 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export function AccessCard() {
+  const searchParams = useSearchParams();
+  const emailParam = searchParams.get('email') || '';
+  const orderIdParam = searchParams.get('orderId') || '';
+
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
-  } = useForm<FormData>();
+  } = useForm<FormData>({
+    defaultValues: { email: emailParam, orderId: orderIdParam },
+  });
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);
+
+  useEffect(() => {
+    if (emailParam) {
+      setValue('email', emailParam);
+      if (orderIdParam) setValue('orderId', orderIdParam);
+      onSubmit({ email: emailParam, orderId: orderIdParam });
+    }
+  }, [emailParam, orderIdParam]);
 
   const onSubmit = async (data: FormData) => {
     setError(null);
@@ -70,7 +86,7 @@ export function AccessCard() {
 
   const copyAll = () => {
     if (!result) return;
-    const text = `🔥 Acesso Forja Viral\nChave de Licença: ${result.licenseKey}\nUsuário: ${result.username}\nCréditos: ${result.credits}\nCurso: ${result.courseUrl}\nColab: ${result.colabUrl}`;
+    const text = `🔥 Acesso Fábrica de Cortes (fabricadecortes.com)\nChave de Licença: ${result.licenseKey}\nUsuário: ${result.username}\nCréditos: ${result.credits}\nCurso: ${result.courseUrl}\nColab: ${result.colabUrl}`;
     navigator.clipboard.writeText(text);
     setCopiedAll(true);
     setTimeout(() => setCopiedAll(false), 2000);
@@ -113,7 +129,7 @@ export function AccessCard() {
                   <Sparkles className="h-5 w-5 text-brand" />
                   Seu Acesso está Liberado!
                 </CardTitle>
-                <CardDescription>Plano: {result.planName || 'Forja Viral'}</CardDescription>
+                <CardDescription>Plano: {result.planName || 'Fábrica de Cortes'}</CardDescription>
               </div>
               <Badge variant="success">Ativo</Badge>
             </div>
@@ -123,7 +139,7 @@ export function AccessCard() {
             <div className="rounded-2xl border-2 border-brand/50 bg-brand/5 p-5 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-brand">
-                  Sua Chave de Licença (Cole no Forja Viral)
+                  Sua Chave de Licença (Cole na Fábrica de Cortes)
                 </span>
                 <span className="flex items-center gap-1 text-xs font-semibold text-text-primary bg-surface px-2.5 py-1 rounded-full border border-border">
                   <Coins className="h-3.5 w-3.5 text-brand" /> {result.credits} Créditos
@@ -139,7 +155,7 @@ export function AccessCard() {
                 </Button>
               </div>
               <p className="text-xs text-text-secondary">
-                Insira esta chave no Forja Viral (WebUI ou Google Colab) para liberar todos os cortes automáticos com IA.
+                Insira esta chave na Fábrica de Cortes (WebUI ou Google Colab) para liberar todos os cortes automáticos com IA.
               </p>
             </div>
 
@@ -153,7 +169,7 @@ export function AccessCard() {
                     Curso & Aulas Práticas
                   </div>
                   <p className="text-xs text-text-secondary">
-                    Assista ao passo a passo de como rodar o Forja Viral, gerar cortes virais e monetizar no TikTok/YouTube.
+                    Assista ao passo a passo de como rodar a Fábrica de Cortes, gerar cortes virais e monetizar no TikTok/YouTube.
                   </p>
                 </div>
                 <div className="pt-4">

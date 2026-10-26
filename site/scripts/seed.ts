@@ -106,7 +106,7 @@ async function main() {
     data: { active: false },
   });
 
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@forjaviral.com';
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@fabricadecortes.com';
   const existing = await prisma.customer.findUnique({ where: { email: adminEmail } });
   if (!existing) {
     await prisma.customer.create({ data: { name: 'Admin', email: adminEmail } });

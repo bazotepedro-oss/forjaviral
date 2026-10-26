@@ -16,19 +16,19 @@ const FAQ = [
   },
   {
     q: 'Preciso ter um computador potente com placa de vídeo?',
-    a: 'Não é obrigatório! A Forja Viral funciona de duas formas: (1) Se você tiver PC com placa NVIDIA, roda com aceleração máxima de GPU localmente. (2) Se tiver um PC fraco ou notebook comum, você roda diretamente na nuvem pelo Google Colab gratuito, sem gastar nem esquentar seu computador.',
+    a: 'Não é obrigatório! A Fábrica de Cortes funciona de duas formas: (1) Se você tiver PC com placa NVIDIA, roda com aceleração máxima de GPU localmente. (2) Se tiver um PC fraco ou notebook comum, você roda diretamente na nuvem pelo Google Colab gratuito, sem gastar nem esquentar seu computador.',
   },
   {
     q: 'Como recebo minha chave de licença após o pagamento?',
-    a: 'Assim que o Pix for aprovado pela AbacatePay (geralmente em menos de 5 segundos), você é redirecionado para a tela de acesso com sua chave FV-XXXXX gerada na hora, além de receber uma cópia no seu e-mail cadastrado.',
+    a: 'Assim que o Pix for aprovado pela AbacatePay (geralmente em menos de 5 segundos), você é redirecionado para a tela de acesso com sua chave FC-XXXXX gerada na hora, além de receber uma cópia no seu e-mail cadastrado.',
   },
   {
     q: 'Como funciona a recarga de créditos se os meus acabarem?',
-    a: 'Basta acessar a página de Recarga (/recarga), informar sua chave FV-... ou e-mail, escolher quantos créditos quer adicionar e pagar o Pix. O servidor da Railway injeta os novos créditos na sua licença automaticamente em segundos.',
+    a: 'Basta acessar a página de Recarga (/recarga), informar sua chave FC-... ou e-mail, escolher quantos créditos quer adicionar e pagar o Pix. O servidor da Railway injeta os novos créditos na sua licença automaticamente em segundos.',
   },
   {
     q: 'Posso exportar o projeto para o Premiere Pro ou DaVinci Resolve?',
-    a: 'Sim! Além de renderizar o vídeo final em MP4 1080p pronto para postar no TikTok/Reels, a Forja Viral gera arquivos XML de timeline aberta para você ajustar cores, trilha ou efeitos no Adobe Premiere ou DaVinci.',
+    a: 'Sim! Além de renderizar o vídeo final em MP4 1080p pronto para postar no TikTok/Reels, a Fábrica de Cortes gera arquivos XML de timeline aberta para você ajustar cores, trilha ou efeitos no Adobe Premiere ou DaVinci.',
   },
 ];
 

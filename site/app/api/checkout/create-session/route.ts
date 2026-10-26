@@ -86,7 +86,7 @@ export async function POST(req: Request) {
       customer: { name, email, phone },
       metadata: { orderId: order.id, slug, email },
       returnURL,
-      appName: process.env.ABACATEPAY_APP_NAME || 'Forja Viral',
+      appName: process.env.ABACATEPAY_APP_NAME || 'Fábrica de Cortes',
     });
   } catch (e: any) {
     await prisma.order.update({

@@ -216,11 +216,11 @@ export async function deleteLicenseOnServer(licenseKey: string): Promise<{ ok: b
 }
 
 /**
- * Gera uma chave de licença no padrão Forja Viral: FV-XXXXX-XXXXX
+ * Gera uma chave de licença no padrão Fábrica de Cortes: FC-XXXXX-XXXXX
  */
 export function generateLicenseKey(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const part1 = Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
   const part2 = Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-  return `FV-${part1}-${part2}`;
+  return `FC-${part1}-${part2}`;
 }

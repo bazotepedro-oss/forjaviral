@@ -1,7 +1,9 @@
 import os
 import sys
 
-# webui/header.py — Forja Viral (client-facing header)
+import base64
+
+# webui/header.py — Fábrica de Cortes (client-facing header)
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 WORKING_DIR = os.path.dirname(CURRENT_DIR)
@@ -13,6 +15,16 @@ i18n = I18nAuto()
 
 # Keep badges var for compatibility (some app.py tries gr.HTML(header.badges))
 badges = ""
+
+LOGO_PATH = os.path.join(CURRENT_DIR, "assets", "logo.png")
+logo_tag = '<div class="fv-mark">FC</div>'
+if os.path.exists(LOGO_PATH):
+    try:
+        with open(LOGO_PATH, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("utf-8")
+            logo_tag = f'<img src="data:image/png;base64,{b64}" style="width:44px;height:44px;border-radius:12px;object-fit:contain;box-shadow:0 0 15px rgba(255,92,0,0.4);" alt="Fábrica de Cortes">'
+    except Exception:
+        pass
 
 description = r"""
 <style>
@@ -122,10 +134,10 @@ description = r"""
 <div class="fv-hero">
   <div class="fv-row">
     <div class="fv-left">
-      <div class="fv-mark">FV</div>
+      <div class="fv-mark">FC</div>
       <div class="fv-title">
-        <h1>FORJA VIRAL</h1>
-        <p>Transforme vídeos longos em cortes prontos para postar — com legenda e seleção inteligente.</p>
+        <h1>FÁBRICA DE CORTES</h1>
+        <p>Transforme vídeos longos em cortes virais prontos para postar — fabricadecortes.com</p>
       </div>
     </div>
 
@@ -137,3 +149,6 @@ description = r"""
   </div>
 </div>
 """
+
+description = description.replace('<div class="fv-mark">FC</div>', logo_tag)
+

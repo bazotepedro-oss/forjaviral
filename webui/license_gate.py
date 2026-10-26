@@ -301,7 +301,7 @@ class LicenseGate:
             license_key_txt = gr.Textbox(
                 label="Chave de licença",
                 value=self.license_key,
-                placeholder="FV-XXXX-XX",
+                placeholder="FC-XXXXX-XXXXX",
                 scale=2,
             )
 

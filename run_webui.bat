@@ -1,5 +1,3 @@
 @echo off
 cd /d "%~dp0"
-call .venv\Scripts\activate.bat
-python webui\app.py
-pause
+call INICIAR_FABRICA_DE_CORTES.bat

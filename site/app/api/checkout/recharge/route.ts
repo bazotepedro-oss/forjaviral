@@ -7,26 +7,42 @@ import { createCheckout } from '@/lib/abacatepay';
 
 const Schema = z.object({
   identifier: z.string().min(3, 'Informe sua Chave de Licença, Usuário ou E-mail'),
-  credits: z.number().min(5, 'Mínimo de 5 créditos').max(1000, 'Máximo de 1.000 créditos'),
+  credits: z.number().min(5, 'Mínimo de 5 créditos').max(5000, 'Máximo de 5.000 créditos'),
   name: z.string().min(2, 'Nome muito curto'),
   email: z.string().email('E-mail inválido'),
   phone: z.string().optional(),
 });
 
 function calculateProgressivePrice(credits: number) {
-  const c = Math.max(5, Math.min(1000, Math.floor(credits)));
+  const c = Math.max(5, Math.min(5000, Math.floor(credits)));
   let unit = 1.30;
   let discount = 0;
-  let tier = 'Sem desconto';
+  let tier = 'Preço Normal';
 
-  if (c >= 100) {
+  if (c >= 2500) {
+    unit = 0.33;
+    discount = 75;
+    tier = 'Mega Volume Industrial (75% OFF)';
+  } else if (c >= 1000) {
+    unit = 0.39;
+    discount = 70;
+    tier = 'Plano Enterprise (70% OFF)';
+  } else if (c >= 500) {
+    unit = 0.45;
+    discount = 65;
+    tier = 'Super Atacado (65% OFF)';
+  } else if (c >= 250) {
+    unit = 0.55;
+    discount = 58;
+    tier = 'Desconto Agência (58% OFF)';
+  } else if (c >= 100) {
     unit = 0.66;
     discount = 49;
-    tier = 'Desconto Máximo de Atacado (49% OFF)';
+    tier = 'Desconto de Atacado (49% OFF)';
   } else if (c >= 50) {
     unit = 0.79;
     discount = 39;
-    tier = 'Super Desconto (39% OFF)';
+    tier = 'Super Desconto Criador (39% OFF)';
   } else if (c >= 30) {
     unit = 0.95;
     discount = 27;
@@ -104,7 +120,7 @@ export async function POST(req: Request) {
         price: pricing.totalCents,
         currency: 'BRL',
         interval: 'one_time',
-        features: JSON.stringify([`+${pricing.credits} Créditos automáticos no Forja Viral (${pricing.tier})`]),
+        features: JSON.stringify([`+${pricing.credits} Créditos automáticos na Fábrica de Cortes (${pricing.tier})`]),
         active: true,
       },
     });
@@ -144,7 +160,7 @@ export async function POST(req: Request) {
         creditsToAdd: String(pricing.credits),
       },
       returnURL,
-      appName: `Forja Viral - Recarga ${pricing.credits} Créditos`,
+      appName: `Fábrica de Cortes - Recarga ${pricing.credits} Créditos`,
     });
 
     await prisma.order.update({

@@ -22,23 +22,39 @@ import {
 } from 'lucide-react';
 
 const PRESETS = [
-  { credits: 15, label: '15 Créditos', badge: 'Teste' },
-  { credits: 30, label: '30 Créditos', badge: '27% OFF' },
-  { credits: 50, label: '50 Créditos', badge: 'Mais Vendido 🔥' },
-  { credits: 100, label: '100 Créditos', badge: '49% OFF 🚀' },
-  { credits: 120, label: '120 Créditos', badge: 'Atacado' },
+  { credits: 50, label: '50 Vídeos', badge: 'Mais Vendido 🔥' },
+  { credits: 120, label: '120 Vídeos', badge: '49% OFF' },
+  { credits: 250, label: '250 Vídeos', badge: '58% OFF' },
+  { credits: 1000, label: '1.000 Vídeos', badge: '70% OFF' },
+  { credits: 5000, label: '5.000 Vídeos', badge: '75% OFF 🚀' },
 ];
 
 function calculatePricing(credits: number) {
-  const c = Math.max(5, Math.min(1000, Math.floor(credits || 5)));
+  const c = Math.max(5, Math.min(5000, Math.floor(credits || 5)));
   let unit = 1.30;
   let discount = 0;
   let tierLabel = 'Preço Normal';
 
-  if (c >= 100) {
+  if (c >= 2500) {
+    unit = 0.33;
+    discount = 75;
+    tierLabel = 'Mega Volume Industrial (75% OFF)';
+  } else if (c >= 1000) {
+    unit = 0.39;
+    discount = 70;
+    tierLabel = 'Plano Enterprise (70% OFF)';
+  } else if (c >= 500) {
+    unit = 0.45;
+    discount = 65;
+    tierLabel = 'Super Atacado (65% OFF)';
+  } else if (c >= 250) {
+    unit = 0.55;
+    discount = 58;
+    tierLabel = 'Desconto Agência (58% OFF)';
+  } else if (c >= 100) {
     unit = 0.66;
     discount = 49;
-    tierLabel = 'Desconto Máximo de Atacado (49% OFF)';
+    tierLabel = 'Desconto de Atacado (49% OFF)';
   } else if (c >= 50) {
     unit = 0.79;
     discount = 39;
@@ -46,7 +62,7 @@ function calculatePricing(credits: number) {
   } else if (c >= 30) {
     unit = 0.95;
     discount = 27;
-    tierLabel = 'Desconto Progressivo (27% OFF)';
+    tierLabel = 'Desconto Especial (27% OFF)';
   }
 
   const total = c * unit;
@@ -79,7 +95,7 @@ function RecargaForm() {
     if (k) setIdentifier(k);
     const c = searchParams.get('credits');
     if (c && !isNaN(Number(c))) {
-      setCredits(Math.max(5, Math.min(1000, Number(c))));
+      setCredits(Math.max(5, Math.min(5000, Number(c))));
     }
   }, [searchParams]);
 
@@ -181,7 +197,7 @@ function RecargaForm() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <Label htmlFor="customCredits" className="font-semibold text-text-primary">
-                  Quantidade personalizada:
+                  Quantidade personalizada (de 5 a 5.000):
                 </Label>
                 <p className="text-xs text-text-secondary">Arraste a barra ou digite o número exato</p>
               </div>
@@ -190,11 +206,11 @@ function RecargaForm() {
                   id="customCredits"
                   type="number"
                   min={5}
-                  max={1000}
+                  max={5000}
                   value={credits}
                   onChange={(e) => {
                     const val = Number(e.target.value);
-                    setCredits(isNaN(val) ? 5 : val);
+                    setCredits(isNaN(val) ? 5 : Math.max(5, Math.min(5000, val)));
                   }}
                   className="w-28 text-center text-lg font-bold font-mono h-11 border-brand/40 bg-surface focus:ring-brand"
                 />
@@ -205,44 +221,54 @@ function RecargaForm() {
             <input
               type="range"
               min={5}
-              max={250}
-              step={1}
-              value={credits > 250 ? 250 : credits}
+              max={5000}
+              step={5}
+              value={credits}
               onChange={(e) => setCredits(Number(e.target.value))}
-              className="w-full h-2 bg-border rounded-lg appearance-none cursor-pointer accent-brand"
+              className="w-full h-2.5 bg-border rounded-lg appearance-none cursor-pointer accent-brand"
             />
 
             {/* Discount Scale visual bar */}
-            <div className="grid grid-cols-3 gap-2 pt-2 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-xs">
               <div
                 className={`rounded-lg p-2.5 border text-center transition-all ${
-                  credits >= 30 && credits < 50
+                  credits >= 50 && credits < 250
                     ? 'border-brand bg-brand/10 font-semibold text-brand'
                     : 'border-border/60 text-text-secondary'
                 }`}
               >
-                <div className="font-bold">30 a 49 créditos</div>
-                <div>R$ 0,95 / un (27% OFF)</div>
+                <div className="font-bold">50 a 249 vídeos</div>
+                <div>R$ 0,79 / un (39% OFF)</div>
               </div>
               <div
                 className={`rounded-lg p-2.5 border text-center transition-all ${
-                  credits >= 50 && credits < 100
+                  credits >= 250 && credits < 1000
                     ? 'border-brand bg-brand/10 font-semibold text-brand'
                     : 'border-border/60 text-text-secondary'
                 }`}
               >
-                <div className="font-bold">50 a 99 créditos</div>
-                <div>R$ 0,79 / un (39% OFF) 🔥</div>
+                <div className="font-bold">250 a 999 vídeos</div>
+                <div>R$ 0,55 / un (58% OFF)</div>
               </div>
               <div
                 className={`rounded-lg p-2.5 border text-center transition-all ${
-                  credits >= 100
+                  credits >= 1000 && credits < 2500
                     ? 'border-brand bg-brand/10 font-semibold text-brand'
                     : 'border-border/60 text-text-secondary'
                 }`}
               >
-                <div className="font-bold">100+ créditos</div>
-                <div>R$ 0,66 / un (49% OFF) 🚀</div>
+                <div className="font-bold">1.000 a 2.499 vídeos</div>
+                <div>R$ 0,39 / un (70% OFF)</div>
+              </div>
+              <div
+                className={`rounded-lg p-2.5 border text-center transition-all ${
+                  credits >= 2500
+                    ? 'border-brand bg-brand/10 font-semibold text-brand'
+                    : 'border-border/60 text-text-secondary'
+                }`}
+              >
+                <div className="font-bold">2.500 a 5.000 vídeos</div>
+                <div>R$ 0,33 / un (75% OFF) 🚀</div>
               </div>
             </div>
           </div>
@@ -292,7 +318,7 @@ function RecargaForm() {
             2. Onde devemos creditar seus créditos?
           </CardTitle>
           <CardDescription>
-            Identifique sua conta do Forja Viral. Pode ser sua chave de licença, e-mail de compra ou nome de usuário.
+            Identifique sua conta da Fábrica de Cortes. Pode ser sua chave de licença, e-mail de compra ou nome de usuário.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -399,7 +425,7 @@ export default function RecargaPage() {
             <Zap className="h-3.5 w-3.5 mr-1" /> Recarga Instantânea via Pix
           </Badge>
           <h1 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight">
-            Recarregue seus créditos no <span className="text-brand">Forja Viral</span>
+            Recarregue seus créditos na <span className="text-brand">Fábrica de Cortes</span>
           </h1>
           <p className="text-text-secondary max-w-xl mx-auto text-sm sm:text-base">
             Desconto progressivo automático: quanto mais créditos você adicionar, mais barato fica cada vídeo cortado.

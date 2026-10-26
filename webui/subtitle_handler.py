@@ -14,7 +14,7 @@ i18n = I18nAuto()
 SUBTITLE_PRESETS = {
 
     "MrBeast Clean Hook": {
-        "font_name": "Arial",
+        "font_name": "Montserrat-ExtraBold",
         "font_size": 32,
         "base_color": "#FFFFFF",
         "highlight_color": "#FFD700",
@@ -38,7 +38,7 @@ SUBTITLE_PRESETS = {
     },
 
     "Hormozi (Classic)": {
-        "font_name": "Arial",
+        "font_name": "Montserrat-ExtraBold",
         "font_size": 30,
         "base_color": "#FFFFFF",
         "highlight_color": "#00FF00",
