@@ -155,6 +155,45 @@ def kill_process():
             return i18n("Error terminating process: {}").format(e)
     return i18n("No process running.")
 
+def count_generated_cuts(project_folder_path, start_time=None):
+    """
+    Conta com precisao a quantidade de videos de cortes gerados com sucesso nesta execucao.
+    Verifica as pastas em ordem de prioridade de acordo com o workflow: burned_sub -> final -> cuts.
+    Apenas arquivos .mp4 validos (> 20KB) e modificados apos start_time sao considerados.
+    """
+    if not project_folder_path or not os.path.exists(project_folder_path):
+        return 0
+    
+    for subdir in ["burned_sub", "final", "cuts"]:
+        folder = os.path.join(project_folder_path, subdir)
+        if os.path.exists(folder):
+            valid_cuts = []
+            for f in os.listdir(folder):
+                if not f.lower().endswith(".mp4"):
+                    continue
+                # Ignora video original de entrada e temporarios
+                if "input" in f.lower() or "temp_video_no_audio" in f.lower() or f.endswith(".temp.mp4"):
+                    continue
+                full_path = os.path.join(folder, f)
+                try:
+                    if not os.path.isfile(full_path):
+                        continue
+                    # Video precisa ter pelo menos 20KB para ser valido
+                    if os.path.getsize(full_path) < 20480:
+                        continue
+                    # Se start_time foi informado, garante que foi criado/modificado nesta execucao
+                    if start_time is not None:
+                        if os.path.getmtime(full_path) < (start_time - 5):
+                            continue
+                    valid_cuts.append(full_path)
+                except OSError:
+                    continue
+            
+            if valid_cuts:
+                return len(valid_cuts)
+                
+    return 0
+
 GEMINI_MODELS = [
     'gemini-3-pro-preview',
     'gemini-2.5-flash',
@@ -211,20 +250,22 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
                      h_size, w_block, gap, mode, under, strike, border_s, remove_punc, video_quality, use_youtube_subs, translate_target):
     
     global current_process
-    yield "", gr.update(value=i18n("Running..."), interactive=False), gr.update(visible=True), None 
+    process_start_time = time.time()
+    return_code = -1
+    yield "", gr.update(value=i18n("Running..."), interactive=False), gr.update(visible=True), None, gr.update()
 
     cmd = [sys.executable, MAIN_SCRIPT_PATH]
     
     # Input Source Logic
     if input_source == "Existing Project":
         if not project_name:
-             yield i18n("Error: No project selected."), gr.update(value=i18n("Start Processing"), interactive=True), gr.update(visible=False), None
+             yield i18n("Error: No project selected."), gr.update(value=i18n("Start Processing"), interactive=True), gr.update(visible=False), None, gr.update()
              return
         full_project_path = os.path.join(VIRALS_DIR, project_name)
         cmd.extend(["--project-path", full_project_path])
     elif input_source == "Upload Video":
         if not video_file:
-             yield i18n("Error: No video file uploaded."), gr.update(value=i18n("Start Processing"), interactive=True), gr.update(visible=False), None
+             yield i18n("Error: No video file uploaded."), gr.update(value=i18n("Start Processing"), interactive=True), gr.update(visible=False), None, gr.update()
              return
         
         # Determine project name from filename
@@ -352,14 +393,14 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
                 # Throttle updates to avoid browser freeze (0.2s interval)
                 current_time = time.time()
                 if current_time - last_update_time > 0.2:
-                    yield logs, gr.update(visible=True, interactive=False), gr.update(visible=True), None
+                    yield logs, gr.update(visible=True, interactive=False), gr.update(visible=True), None, gr.update()
                     last_update_time = current_time
         
         # Final yield to ensure all logs are shown
-        yield logs, gr.update(visible=True, interactive=False), gr.update(visible=True), None
+        yield logs, gr.update(visible=True, interactive=False), gr.update(visible=True), None, gr.update()
     except Exception as e:
         logs += f"\nError running process: {str(e)}\n"
-        yield logs, gr.update(visible=True, interactive=False), gr.update(visible=True), None
+        yield logs, gr.update(visible=True, interactive=False), gr.update(visible=True), None, gr.update()
     finally:
         if current_process:
             if current_process.stdout:
@@ -367,24 +408,50 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
                     current_process.stdout.close()
                 except Exception: pass
             if current_process.poll() is None:
-                # If we are here, it means we finished reading or errored out, but process is still running.
-                # If it was a normal break from loop, process should be done or close to done.
-                # If we are stopping, current_process.terminate() might be needed outside? 
-                # But here we just wait.
                 try:
                     current_process.wait()
                 except Exception: pass
+            return_code = current_process.returncode
             current_process = None
+        else:
+            return_code = -1
     
     # Wait to ensure filesystem flush
     time.sleep(1.0)
     
+    # Verificação justa de créditos: só debita se os cortes realmente foram gerados com sucesso!
+    actual_cuts = count_generated_cuts(project_folder_path, start_time=process_start_time)
+    
+    if return_code == 0 and actual_cuts > 0:
+        asked_segments = int(segments or 1)
+        to_debit = min(actual_cuts, asked_segments)
+        try:
+            debited = _gate.consume_n(to_debit)
+            if debited:
+                logs += f"\n\n========================================================"
+                logs += f"\n[CRÉDITOS] Sucesso! {actual_cuts} corte(s) gerado(s) com sucesso."
+                logs += f"\n[CRÉDITOS] Foram debitados {to_debit} crédito(s). Saldo restante: {_gate.state.credits}."
+                logs += f"\n========================================================\n"
+            else:
+                logs += f"\n\n[AVISO CRÉDITOS] Cortes gerados com sucesso ({actual_cuts}), mas não foi possível conectar ao servidor de licença para sincronizar créditos.\n"
+        except Exception as e_cred:
+            logs += f"\n\n[AVISO CRÉDITOS] Erro ao sincronizar créditos com o servidor: {e_cred}\n"
+    else:
+        logs += f"\n\n========================================================"
+        if actual_cuts == 0:
+            logs += f"\n[CRÉDITOS] Nenhum vídeo de corte foi gerado nesta execução."
+        else:
+            logs += f"\n[CRÉDITOS] O processo foi cancelado ou encerrou antes da conclusão total."
+        logs += f"\n[CRÉDITOS] Seus créditos NÃO foram descontados (0 créditos consumidos)!"
+        logs += f"\n[CRÉDITOS] Saldo preservado: {_gate.state.credits} crédito(s)."
+        logs += f"\n========================================================\n"
+
     html_output = ""
     if project_folder_path and os.path.exists(project_folder_path):
         html_output = library.generate_project_gallery(project_folder_path, is_full_path=True)
     else:
         html_output = f"<h3>{i18n('Error: Project folder could not be determined from logs.')}</h3>"
-    yield logs, gr.update(value=i18n("Start Processing"), interactive=True), gr.update(visible=False), html_output
+    yield logs, gr.update(value=i18n("Start Processing"), interactive=True), gr.update(visible=False), html_output, _render_topbar_html()
 
 css = """
 /* Forja Viral — Minimal dark UI */
@@ -868,7 +935,7 @@ with gr.Blocks(title="Fábrica de Cortes", theme=gr.themes.Default(primary_hue="
                  highlight_size_input, words_per_block_input, gap_limit_input, mode_input, 
                  underline_input, strikeout_input, border_style_input, remove_punc_input,
                  video_quality_input, use_youtube_subs_input, translate_input
-             ], outputs=[logs_output, start_btn, stop_btn, results_html])
+             ], outputs=[logs_output, start_btn, stop_btn, results_html, topbar_html])
 
 
         with gr.Tab(i18n("Subtitle Editor")):

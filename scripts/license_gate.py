@@ -250,14 +250,14 @@ class LicenseGate:
                 if required < 1:
                     required = 1
 
-                if int(self.state.credits or 0) < required:
+                available = int(self.state.credits or 0)
+                if available < required:
                     self.state.ok = False
                     self.state.reason = "no_credits"
-                    self._raise_block()
-
-                ok = self.consume_n(required)
-                if not ok:
-                    self._raise_block()
+                    msg = f"Créditos insuficientes! Você possui {available} crédito(s), mas solicitou {required} corte(s). Recarregue seus créditos para continuar."
+                    if gr is not None:
+                        raise gr.Error(msg)
+                    raise RuntimeError(msg)
 
                 yield from fn(*args, **kwargs)
             return _wrapped
@@ -271,14 +271,14 @@ class LicenseGate:
             if required < 1:
                 required = 1
 
-            if int(self.state.credits or 0) < required:
+            available = int(self.state.credits or 0)
+            if available < required:
                 self.state.ok = False
                 self.state.reason = "no_credits"
-                self._raise_block()
-
-            ok = self.consume_n(required)
-            if not ok:
-                self._raise_block()
+                msg = f"Créditos insuficientes! Você possui {available} crédito(s), mas solicitou {required} corte(s). Recarregue seus créditos para continuar."
+                if gr is not None:
+                    raise gr.Error(msg)
+                raise RuntimeError(msg)
 
             return fn(*args, **kwargs)
 
