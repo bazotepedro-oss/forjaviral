@@ -1,6 +1,10 @@
 #######################################
-# 🔥 FORJA VIRAL - GITIGNORE OFICIAL
+# 🔥 FÁBRICA DE CORTES - GITIGNORE OFICIAL
 #######################################
+
+# 🌐 Site / Landing Page (Hospedado na Hostinger - não distribuir para clientes)
+site/
+run_site.bat
 
 ############################
 # 🐍 Python
