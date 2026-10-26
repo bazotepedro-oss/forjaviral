@@ -709,7 +709,7 @@ with gr.Blocks(title="Fábrica de Cortes", theme=gr.themes.Default(primary_hue="
                     with gr.Row():
                         ai_model_input = gr.Dropdown(choices=GEMINI_MODELS, label=i18n("AI Model"), value=GEMINI_MODELS[1], allow_custom_value=True, visible=True, scale=5)
                         refresh_models_btn = gr.Button("🔄", size="sm", visible=False, scale=0, min_width=50) # Only local
-                        chunk_size_input = gr.Number(label=i18n("Chunk Size"), value=70000, precision=0, scale=2)
+                        chunk_size_input = gr.Number(label=i18n("Chunk Size"), value=250000, precision=0, scale=2)
                     
                     # Update listeners with logic to hide/show API key
                     def update_ai_ui(backend):
@@ -719,21 +719,21 @@ with gr.Blocks(title="Fábrica de Cortes", theme=gr.themes.Default(primary_hue="
                         # Definições padrão para evitar que fiquem vazios
                         new_choices = []
                         new_val = ""
-                        new_chunk = 70000
+                        new_chunk = 250000
                         
                         if backend == "gemini":
                             new_choices = GEMINI_MODELS
                             new_val = GEMINI_MODELS[1]
-                            new_chunk = 70000
+                            new_chunk = 250000
                         elif backend == "g4f":
                             new_choices = G4F_MODELS
                             new_val = G4F_MODELS[5]
-                            new_chunk = 70000
+                            new_chunk = 25000
                         elif backend == "local":
                             models = get_local_models()
                             new_choices = models if models else [i18n("No models found")]
                             new_val = new_choices[0]
-                            new_chunk = 30000
+                            new_chunk = 15000
                         else: # Manual
                              pass
 

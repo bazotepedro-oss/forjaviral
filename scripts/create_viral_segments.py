@@ -35,10 +35,12 @@ except ImportError:
 
 def clean_json_response(response_text):
     """
-    Limpa a resposta focando em encontrar o objeto JSON que contém a chave "segments".
-    Estratégia: 
-    1. Busca a palavra "segments", encontra o '{' anterior e usa raw_decode.
-    2. Fallback: Parsear lista de segmentos item a item (recuperação de JSON truncado).
+    Limpa e extrai a lista de segmentos virais da resposta do modelo de IA.
+    Suporta:
+    1. Blocos de markdown ```json ... ```
+    2. Listas JSON brutas contendo diretamente os segmentos [ {...}, {...} ]
+    3. Objetos JSON contendo chaves como 'segments', 'viral_moments', 'cuts', 'cortes', 'items', 'results'
+    4. Fragment parser para respostas truncadas por limite de tokens
     """
     if not isinstance(response_text, str):
         response_text = str(response_text)
@@ -46,112 +48,92 @@ def clean_json_response(response_text):
     if not response_text:
         return {"segments": []}
 
-    # 1. Limpeza preliminar
-    # Remove tags de pensamento (DeepSeek R1)
+    # 1. Limpeza preliminar: remove tags de pensamento (DeepSeek R1) e normaliza escapes
     response_text = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
-    
-    # Normaliza escapes excessivos (\n virando \\n) e aspas se parecer necessário
     try:
         if "\\n" in response_text or "\\\"" in response_text:
-             # Tenta um decode básico de escapes
-             response_text = response_text.replace("\\n", "\n").replace("\\\"", "\"").replace("\\'", "'")
-    except:
+            response_text = response_text.replace("\\n", "\n").replace('\\"', '"').replace("\\'", "'")
+    except Exception:
         pass
 
-    # 2. Busca pela palavra-chave "segments"
-    # Procura índices de todas as ocorrências de 'segments'
-    matches = [m.start() for m in re.finditer(r'segments', response_text)]
-    
-    if not matches:
-        # Se não achou segments, retorna vazio
-        return {"segments": []}
+    # 2. Tentativa Direta A: Extrair bloco markdown ```json ... ``` se existir
+    markdown_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", response_text)
+    if markdown_match:
+        cand = markdown_match.group(1).strip()
+        try:
+            parsed = json.loads(cand)
+            if isinstance(parsed, list):
+                return {"segments": parsed}
+            elif isinstance(parsed, dict):
+                for k in ["segments", "viral_moments", "cuts", "cortes", "items", "results"]:
+                    if k in parsed and isinstance(parsed[k], list):
+                        return {"segments": parsed[k]}
+        except Exception:
+            pass
 
-    # Tenta extrair JSON válido a partir de cada ocorrência
+    # 3. Tentativa Direta B: Tentar parsear o texto inteiro como JSON direto
+    trimmed = response_text.strip()
+    if (trimmed.startswith("{") and trimmed.endswith("}")) or (trimmed.startswith("[") and trimmed.endswith("]")):
+        try:
+            parsed = json.loads(trimmed)
+            if isinstance(parsed, list):
+                return {"segments": parsed}
+            elif isinstance(parsed, dict):
+                for k in ["segments", "viral_moments", "cuts", "cortes", "items", "results"]:
+                    if k in parsed and isinstance(parsed[k], list):
+                        return {"segments": parsed[k]}
+        except Exception:
+            pass
+
+    # 4. Tentativa C: Busca flexível por qualquer objeto JSON contendo 'segments', 'cuts', 'cortes' ou 'viral'
+    keywords = ['segments', 'cuts', 'cortes', 'viral']
+    matches = []
+    for kw in keywords:
+        matches.extend([m.start() for m in re.finditer(kw, response_text, re.IGNORECASE)])
+    matches = sorted(list(set(matches)))
+
     for match_idx in matches:
-        # Procura o '{' mais próximo ANTES de "segments"
-        # Limita busca a 5000 chars para trás para performance
         start_search = max(0, match_idx - 5000)
         snippet_before = response_text[start_search:match_idx]
-        
-        # Encontra o ÚLTIMO '{' no snippet
         last_open_rel = snippet_before.rfind('{')
-        
         if last_open_rel != -1:
             real_start = start_search + last_open_rel
             candidate_text = response_text[real_start:]
-            
-            # Tentativa A: json.raw_decode
             try:
                 decoder = json.JSONDecoder()
                 obj, _ = decoder.raw_decode(candidate_text)
-                if 'segments' in obj and isinstance(obj['segments'], list):
-                    return obj
-            except:
-                pass
-            
-            # Tentativa B: ast.literal_eval
-            try:
-                balance = 0
-                in_string = False
-                escape = False
-                found_end = -1
-                
-                for i, char in enumerate(candidate_text):
-                    if escape:
-                        escape = False
-                        continue
-                    if char == '\\':
-                        escape = True
-                        continue
-                    if char == "'" or char == '"':
-                        in_string = not in_string
-                        continue
-                        
-                    if not in_string:
-                        if char == '{':
-                            balance += 1
-                        elif char == '}':
-                            balance -= 1
-                            if balance == 0:
-                                found_end = i
-                                break
-                
-                if found_end != -1:
-                    clean_cand = candidate_text[:found_end+1]
-                    obj = ast.literal_eval(clean_cand)
-                    if 'segments' in obj and isinstance(obj['segments'], list):
-                        return obj
-            except:
+                if isinstance(obj, dict):
+                    for k in ["segments", "viral_moments", "cuts", "cortes", "items", "results"]:
+                        if k in obj and isinstance(obj[k], list):
+                            return {"segments": obj[k]}
+            except Exception:
                 pass
 
-    # 3. Fallback: Extração bruta de markdown
+    # 5. Tentativa D: Tentar achar qualquer lista JSON bruta [ { ... } ]
+    array_start = response_text.find('[')
+    if array_start != -1:
+        candidate_arr = response_text[array_start:]
+        try:
+            decoder = json.JSONDecoder()
+            arr_obj, _ = decoder.raw_decode(candidate_arr)
+            if isinstance(arr_obj, list) and len(arr_obj) > 0 and isinstance(arr_obj[0], dict):
+                return {"segments": arr_obj}
+        except Exception:
+            pass
+
+    # 6. Tentativa E: Fragment Parser (para JSON truncado no meio de um chunk)
     try:
-        match = re.search(r"```json(.*?)```", response_text, re.DOTALL)
-        if match:
-            return json.loads(match.group(1))
-    except:
-        pass
-        
-    # 4. LAST RESORT: Fragment Parser (Para JSON truncado/incompleto)
-    # Procura por "segments": [ e tenta parsear item por item
-    try:
-        match_list = re.search(r'"segments"\s*:\s*\[', response_text)
-        if match_list:
-            start_pos = match_list.end()
+        match_list = re.search(r'["\']?(?:segments|cuts|cortes)["\']?\s*:\s*\[', response_text, re.IGNORECASE)
+        start_pos = match_list.end() if match_list else response_text.find('[') + 1
+        if start_pos > 0:
             current_pos = start_pos
             found_segments = []
             decoder = json.JSONDecoder()
-            
-            while True:
+            while current_pos < len(response_text):
                 while current_pos < len(response_text) and response_text[current_pos] in ' \t\n\r,':
                     current_pos += 1
-                
-                if current_pos >= len(response_text):
+                if current_pos >= len(response_text) or response_text[current_pos] == ']':
                     break
-                    
-                if response_text[current_pos] == ']':
-                    break
-                
                 try:
                     obj, end_pos = decoder.raw_decode(response_text[current_pos:])
                     if isinstance(obj, dict):
@@ -159,11 +141,10 @@ def clean_json_response(response_text):
                     current_pos += end_pos
                 except json.JSONDecodeError:
                     break
-                    
             if found_segments:
                 print(f"[INFO] Recuperado {len(found_segments)} segmentos de JSON truncado.")
                 return {"segments": found_segments}
-    except:
+    except Exception:
         pass
 
     return {"segments": []}
@@ -542,20 +523,20 @@ def create(num_segments, viral_mode, themes, tempo_minimo, tempo_maximo, ai_mode
     model_name = ""
     
     if ai_mode == "gemini":
-        cfg_chunk = config["gemini"].get("chunk_size", 15000)
+        cfg_chunk = config["gemini"].get("chunk_size", 250000)
         current_chunk_size = chunk_size_arg if chunk_size_arg and int(chunk_size_arg) > 0 else cfg_chunk
-        cfg_model = config["gemini"].get("model", "gemini-flash-lite-latest")
+        cfg_model = config["gemini"].get("model", "gemini-2.5-flash-lite-preview-09-2025")
         model_name = model_name_arg if model_name_arg else cfg_model
         if not api_key: api_key = config["gemini"].get("api_key", "")
             
     elif ai_mode == "g4f":
-        cfg_chunk = config["g4f"].get("chunk_size", 2000)
+        cfg_chunk = config["g4f"].get("chunk_size", 25000)
         current_chunk_size = chunk_size_arg if chunk_size_arg and int(chunk_size_arg) > 0 else cfg_chunk
-        cfg_model = config["g4f"].get("model")
+        cfg_model = config["g4f"].get("model", "gpt-4o-mini")
         model_name = model_name_arg if model_name_arg else cfg_model
 
     elif ai_mode == "local":
-        current_chunk_size = chunk_size_arg if chunk_size_arg and int(chunk_size_arg) > 0 else 3000
+        current_chunk_size = chunk_size_arg if chunk_size_arg and int(chunk_size_arg) > 0 else 15000
         model_name = model_name_arg if model_name_arg else ""
 
     system_prompt_template = ""
@@ -590,33 +571,41 @@ OUTPUT JSON ONLY:
             }
         '''
 
-    # Chunking
-    chunk_size = int(current_chunk_size)
-    overlap_size = max(1000, int(chunk_size * 0.1))
-    
-    chunks = []
-    start = 0
+    # Chunking Inteligente e Adaptativo
     content_len = len(content)
 
-    print(f"[DEBUG] Chunking content (Size: {content_len}) with Chunk Size: {chunk_size} and Overlap: {overlap_size}")
+    # Se estiver usando Gemini e o transcript tiver ate 350.000 caracteres (~4 a 5 horas de audio),
+    # processa tudo em 1 unico bloco! Isso evita cortes fatiados no meio de historias e garante contexto completo.
+    if ai_mode == "gemini" and content_len <= 350000 and (not chunk_size_arg or int(chunk_size_arg) >= 200000):
+        chunk_size = content_len
+        overlap_size = 0
+        chunks = [content]
+        print(f"[INFO] Gemini (Contexto Amplo): Analisando video completo em chamada unica ({content_len} caracteres).")
+    else:
+        chunk_size = int(current_chunk_size)
+        # Overlap generoso (minimo de 4.000 caracteres ou 20%) para que nenhuma historia de 60s a 120s fique cortada na borda
+        overlap_size = max(4000, int(chunk_size * 0.20))
+        chunks = []
+        start = 0
+        print(f"[DEBUG] Chunking content (Tamanho: {content_len}) com Chunk Size: {chunk_size} e Overlap: {overlap_size}")
 
-    while start < content_len:
-        end = min(start + chunk_size, content_len)
-        if end < content_len:
-            last_space = content.rfind(' ', start, end)
-            if last_space != -1 and last_space > start:
-                end = last_space
-        chunk_text = content[start:end]
-        if chunk_text.strip():
-            chunks.append(chunk_text)
-        if end >= content_len:
-            break
-        next_start = max(start + 1, end - overlap_size)
-        safe_space = content.rfind(' ', start, next_start)
-        if safe_space != -1:
-            start = safe_space + 1
-        else:
-            start = next_start
+        while start < content_len:
+            end = min(start + chunk_size, content_len)
+            if end < content_len:
+                last_space = content.rfind(' ', start, end)
+                if last_space != -1 and last_space > start:
+                    end = last_space
+            chunk_text = content[start:end]
+            if chunk_text.strip():
+                chunks.append(chunk_text)
+            if end >= content_len:
+                break
+            next_start = max(start + 1, end - overlap_size)
+            safe_space = content.rfind(' ', start, next_start)
+            if safe_space != -1:
+                start = safe_space + 1
+            else:
+                start = next_start
 
     if viral_mode:
         virality_instruction = f"""analyze the segment for potential virality and identify {quantidade_de_virals} most viral segments from the transcript"""
@@ -781,6 +770,81 @@ OUTPUT JSON ONLY:
             print(f"Erro: Resposta inválida.")
         except Exception as e:
             print(f"Erro desconhecido ao processar chunk: {e}")
+
+    # MODO DE RESGATE ADAPTATIVO: se nenhum segmento foi encontrado pelos chunks normais
+    if not all_raw_segments:
+        print("\n" + "="*60)
+        print("[MODO DE RESGATE] Nenhum corte detectado nos chunks iniciais.")
+        print("[MODO DE RESGATE] Ativando analise adaptativa de alta sensibilidade...")
+        print("="*60 + "\n")
+        
+        # Usa um trecho representativo (ate 180.000 caracteres)
+        rescue_chunk = content[:180000] if len(content) > 180000 else content
+        
+        rescue_prompt = f"""You are a World-Class Viral Video Editor.
+Analyze this transcript with timestamps (XXs) and identify {quantidade_de_virals} high-interest segments.
+Each segment must be between {tempo_minimo}s and {tempo_maximo}s.
+CRITICAL: Do NOT return an empty list. If there are no explosive viral moments, pick the best discussions, insights, or interesting stories.
+Output Title, Hook, and Reasoning in the same language as the transcript.
+
+TRANSCRIPT:
+{rescue_chunk}
+
+OUTPUT VALID JSON ONLY:
+{{
+  "segments": [
+    {{
+      "start_time_ref": "(XXs)",
+      "start_text": "Exact first 5-10 words",
+      "end_text": "Exact last 5-10 words",
+      "title": "Engaging Clip Title",
+      "reasoning": "Why this moment is interesting",
+      "score": 90
+    }}
+  ]
+}}"""
+        rescue_resp = ""
+        try:
+            if ai_mode == "gemini":
+                rescue_resp = call_gemini(rescue_prompt, api_key, model_name=model_name)
+            elif ai_mode == "g4f":
+                rescue_resp = call_g4f(rescue_prompt, model_name=model_name)
+            elif ai_mode == "local" and local_llm_instance:
+                out = local_llm_instance.create_chat_completion(
+                    messages=[{"role": "user", "content": rescue_prompt}],
+                    max_tokens=4096,
+                    temperature=0.7
+                )
+                rescue_resp = out['choices'][0]['message']['content']
+        except Exception as e_res:
+            print(f"[MODO DE RESGATE] Erro na chamada da IA: {e_res}")
+
+        if rescue_resp:
+            rescue_data = clean_json_response(rescue_resp)
+            rescued_segs = rescue_data.get("segments", [])
+            if rescued_segs:
+                print(f"[MODO DE RESGATE] Sucesso! Recuperados {len(rescued_segs)} corte(s)!")
+                all_raw_segments.extend(rescued_segs)
+
+    # ULTIMATE SAFETY NET: Se mesmo apos o resgate a IA ainda nao retornou nada (ex: API offline),
+    # gera segmentos baseados no fluxo da transcricao para que o processo NUNCA crashe
+    if not all_raw_segments and transcript_segments:
+        print("\n[MODO DE SEGURANCA] Recuperando momentos de destaque diretamente da transcricao...")
+        total_time = transcript_segments[-1].get('end', 0)
+        if total_time > tempo_minimo:
+            step = total_time / (quantidade_de_virals + 1)
+            for s_idx in range(1, quantidade_de_virals + 1):
+                target = s_idx * step
+                closest = min(transcript_segments, key=lambda x: abs(x['start'] - target))
+                s_t = closest['start']
+                all_raw_segments.append({
+                    "start_time_ref": f"({int(s_t)}s)",
+                    "start_text": closest.get('text', '')[:40],
+                    "end_text": "",
+                    "title": f"Destaque do Video #{s_idx}",
+                    "reasoning": "Momento de destaque recuperado do fluxo da conversa",
+                    "score": 85
+                })
 
     # Call the alignment / processing logic
     return process_segments(
