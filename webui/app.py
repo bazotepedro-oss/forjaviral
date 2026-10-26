@@ -1148,14 +1148,24 @@ if __name__ == "__main__":
         if is_windows:
             print("Running in Windows environment (using Gradio launch for convenience).")
             # Windows: Use demo.launch() for convenience (auto-browser, etc)
-            app, local_url, share_url = demo.queue().launch(
-                share=False, 
-                allowed_paths=allowed_dirs, 
-                inbrowser=True,
-                server_name="0.0.0.0",
-                server_port=7860,
-                prevent_thread_lock=True
-            )
+            try:
+                app, local_url, share_url = demo.queue().launch(
+                    share=False, 
+                    allowed_paths=allowed_dirs, 
+                    inbrowser=True,
+                    server_name="0.0.0.0",
+                    server_port=7860,
+                    prevent_thread_lock=True
+                )
+            except OSError:
+                print("Porta 7860 ocupada. Localizando proxima porta disponivel...")
+                app, local_url, share_url = demo.queue().launch(
+                    share=False, 
+                    allowed_paths=allowed_dirs, 
+                    inbrowser=True,
+                    server_name="0.0.0.0",
+                    prevent_thread_lock=True
+                )
             attach_extra_routes(app)
             demo.block_thread()
         else:

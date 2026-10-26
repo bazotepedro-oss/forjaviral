@@ -28,6 +28,11 @@ echo  Para fechar o programa, feche esta janela do terminal.
 echo ==============================================================
 echo.
 
+rem Liberar porta 7860 se houver processo anterior preso
+for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":7860" ^| findstr "LISTENING"') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
+
 call ".venv\Scripts\activate.bat"
 python "webui\app.py"
 
