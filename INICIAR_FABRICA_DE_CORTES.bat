@@ -18,6 +18,9 @@ echo ==============================================================
 echo.
 echo           INICIANDO FABRICA DE CORTES - EDICAO DE VIDEOS
 echo.
+echo  Carregando modelos de IA e CUDA na placa de video...
+echo  (Na primeira inicializacao pode levar de 20 a 30 segundos)
+echo.
 echo  Aguarde... Seu navegador abrira automaticamente:
 echo  --^> http://localhost:7860
 echo.
