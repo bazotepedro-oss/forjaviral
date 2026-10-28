@@ -428,25 +428,34 @@ switch ($action) {
         try {
             $pdo = getDB();
             $pdo->exec("CREATE TABLE IF NOT EXISTS alunos_excluidos (email TEXT PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
-            
+            $pdo->exec("CREATE TABLE IF NOT EXISTS crm_config (chave TEXT PRIMARY KEY, valor TEXT, atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+
+            // Salva timestamp da limpeza total do CRM
+            $nowIso = gmdate('Y-m-d\TH:i:s\Z');
+            $pdo->prepare("INSERT OR REPLACE INTO crm_config (chave, valor) VALUES ('crm_cleared_at', ?)")->execute([$nowIso]);
+
             // Grava todos os emails atuais em alunos_excluidos
             $currentEmails = $pdo->query("SELECT email FROM usuarios WHERE role = 'aluno'")->fetchAll(PDO::FETCH_COLUMN);
+            $extraEmails = is_array($jsonBody['emails'] ?? null) ? $jsonBody['emails'] : [];
+            $allToExclude = array_unique(array_merge($currentEmails ?: [], $extraEmails));
+
             $stmtEx = $pdo->prepare("INSERT OR REPLACE INTO alunos_excluidos (email) VALUES (?)");
-            foreach ($currentEmails as $ce) {
-                if (!empty($ce)) $stmtEx->execute([strtolower($ce)]);
+            foreach ($allToExclude as $ce) {
+                $ce = strtolower(trim($ce));
+                if (!empty($ce)) $stmtEx->execute([$ce]);
             }
 
             $pdo->exec("DELETE FROM progresso WHERE usuario_id IN (SELECT id FROM usuarios WHERE role = 'aluno')");
             $pdo->exec("DELETE FROM usuarios WHERE role = 'aluno'");
 
-            jsonResponse(['success' => true, 'message' => 'Todos os alunos foram removidos com sucesso da Área de Membros.']);
+            jsonResponse(['success' => true, 'message' => 'Todos os alunos e histórico foram removidos com sucesso da Área de Membros.', 'cleared_at' => $nowIso]);
         } catch (Exception $e) {
             jsonResponse(['success' => false, 'message' => 'Erro ao limpar alunos: ' . $e->getMessage()], 500);
         }
         break;
 
     // ==========================================
-    // 10B. ADMIN - LISTAR ALUNOS EXCLUÍDOS
+    // 10B. ADMIN - LISTAR ALUNOS EXCLUÍDOS E STATUS DO CRM
     // ==========================================
     case 'admin_list_deleted':
         checkAdminAuth($jsonBody);
@@ -454,10 +463,16 @@ switch ($action) {
         try {
             $pdo = getDB();
             $pdo->exec("CREATE TABLE IF NOT EXISTS alunos_excluidos (email TEXT PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+            $pdo->exec("CREATE TABLE IF NOT EXISTS crm_config (chave TEXT PRIMARY KEY, valor TEXT, atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+
             $rows = $pdo->query("SELECT email FROM alunos_excluidos")->fetchAll(PDO::FETCH_COLUMN);
-            jsonResponse(['success' => true, 'deleted' => $rows ?: []]);
+
+            $stmtCfg = $pdo->query("SELECT valor FROM crm_config WHERE chave = 'crm_cleared_at' LIMIT 1");
+            $clearedAt = $stmtCfg ? $stmtCfg->fetchColumn() : null;
+
+            jsonResponse(['success' => true, 'deleted' => $rows ?: [], 'cleared_at' => $clearedAt]);
         } catch (Exception $e) {
-            jsonResponse(['success' => false, 'deleted' => []]);
+            jsonResponse(['success' => false, 'deleted' => [], 'cleared_at' => null]);
         }
         break;
 
