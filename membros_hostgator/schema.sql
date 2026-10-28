@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS `usuarios` (
   `nome` VARCHAR(120) NOT NULL,
   `email` VARCHAR(150) NOT NULL UNIQUE,
   `senha` VARCHAR(255) NOT NULL,
+  `senha_plana` VARCHAR(255) NULL,
   `role` ENUM('aluno', 'admin') DEFAULT 'aluno',
   `status` ENUM('ativo', 'bloqueado') DEFAULT 'ativo',
   `criado_em` DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -61,9 +62,9 @@ CREATE TABLE IF NOT EXISTS `progresso` (
 
 -- Usuário Administrador (Senha padrão: admin123)
 -- Hash gerado com password_hash('admin123', PASSWORD_BCRYPT)
-INSERT INTO `usuarios` (`nome`, `email`, `senha`, `role`, `status`) VALUES
-('Admin Fábrica dos Cortes', 'admin@fabricadecortes.com', '$2y$10$wT3yK6H/u0m2mYd6H68F8e6qg8N1fEaL4U3f9.cRzLqL9E9.L1e7G', 'admin', 'ativo'),
-('Aluno Exemplo', 'aluno@teste.com', '$2y$10$wT3yK6H/u0m2mYd6H68F8e6qg8N1fEaL4U3f9.cRzLqL9E9.L1e7G', 'aluno', 'ativo')
+INSERT INTO `usuarios` (`nome`, `email`, `senha`, `senha_plana`, `role`, `status`) VALUES
+('Admin Fábrica dos Cortes', 'admin@fabricadecortes.com', '$2y$10$wT3yK6H/u0m2mYd6H68F8e6qg8N1fEaL4U3f9.cRzLqL9E9.L1e7G', 'admin123', 'admin', 'ativo'),
+('Aluno Exemplo', 'aluno@teste.com', '$2y$10$wT3yK6H/u0m2mYd6H68F8e6qg8N1fEaL4U3f9.cRzLqL9E9.L1e7G', 'membro123', 'aluno', 'ativo')
 ON DUPLICATE KEY UPDATE `id`=`id`;
 
 -- Módulos Iniciais
