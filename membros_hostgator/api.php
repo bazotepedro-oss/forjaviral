@@ -412,11 +412,7 @@ switch ($action) {
                 $del->execute([$target['id']]);
             }
 
-            if (!empty($targetEmail)) {
-                $pdo->prepare("INSERT OR REPLACE INTO alunos_excluidos (email, excluido_em) VALUES (?, CURRENT_TIMESTAMP)")->execute([$targetEmail]);
-            }
-
-            jsonResponse(['success' => true, 'message' => "Acesso do aluno {$targetEmail} excluído permanentemente da Área de Membros."]);
+            jsonResponse(['success' => true, 'message' => "Acesso do aluno {$targetEmail} excluído com sucesso da Área de Membros."]);
         } catch (Exception $e) {
             jsonResponse(['success' => false, 'message' => 'Erro ao excluir aluno: ' . $e->getMessage()], 500);
         }
