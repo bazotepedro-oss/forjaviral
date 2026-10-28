@@ -324,6 +324,9 @@ switch ($action) {
             $check->execute([$email]);
             $exists = $check->fetch();
 
+            // Se o email estava na lista de excluídos, remove para reativar completamente
+            $pdo->prepare("DELETE FROM alunos_excluidos WHERE LOWER(email) = ?")->execute([$email]);
+
             if ($exists) {
                 // Atualiza nome, nova senha, senha plana e reativa o status
                 $upd = $pdo->prepare("UPDATE usuarios SET nome = ?, senha = ?, senha_plana = ?, status = 'ativo' WHERE id = ?");
@@ -431,19 +434,11 @@ switch ($action) {
             $pdo->exec("CREATE TABLE IF NOT EXISTS crm_config (chave TEXT PRIMARY KEY, valor TEXT, atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
 
             // Salva timestamp da limpeza total do CRM
-            $nowIso = gmdate('Y-m-d\TH:i:s\Z');
+            $nowIso = !empty($jsonBody['cleared_at']) ? trim($jsonBody['cleared_at']) : gmdate('Y-m-d\TH:i:s\Z');
             $pdo->prepare("INSERT OR REPLACE INTO crm_config (chave, valor) VALUES ('crm_cleared_at', ?)")->execute([$nowIso]);
 
-            // Grava todos os emails atuais em alunos_excluidos
-            $currentEmails = $pdo->query("SELECT email FROM usuarios WHERE role = 'aluno'")->fetchAll(PDO::FETCH_COLUMN);
-            $extraEmails = is_array($jsonBody['emails'] ?? null) ? $jsonBody['emails'] : [];
-            $allToExclude = array_unique(array_merge($currentEmails ?: [], $extraEmails));
-
-            $stmtEx = $pdo->prepare("INSERT OR REPLACE INTO alunos_excluidos (email) VALUES (?)");
-            foreach ($allToExclude as $ce) {
-                $ce = strtolower(trim($ce));
-                if (!empty($ce)) $stmtEx->execute([$ce]);
-            }
+            // Limpa lista de alunos excluídos para não bloquear compras futuras após o reset
+            $pdo->exec("DELETE FROM alunos_excluidos");
 
             $pdo->exec("DELETE FROM progresso WHERE usuario_id IN (SELECT id FROM usuarios WHERE role = 'aluno')");
             $pdo->exec("DELETE FROM usuarios WHERE role = 'aluno'");
@@ -465,7 +460,7 @@ switch ($action) {
             $pdo->exec("CREATE TABLE IF NOT EXISTS alunos_excluidos (email TEXT PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
             $pdo->exec("CREATE TABLE IF NOT EXISTS crm_config (chave TEXT PRIMARY KEY, valor TEXT, atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
 
-            $rows = $pdo->query("SELECT email FROM alunos_excluidos")->fetchAll(PDO::FETCH_COLUMN);
+            $rows = $pdo->query("SELECT email, excluido_em FROM alunos_excluidos")->fetchAll(PDO::FETCH_ASSOC);
 
             $stmtCfg = $pdo->query("SELECT valor FROM crm_config WHERE chave = 'crm_cleared_at' LIMIT 1");
             $clearedAt = $stmtCfg ? $stmtCfg->fetchColumn() : null;
