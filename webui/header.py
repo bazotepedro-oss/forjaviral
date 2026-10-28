@@ -3,7 +3,7 @@ import sys
 
 import base64
 
-# webui/header.py — Fábrica de Cortes (client-facing header)
+# webui/header.py — Fábrica dos Cortes (client-facing header)
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 WORKING_DIR = os.path.dirname(CURRENT_DIR)
@@ -22,7 +22,7 @@ if os.path.exists(LOGO_PATH):
     try:
         with open(LOGO_PATH, "rb") as f:
             b64 = base64.b64encode(f.read()).decode("utf-8")
-            logo_tag = f'<img src="data:image/png;base64,{b64}" style="width:44px;height:44px;border-radius:12px;object-fit:contain;box-shadow:0 0 15px rgba(255,92,0,0.4);" alt="Fábrica de Cortes">'
+            logo_tag = f'<img src="data:image/png;base64,{b64}" style="width:44px;height:44px;border-radius:12px;object-fit:contain;box-shadow:0 0 15px rgba(255,92,0,0.4);" alt="Fábrica dos Cortes">'
     except Exception:
         pass
 
@@ -136,7 +136,7 @@ description = r"""
     <div class="fv-left">
       <div class="fv-mark">FC</div>
       <div class="fv-title">
-        <h1>FÁBRICA DE CORTES</h1>
+        <h1>FÁBRICA DOS CORTES</h1>
         <p>Transforme vídeos longos em cortes virais prontos para postar — fabricadecortes.com</p>
       </div>
     </div>
