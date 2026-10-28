@@ -386,6 +386,9 @@ switch ($action) {
         try {
             $pdo = getDB();
 
+            // Garantir tabela de alunos excluídos para sincronização com o CRM
+            $pdo->exec("CREATE TABLE IF NOT EXISTS alunos_excluidos (email TEXT PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+
             // Localizar o aluno
             if ($alunoId > 0) {
                 $stmt = $pdo->prepare("SELECT id, email FROM usuarios WHERE id = ? AND role != 'admin' LIMIT 1");
@@ -396,17 +399,21 @@ switch ($action) {
             }
             $target = $stmt->fetch();
 
+            $targetEmail = $target ? strtolower($target['email']) : $email;
+
             if ($target) {
                 // Remover progresso de aulas
                 $pdo->prepare("DELETE FROM progresso WHERE usuario_id = ?")->execute([$target['id']]);
                 // Excluir usuário da tabela
                 $del = $pdo->prepare("DELETE FROM usuarios WHERE id = ?");
                 $del->execute([$target['id']]);
-
-                jsonResponse(['success' => true, 'message' => "Acesso do aluno {$target['email']} excluído permanentemente da Área de Membros."]);
-            } else {
-                jsonResponse(['success' => true, 'message' => 'Aluno já não constava na Área de Membros.']);
             }
+
+            if (!empty($targetEmail)) {
+                $pdo->prepare("INSERT OR REPLACE INTO alunos_excluidos (email) VALUES (?)")->execute([$targetEmail]);
+            }
+
+            jsonResponse(['success' => true, 'message' => "Acesso do aluno {$targetEmail} excluído permanentemente da Área de Membros."]);
         } catch (Exception $e) {
             jsonResponse(['success' => false, 'message' => 'Erro ao excluir aluno: ' . $e->getMessage()], 500);
         }
@@ -420,12 +427,37 @@ switch ($action) {
 
         try {
             $pdo = getDB();
+            $pdo->exec("CREATE TABLE IF NOT EXISTS alunos_excluidos (email TEXT PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+            
+            // Grava todos os emails atuais em alunos_excluidos
+            $currentEmails = $pdo->query("SELECT email FROM usuarios WHERE role = 'aluno'")->fetchAll(PDO::FETCH_COLUMN);
+            $stmtEx = $pdo->prepare("INSERT OR REPLACE INTO alunos_excluidos (email) VALUES (?)");
+            foreach ($currentEmails as $ce) {
+                if (!empty($ce)) $stmtEx->execute([strtolower($ce)]);
+            }
+
             $pdo->exec("DELETE FROM progresso WHERE usuario_id IN (SELECT id FROM usuarios WHERE role = 'aluno')");
             $pdo->exec("DELETE FROM usuarios WHERE role = 'aluno'");
 
             jsonResponse(['success' => true, 'message' => 'Todos os alunos foram removidos com sucesso da Área de Membros.']);
         } catch (Exception $e) {
             jsonResponse(['success' => false, 'message' => 'Erro ao limpar alunos: ' . $e->getMessage()], 500);
+        }
+        break;
+
+    // ==========================================
+    // 10B. ADMIN - LISTAR ALUNOS EXCLUÍDOS
+    // ==========================================
+    case 'admin_list_deleted':
+        checkAdminAuth($jsonBody);
+
+        try {
+            $pdo = getDB();
+            $pdo->exec("CREATE TABLE IF NOT EXISTS alunos_excluidos (email TEXT PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+            $rows = $pdo->query("SELECT email FROM alunos_excluidos")->fetchAll(PDO::FETCH_COLUMN);
+            jsonResponse(['success' => true, 'deleted' => $rows ?: []]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'deleted' => []]);
         }
         break;
 
