@@ -525,8 +525,17 @@ switch ($action) {
                 $stmt = $pdo->prepare("UPDATE usuarios SET senha = ?, senha_plana = ? WHERE id = ?");
                 $stmt->execute([$hash, $novaSenha, $alunoId]);
             } elseif (!empty($email)) {
-                $stmt = $pdo->prepare("UPDATE usuarios SET senha = ?, senha_plana = ? WHERE LOWER(email) = ?");
-                $stmt->execute([$hash, $novaSenha, $email]);
+                $chk = $pdo->prepare("SELECT id FROM usuarios WHERE LOWER(email) = ? LIMIT 1");
+                $chk->execute([$email]);
+                $existing = $chk->fetch();
+                if ($existing) {
+                    $stmt = $pdo->prepare("UPDATE usuarios SET senha = ?, senha_plana = ?, status = 'ativo' WHERE id = ?");
+                    $stmt->execute([$hash, $novaSenha, $existing['id']]);
+                } else {
+                    $nome = explode('@', $email)[0];
+                    $ins = $pdo->prepare("INSERT INTO usuarios (nome, email, senha, senha_plana, role, status) VALUES (?, ?, ?, ?, 'aluno', 'ativo')");
+                    $ins->execute([$nome, $email, $hash, $novaSenha]);
+                }
             } else {
                 jsonResponse(['success' => false, 'message' => 'Informe o ID ou e-mail do aluno.'], 400);
             }
