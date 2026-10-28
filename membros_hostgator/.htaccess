@@ -8,11 +8,18 @@ ServerSignature Off
 # Forçar UTF-8
 AddDefaultCharset UTF-8
 
-# Bloquear acesso direto ao arquivo de schema SQL
-<Files "schema.sql">
-    Order Allow,Deny
-    Deny from all
-</Files>
+DirectoryIndex index.php index.html
+
+# Bloquear acesso direto a bancos e schemas
+<FilesMatch "\.(sqlite|db|sql)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Allow,Deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
 
 # Habilitar RewriteEngine para URLs limpas
 <IfModule mod_rewrite.c>
