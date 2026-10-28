@@ -413,7 +413,7 @@ switch ($action) {
             }
 
             if (!empty($targetEmail)) {
-                $pdo->prepare("INSERT OR REPLACE INTO alunos_excluidos (email) VALUES (?)")->execute([$targetEmail]);
+                $pdo->prepare("INSERT OR REPLACE INTO alunos_excluidos (email, excluido_em) VALUES (?, CURRENT_TIMESTAMP)")->execute([$targetEmail]);
             }
 
             jsonResponse(['success' => true, 'message' => "Acesso do aluno {$targetEmail} excluído permanentemente da Área de Membros."]);
@@ -431,14 +431,16 @@ switch ($action) {
         try {
             $pdo = getDB();
             $pdo->exec("CREATE TABLE IF NOT EXISTS alunos_excluidos (email TEXT PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+            $pdo->exec("CREATE TABLE IF NOT EXISTS checkouts_excluidos (checkout_id TEXT PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
             $pdo->exec("CREATE TABLE IF NOT EXISTS crm_config (chave TEXT PRIMARY KEY, valor TEXT, atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
 
             // Salva timestamp da limpeza total do CRM
             $nowIso = !empty($jsonBody['cleared_at']) ? trim($jsonBody['cleared_at']) : gmdate('Y-m-d\TH:i:s\Z');
             $pdo->prepare("INSERT OR REPLACE INTO crm_config (chave, valor) VALUES ('crm_cleared_at', ?)")->execute([$nowIso]);
 
-            // Limpa lista de alunos excluídos para não bloquear compras futuras após o reset
+            // Limpa lista de alunos excluídos e checkouts excluídos para não bloquear compras futuras após o reset
             $pdo->exec("DELETE FROM alunos_excluidos");
+            $pdo->exec("DELETE FROM checkouts_excluidos");
 
             $pdo->exec("DELETE FROM progresso WHERE usuario_id IN (SELECT id FROM usuarios WHERE role = 'aluno')");
             $pdo->exec("DELETE FROM usuarios WHERE role = 'aluno'");
@@ -450,7 +452,7 @@ switch ($action) {
         break;
 
     // ==========================================
-    // 10B. ADMIN - LISTAR ALUNOS EXCLUÍDOS E STATUS DO CRM
+    // 10B. ADMIN - LISTAR ALUNOS E CHECKOUTS EXCLUÍDOS E STATUS DO CRM
     // ==========================================
     case 'admin_list_deleted':
         checkAdminAuth($jsonBody);
@@ -458,6 +460,7 @@ switch ($action) {
         try {
             $pdo = getDB();
             $pdo->exec("CREATE TABLE IF NOT EXISTS alunos_excluidos (email TEXT PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+            $pdo->exec("CREATE TABLE IF NOT EXISTS checkouts_excluidos (checkout_id TEXT PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
             $pdo->exec("CREATE TABLE IF NOT EXISTS crm_config (chave TEXT PRIMARY KEY, valor TEXT, atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
 
             $rows = $pdo->query("SELECT email, excluido_em FROM alunos_excluidos")->fetchAll(PDO::FETCH_ASSOC);
@@ -465,9 +468,38 @@ switch ($action) {
             $stmtCfg = $pdo->query("SELECT valor FROM crm_config WHERE chave = 'crm_cleared_at' LIMIT 1");
             $clearedAt = $stmtCfg ? $stmtCfg->fetchColumn() : null;
 
-            jsonResponse(['success' => true, 'deleted' => $rows ?: [], 'cleared_at' => $clearedAt]);
+            $checkouts = $pdo->query("SELECT checkout_id FROM checkouts_excluidos")->fetchAll(PDO::FETCH_COLUMN);
+
+            jsonResponse([
+                'success' => true,
+                'deleted' => $rows ?: [],
+                'deleted_checkouts' => $checkouts ?: [],
+                'cleared_at' => $clearedAt
+            ]);
         } catch (Exception $e) {
-            jsonResponse(['success' => false, 'deleted' => [], 'cleared_at' => null]);
+            jsonResponse(['success' => false, 'deleted' => [], 'deleted_checkouts' => [], 'cleared_at' => null]);
+        }
+        break;
+
+    // ==========================================
+    // 10C. ADMIN - EXCLUIR CHECKOUT / PEDIDO ESPECÍFICO
+    // ==========================================
+    case 'admin_delete_checkout':
+        checkAdminAuth($jsonBody);
+
+        $checkoutId = trim($_POST['checkout_id'] ?? $jsonBody['checkout_id'] ?? '');
+        if (empty($checkoutId)) {
+            jsonResponse(['success' => false, 'message' => 'Informe o checkout_id.'], 400);
+        }
+
+        try {
+            $pdo = getDB();
+            $pdo->exec("CREATE TABLE IF NOT EXISTS checkouts_excluidos (checkout_id TEXT PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+            $pdo->prepare("INSERT OR REPLACE INTO checkouts_excluidos (checkout_id, excluido_em) VALUES (?, CURRENT_TIMESTAMP)")->execute([$checkoutId]);
+
+            jsonResponse(['success' => true, 'message' => "Checkout {$checkoutId} excluído com sucesso."]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro ao excluir checkout: ' . $e->getMessage()], 500);
         }
         break;
 
