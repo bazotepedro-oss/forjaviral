@@ -626,6 +626,145 @@ switch ($action) {
         }
         break;
 
+    // ==========================================
+    // 13. ADMIN - SALVAR / SINCRONIZAR AFILIADO / YOUTUBER
+    // ==========================================
+    case 'admin_save_affiliate':
+        checkAdminAuth($jsonBody);
+
+        $id                = trim($_POST['id'] ?? $jsonBody['id'] ?? '');
+        $name              = trim($_POST['name'] ?? $jsonBody['name'] ?? '');
+        $email             = strtolower(trim($_POST['email'] ?? $jsonBody['email'] ?? ''));
+        $slug              = strtolower(trim($_POST['slug'] ?? $jsonBody['slug'] ?? ''));
+        $token             = trim($_POST['token'] ?? $jsonBody['token'] ?? '');
+        $couponCode        = strtoupper(trim($_POST['coupon_code'] ?? $jsonBody['coupon_code'] ?? ''));
+        $discountPercent   = intval($_POST['discount_percent'] ?? $jsonBody['discount_percent'] ?? 0);
+        $commissionPercent = intval($_POST['commission_percent'] ?? $jsonBody['commission_percent'] ?? 20);
+        $pixKey            = trim($_POST['pix_key'] ?? $jsonBody['pix_key'] ?? '');
+        $pixKeyType        = trim($_POST['pix_key_type'] ?? $jsonBody['pix_key_type'] ?? 'cpf');
+        $notes             = trim($_POST['notes'] ?? $jsonBody['notes'] ?? '');
+        $active            = intval($_POST['active'] ?? $jsonBody['active'] ?? 1);
+
+        if (empty($email) || empty($name) || empty($slug)) {
+            jsonResponse(['success' => false, 'message' => 'Nome, e-mail e slug são obrigatórios.'], 400);
+        }
+
+        if (empty($id)) {
+            $id = 'aff_' . substr(md5($email . time()), 0, 16);
+        }
+        if (empty($token)) {
+            $token = 'tok_' . substr(md5($slug . time()), 0, 20);
+        }
+        if (empty($couponCode)) {
+            $couponCode = strtoupper($slug);
+        }
+
+        try {
+            $pdo = getDB();
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS afiliados (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    email TEXT NOT NULL UNIQUE,
+                    slug TEXT NOT NULL UNIQUE,
+                    token TEXT NOT NULL UNIQUE,
+                    coupon_code TEXT NOT NULL UNIQUE,
+                    discount_percent INTEGER DEFAULT 0,
+                    commission_percent INTEGER DEFAULT 20,
+                    pix_key TEXT NOT NULL,
+                    pix_key_type TEXT DEFAULT 'cpf',
+                    active INTEGER DEFAULT 1,
+                    notes TEXT NULL,
+                    criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    atualizado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+
+            $stmt = $pdo->prepare("
+                INSERT INTO afiliados (id, name, email, slug, token, coupon_code, discount_percent, commission_percent, pix_key, pix_key_type, active, notes, atualizado_em)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(email) DO UPDATE SET
+                    name = excluded.name,
+                    slug = excluded.slug,
+                    coupon_code = excluded.coupon_code,
+                    discount_percent = excluded.discount_percent,
+                    commission_percent = excluded.commission_percent,
+                    pix_key = excluded.pix_key,
+                    pix_key_type = excluded.pix_key_type,
+                    active = excluded.active,
+                    notes = excluded.notes,
+                    atualizado_em = CURRENT_TIMESTAMP
+            ");
+            $stmt->execute([
+                $id, $name, $email, $slug, $token, $couponCode,
+                $discountPercent, $commissionPercent, $pixKey, $pixKeyType,
+                $active, $notes
+            ]);
+
+            jsonResponse(['success' => true, 'message' => 'Afiliado salvo com sucesso!', 'id' => $id, 'token' => $token]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro ao salvar afiliado: ' . $e->getMessage()], 500);
+        }
+        break;
+
+    // ==========================================
+    // 14. ADMIN - LISTAR AFILIADOS EM JSON
+    // ==========================================
+    case 'admin_list_affiliates':
+        checkAdminAuth($jsonBody);
+
+        try {
+            $pdo = getDB();
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS afiliados (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    email TEXT NOT NULL UNIQUE,
+                    slug TEXT NOT NULL UNIQUE,
+                    token TEXT NOT NULL UNIQUE,
+                    coupon_code TEXT NOT NULL UNIQUE,
+                    discount_percent INTEGER DEFAULT 0,
+                    commission_percent INTEGER DEFAULT 20,
+                    pix_key TEXT NOT NULL,
+                    pix_key_type TEXT DEFAULT 'cpf',
+                    active INTEGER DEFAULT 1,
+                    notes TEXT NULL,
+                    criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    atualizado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+
+            $affiliates = $pdo->query("SELECT * FROM afiliados ORDER BY criado_em DESC")->fetchAll();
+            jsonResponse(['success' => true, 'affiliates' => $affiliates ?: []]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => $e->getMessage(), 'affiliates' => []], 500);
+        }
+        break;
+
+    // ==========================================
+    // 15. ADMIN - EXCLUIR AFILIADO
+    // ==========================================
+    case 'admin_delete_affiliate':
+        checkAdminAuth($jsonBody);
+
+        $id    = trim($_POST['id'] ?? $jsonBody['id'] ?? '');
+        $email = strtolower(trim($_POST['email'] ?? $jsonBody['email'] ?? ''));
+
+        if (empty($id) && empty($email)) {
+            jsonResponse(['success' => false, 'message' => 'ID ou e-mail obrigatório.'], 400);
+        }
+
+        try {
+            $pdo = getDB();
+            $stmt = $pdo->prepare("DELETE FROM afiliados WHERE id = ? OR LOWER(email) = ?");
+            $stmt->execute([$id, $email]);
+
+            jsonResponse(['success' => true, 'message' => 'Afiliado excluído com sucesso da Área de Membros.']);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro ao excluir afiliado: ' . $e->getMessage()], 500);
+        }
+        break;
+
     default:
         jsonResponse(['success' => false, 'message' => 'Ação não especificada'], 400);
 }
