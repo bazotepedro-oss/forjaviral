@@ -412,9 +412,33 @@ switch ($action) {
                 $del->execute([$target['id']]);
             }
 
+            if (!empty($targetEmail)) {
+                $pdo->prepare("INSERT OR REPLACE INTO alunos_excluidos (email, excluido_em) VALUES (?, CURRENT_TIMESTAMP)")->execute([$targetEmail]);
+            }
+
             jsonResponse(['success' => true, 'message' => "Acesso do aluno {$targetEmail} excluído com sucesso da Área de Membros."]);
         } catch (Exception $e) {
             jsonResponse(['success' => false, 'message' => 'Erro ao excluir aluno: ' . $e->getMessage()], 500);
+        }
+        break;
+
+    // ==========================================
+    // 9B. ADMIN - REGISTRAR CHECKOUT EXCLUÍDO (IMPEDIR RESSUSCITAÇÃO)
+    // ==========================================
+    case 'admin_delete_checkout':
+        checkAdminAuth($jsonBody);
+        $checkoutId = trim($jsonBody['checkout_id'] ?? $_POST['checkout_id'] ?? '');
+        if (empty($checkoutId)) {
+            jsonResponse(['success' => false, 'message' => 'Checkout ID obrigatório.'], 400);
+        }
+        try {
+            $pdo = getDB();
+            $pdo->exec("CREATE TABLE IF NOT EXISTS checkouts_excluidos (checkout_id TEXT PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+            $stmt = $pdo->prepare("INSERT OR REPLACE INTO checkouts_excluidos (checkout_id, excluido_em) VALUES (?, CURRENT_TIMESTAMP)");
+            $stmt->execute([$checkoutId]);
+            jsonResponse(['success' => true, 'message' => "Checkout {$checkoutId} registrado como excluído com sucesso."]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro ao salvar checkout excluído: ' . $e->getMessage()], 500);
         }
         break;
 
