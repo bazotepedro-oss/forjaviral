@@ -473,7 +473,7 @@ switch ($action) {
             }
 
             if (!empty($targetEmail)) {
-                $pdo->prepare("INSERT OR REPLACE INTO alunos_excluidos (email, excluido_em) VALUES (?, CURRENT_TIMESTAMP)")->execute([$targetEmail]);
+                $pdo->prepare("DELETE FROM alunos_excluidos WHERE LOWER(email) = ?")->execute([$targetEmail]);
             }
 
             jsonResponse(['success' => true, 'message' => "Acesso do aluno {$targetEmail} excluído com sucesso da Área de Membros."]);
@@ -757,8 +757,8 @@ switch ($action) {
 
         try {
             $pdo = getDB();
-            $stmt = $pdo->prepare("DELETE FROM afiliados WHERE id = ? OR LOWER(email) = ? OR LOWER(slug) = ?");
-            $stmt->execute([$id, $email, $slug]);
+            $stmt = $pdo->prepare("DELETE FROM afiliados WHERE (? != '' AND id = ?) OR (? != '' AND LOWER(email) = ?) OR (? != '' AND LOWER(slug) = ?)");
+            $stmt->execute([$id, $id, $email, $email, $slug, $slug]);
 
             jsonResponse(['success' => true, 'message' => 'Afiliado excluído com sucesso da Área de Membros.']);
         } catch (Exception $e) {
