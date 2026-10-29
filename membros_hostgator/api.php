@@ -343,6 +343,66 @@ switch ($action) {
         break;
 
     // ==========================================
+    // 7B. ADMIN - EDITAR DADOS DO ALUNO (NOME, EMAIL, SENHA)
+    // ==========================================
+    case 'admin_edit_student':
+        checkAdminAuth($jsonBody);
+
+        $email     = strtolower(trim($_POST['email'] ?? $jsonBody['email'] ?? ''));
+        $novoNome  = trim($_POST['nome'] ?? $jsonBody['nome'] ?? '');
+        $novoEmail = strtolower(trim($_POST['novo_email'] ?? $jsonBody['novo_email'] ?? ''));
+        $novaSenha = trim($_POST['senha'] ?? $jsonBody['senha'] ?? $_POST['nova_senha'] ?? $jsonBody['nova_senha'] ?? '');
+
+        if (empty($email) && empty($novoEmail)) {
+            jsonResponse(['success' => false, 'message' => 'E-mail do aluno obrigatório.'], 400);
+        }
+
+        try {
+            $pdo = getDB();
+            $searchEmail = !empty($email) ? $email : $novoEmail;
+            $chk = $pdo->prepare("SELECT id FROM usuarios WHERE LOWER(email) = ? LIMIT 1");
+            $chk->execute([$searchEmail]);
+            $existing = $chk->fetch();
+
+            if ($existing) {
+                $fields = [];
+                $params = [];
+                if (!empty($novoNome)) {
+                    $fields[] = "nome = ?";
+                    $params[] = $novoNome;
+                }
+                if (!empty($novoEmail) && $novoEmail !== $searchEmail) {
+                    $fields[] = "email = ?";
+                    $params[] = $novoEmail;
+                }
+                if (!empty($novaSenha)) {
+                    $hash = password_hash($novaSenha, PASSWORD_BCRYPT);
+                    $fields[] = "senha = ?";
+                    $params[] = $hash;
+                    $fields[] = "senha_plana = ?";
+                    $params[] = $novaSenha;
+                }
+                if (!empty($fields)) {
+                    $params[] = $existing['id'];
+                    $sql = "UPDATE usuarios SET " . implode(", ", $fields) . " WHERE id = ?";
+                    $pdo->prepare($sql)->execute($params);
+                }
+                jsonResponse(['success' => true, 'message' => 'Aluno atualizado com sucesso na Área de Membros.']);
+            } else {
+                $targetEmail = !empty($novoEmail) ? $novoEmail : $email;
+                $nome = !empty($novoNome) ? $novoNome : explode('@', $targetEmail)[0];
+                $pass = !empty($novaSenha) ? $novaSenha : 'membro2026';
+                $hash = password_hash($pass, PASSWORD_BCRYPT);
+                $stmt = $pdo->prepare("INSERT INTO usuarios (nome, email, senha, senha_plana, role, status) VALUES (?, ?, ?, ?, 'aluno', 'ativo')");
+                $stmt->execute([$nome, $targetEmail, $hash, $pass]);
+                jsonResponse(['success' => true, 'message' => 'Aluno cadastrado e sincronizado com sucesso na Área de Membros.']);
+            }
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro ao editar aluno: ' . $e->getMessage()], 500);
+        }
+        break;
+
+    // ==========================================
     // 8. ADMIN - ALTERAR STATUS DO ALUNO (BLOQUEAR/ATIVAR)
     // ==========================================
     case 'admin_toggle_student':
@@ -501,27 +561,6 @@ switch ($action) {
         }
         break;
 
-    // ==========================================
-    // 10C. ADMIN - EXCLUIR CHECKOUT / PEDIDO ESPECÍFICO
-    // ==========================================
-    case 'admin_delete_checkout':
-        checkAdminAuth($jsonBody);
-
-        $checkoutId = trim($_POST['checkout_id'] ?? $jsonBody['checkout_id'] ?? '');
-        if (empty($checkoutId)) {
-            jsonResponse(['success' => false, 'message' => 'Informe o checkout_id.'], 400);
-        }
-
-        try {
-            $pdo = getDB();
-            $pdo->exec("CREATE TABLE IF NOT EXISTS checkouts_excluidos (checkout_id TEXT PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
-            $pdo->prepare("INSERT OR REPLACE INTO checkouts_excluidos (checkout_id, excluido_em) VALUES (?, CURRENT_TIMESTAMP)")->execute([$checkoutId]);
-
-            jsonResponse(['success' => true, 'message' => "Checkout {$checkoutId} excluído com sucesso."]);
-        } catch (Exception $e) {
-            jsonResponse(['success' => false, 'message' => 'Erro ao excluir checkout: ' . $e->getMessage()], 500);
-        }
-        break;
 
     // ==========================================
     // 11. ADMIN - ALTERAR / REDEFINIR SENHA DO ALUNO
