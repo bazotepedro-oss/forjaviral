@@ -749,15 +749,16 @@ switch ($action) {
 
         $id    = trim($_POST['id'] ?? $jsonBody['id'] ?? '');
         $email = strtolower(trim($_POST['email'] ?? $jsonBody['email'] ?? ''));
+        $slug  = strtolower(trim($_POST['slug'] ?? $jsonBody['slug'] ?? ''));
 
-        if (empty($id) && empty($email)) {
-            jsonResponse(['success' => false, 'message' => 'ID ou e-mail obrigatório.'], 400);
+        if (empty($id) && empty($email) && empty($slug)) {
+            jsonResponse(['success' => false, 'message' => 'ID, e-mail ou slug obrigatório.'], 400);
         }
 
         try {
             $pdo = getDB();
-            $stmt = $pdo->prepare("DELETE FROM afiliados WHERE id = ? OR LOWER(email) = ?");
-            $stmt->execute([$id, $email]);
+            $stmt = $pdo->prepare("DELETE FROM afiliados WHERE id = ? OR LOWER(email) = ? OR LOWER(slug) = ?");
+            $stmt->execute([$id, $email, $slug]);
 
             jsonResponse(['success' => true, 'message' => 'Afiliado excluído com sucesso da Área de Membros.']);
         } catch (Exception $e) {
