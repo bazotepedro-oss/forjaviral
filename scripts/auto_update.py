@@ -56,26 +56,27 @@ def save_local_version(project_root, version_data):
     except Exception as e:
         print(f"[AUTO-UPDATE] Aviso ao salvar versão local: {e}")
 
-def check_remote_version_raw(timeout=3):
-    """Tenta obter versão remota sem limite de requisições via raw.githubusercontent.com."""
+def check_remote_version_raw(timeout=4):
+    """Tenta obter versão remota sem limite de requisições com cache-busting."""
     try:
         ctx = ssl.create_default_context()
-        req = urllib.request.Request(RAW_VERSION_URL, headers={"User-Agent": "FabricaDosCortes-Updater"})
+        url = f"{RAW_VERSION_URL}?cb={int(time.time())}"
+        req = urllib.request.Request(url, headers={"User-Agent": "FabricaDosCortes-Updater", "Cache-Control": "no-cache"})
         with urllib.request.urlopen(req, context=ctx, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             return data
     except Exception:
         return None
 
-def check_remote_version_api(timeout=3):
+def check_remote_version_api(timeout=4):
     """Fallback: Tenta obter último commit via GitHub API."""
     try:
         ctx = ssl.create_default_context()
-        req = urllib.request.Request(API_COMMITS_URL, headers={"User-Agent": "FabricaDosCortes-Updater"})
+        req = urllib.request.Request(API_COMMITS_URL, headers={"User-Agent": "FabricaDosCortes-Updater", "Cache-Control": "no-cache"})
         with urllib.request.urlopen(req, context=ctx, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             sha = data.get("sha", "")[:7]
-            return {"version": "1.2.0", "commit": sha}
+            return {"version": "1.2.5", "commit": sha}
     except Exception:
         return None
 
@@ -110,7 +111,7 @@ def update_via_git(project_root):
         if res.returncode == 0:
             return "UPDATED"
         else:
-            # Fallback seguro com merge/checkout se houver conflito não intencional
+            # Fallback seguro com checkout
             subprocess.run([git_exe, "reset", "--hard", "origin/main"], cwd=project_root, timeout=10)
             return "UPDATED"
     except Exception as e:
@@ -126,7 +127,7 @@ def update_via_zip(project_root, new_version_data=None):
         print("[AUTO-UPDATE] Baixando pacote de atualização oficial...")
         ctx = ssl.create_default_context()
         req = urllib.request.Request(ZIP_URL, headers={"User-Agent": "FabricaDosCortes-Updater"})
-        with urllib.request.urlopen(req, context=ctx, timeout=15) as resp, open(temp_zip, "wb") as out_file:
+        with urllib.request.urlopen(req, context=ctx, timeout=20) as resp, open(temp_zip, "wb") as out_file:
             shutil.copyfileobj(resp, out_file)
 
         # Extrai
@@ -199,7 +200,8 @@ def run_auto_update():
 
     project_root = get_project_root()
     local_ver = load_local_version(project_root)
-    local_commit = local_ver.get("commit", "").strip()
+    local_commit = str(local_ver.get("commit", "")).strip()
+    local_v = str(local_ver.get("version", "1.0.0")).strip()
 
     print("==============================================================")
     print(" [AUTO-UPDATE] Verificando atualizacoes no GitHub...")
@@ -207,7 +209,7 @@ def run_auto_update():
     # 1. Tenta método Git primeiro se houver pasta .git
     git_result = update_via_git(project_root)
     if git_result == "ALREADY_UPDATED":
-        print(f" [OK] Seu sistema ja esta na versao mais recente! ({local_commit[:7] if local_commit else 'OK'})")
+        print(f" [OK] Seu sistema ja esta na versao mais recente! (v{local_v} - {local_commit[:7] if local_commit else 'Git'})")
         print("==============================================================")
         return
     elif git_result == "UPDATED":
@@ -219,9 +221,9 @@ def run_auto_update():
         return
 
     # 2. Se não tem Git ou falhou, consulta a versão remota
-    remote_ver = check_remote_version_raw(timeout=3)
+    remote_ver = check_remote_version_raw(timeout=4)
     if not remote_ver:
-        remote_ver = check_remote_version_api(timeout=3)
+        remote_ver = check_remote_version_api(timeout=4)
 
     if not remote_ver:
         print(" [i] Sem conexao com o GitHub ou servidor ocupado.")
@@ -229,15 +231,27 @@ def run_auto_update():
         print("==============================================================")
         return
 
-    remote_commit = remote_ver.get("commit", "").strip()
+    remote_commit = str(remote_ver.get("commit", "")).strip()
+    remote_v = str(remote_ver.get("version", "")).strip()
 
-    # Se a versão for a mesma, nada a fazer
-    if local_commit and remote_commit and local_commit == remote_commit:
-        print(f" [OK] Seu sistema ja esta na versao mais recente! ({local_commit[:7]})")
+    # Verifica se há atualização necessária
+    is_outdated = False
+    if local_commit in ("auto", "unknown", ""):
+        is_outdated = True
+    elif remote_commit and remote_commit != "auto" and local_commit != remote_commit:
+        is_outdated = True
+    elif remote_v and local_v != remote_v:
+        is_outdated = True
+
+    if not is_outdated:
+        print(f" [OK] Seu sistema ja esta na versao mais recente! (v{local_v} - {local_commit[:7]})")
         print("==============================================================")
         return
 
-    print(f" [!] Nova versao detectada: {remote_commit[:7]} (Versao local: {local_commit[:7] if local_commit else 'antiga'})")
+    target_display = remote_commit[:7] if (remote_commit and remote_commit != "auto") else f"v{remote_v}"
+    local_display = local_commit[:7] if (local_commit and local_commit != "auto") else f"v{local_v}"
+    print(f" [!] Nova versao detectada: {target_display} (Local: {local_display})")
+    
     success = update_via_zip(project_root, remote_ver)
     if success:
         print(" [OK] Todas as melhorias foram sincronizadas com sucesso!")
@@ -251,4 +265,3 @@ if __name__ == "__main__":
         run_auto_update()
     except Exception as e:
         print(f"[AUTO-UPDATE] Erro silencioso: {e}")
-    # print(f"DEBUG: Tempo de checagem: {round(time.time() - t0, 2)}s")
