@@ -242,9 +242,17 @@ def transcribe(input_file, model_name='large-v3', project_folder='tmp'):
                 start_segments = parsed
                 alignment_only = True
                 
-                # Forçar EN conforme solicitado pelo usuário para alinhamento
-                detected_language = 'en'
-                print(f"Idioma forçado para alinhamento: {detected_language}")
+                # Detecção inteligente do idioma a partir do nome ou conteúdo da legenda
+                sub_name_low = sub_path.lower()
+                if 'pt' in sub_name_low:
+                    detected_language = 'pt'
+                elif 'es' in sub_name_low or 'sp' in sub_name_low:
+                    detected_language = 'es'
+                elif 'en' in sub_name_low:
+                    detected_language = 'en'
+                else:
+                    detected_language = 'pt'
+                print(f"Idioma detectado para alinhamento: {detected_language}")
                 
                 print("--- MODO ALINHAMENTO RÁPIDO ATIVADO ---")
         
@@ -305,9 +313,26 @@ def transcribe(input_file, model_name='large-v3', project_folder='tmp'):
         except Exception as e:
             print(f"Erro durante alinhamento: {e}. ")
             if alignment_only:
-                 print("Falha crítica no alinhamento de legendas externas. Abortando usage de legendas externas.")
-                 # Opcional: Fallback para transcrição normal se falhar? Seria complexo aqui pois já limpamos memória.
-                 # Vamos apenas salvar o que temos (timestamps da legenda original podem não bater com áudio perfeitamente se não alinhar)
+                 print("Alinhamento acústico falhou ou Wav2Vec2 ausente. Gerando timestamps sintéticos por palavra a partir da legenda...")
+                 for seg in start_segments:
+                     raw_txt = seg.get("text", "").strip()
+                     words_arr = raw_txt.split()
+                     if words_arr:
+                         s_start = float(seg.get("start", 0.0))
+                         s_end = float(seg.get("end", s_start + 2.0))
+                         dur = max(0.1, s_end - s_start)
+                         w_dur = dur / len(words_arr)
+                         seg_words = []
+                         for w_idx, w in enumerate(words_arr):
+                             w_s = s_start + w_idx * w_dur
+                             w_e = w_s + w_dur
+                             seg_words.append({
+                                 "word": w,
+                                 "start": round(w_s, 3),
+                                 "end": round(w_e, 3),
+                                 "score": 0.99
+                             })
+                         seg["words"] = seg_words
                  result = {"segments": start_segments, "language": detected_language}
             else:
                  print("Continuando com transcrição bruta.")

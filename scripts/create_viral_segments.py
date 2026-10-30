@@ -205,6 +205,22 @@ def call_gemini(prompt, api_key, model_name='gemini-flash-lite-latest'):
                 time.sleep(wait_time)
                 continue
             else:
+                err_lower = error_str.lower()
+                if "404" in error_str or "not found" in err_lower or "no longer available" in err_lower:
+                    print(f"[Gemini 404] Modelo '{model_name}' indisponível. Tentando automaticamente 'gemini-2.0-flash'...")
+                    try:
+                        fallback_model = genai.GenerativeModel("gemini-2.0-flash")
+                        response_fb = fallback_model.generate_content(prompt)
+                        return response_fb.text
+                    except Exception as e_fb:
+                        print(f"Fallback para gemini-2.0-flash falhou ({e_fb}). Tentando 'gemini-1.5-flash'...")
+                        try:
+                            fallback_model2 = genai.GenerativeModel("gemini-1.5-flash")
+                            response_fb2 = fallback_model2.generate_content(prompt)
+                            return response_fb2.text
+                        except Exception as e_fb2:
+                            print(f"Erro em todos os fallbacks do Gemini: {e_fb2}")
+                            return "{}"
                 print(f"Erro na API do Gemini: {e}")
                 return "{}"
     

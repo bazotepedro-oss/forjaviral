@@ -6,11 +6,15 @@ import json
 def cut(segments, project_folder="tmp", skip_video=False):
 
     def check_nvenc_support():
-        # ... (unchanged)
         try:
-            result = subprocess.run(["ffmpeg", "-encoders"], capture_output=True, text=True)
-            return "h264_nvenc" in result.stdout
-        except subprocess.CalledProcessError:
+            # Testa codificação real de 1 frame para validar se a GPU e os drivers NVIDIA funcionam
+            test_cmd = [
+                "ffmpeg", "-f", "lavfi", "-i", "color=black:s=256x256:d=0.04",
+                "-c:v", "h264_nvenc", "-f", "null", "-"
+            ]
+            res = subprocess.run(test_cmd, capture_output=True)
+            return res.returncode == 0
+        except Exception:
             return False
 
     def generate_segments(response, project_folder, skip_video):
@@ -134,13 +138,35 @@ def cut(segments, project_folder="tmp", skip_video=False):
                     output_path
                 ])
 
+                cut_success = False
                 try:
                     subprocess.run(command, check=True, capture_output=True, text=True)
-                    if os.path.exists(output_path):
+                    if os.path.exists(output_path) and os.path.getsize(output_path) > 1024:
                         file_size = os.path.getsize(output_path)
                         print(f"Generated segment: {output_filename}, Size: {file_size} bytes")
+                        cut_success = True
+                    else:
+                        raise subprocess.CalledProcessError(1, command, output="Empty file")
                 except subprocess.CalledProcessError as e:
-                    print(f"Error executing ffmpeg: {e}")
+                    if video_codec == "h264_nvenc":
+                        print(f"[AVISO] NVENC falhou na renderização ({e}). Alternando automaticamente para CPU (libx264)...")
+                        video_codec = "libx264"
+                        command_cpu = [
+                            "ffmpeg", "-y", "-loglevel", "error", "-hide_banner",
+                            "-ss", start_time_str, "-i", input_file, "-t", duration_str,
+                            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+                            "-c:a", "aac", "-b:a", "128k", output_path
+                        ]
+                        try:
+                            subprocess.run(command_cpu, check=True, capture_output=True, text=True)
+                            if os.path.exists(output_path) and os.path.getsize(output_path) > 1024:
+                                file_size = os.path.getsize(output_path)
+                                print(f"Generated segment (CPU Fallback): {output_filename}, Size: {file_size} bytes")
+                                cut_success = True
+                        except subprocess.CalledProcessError as e_cpu:
+                            print(f"Error executing ffmpeg (CPU Fallback): {e_cpu}")
+                    else:
+                        print(f"Error executing ffmpeg: {e}")
             else:
                 print(f"Skipping video generation for {output_filename} (using existing). check json...")
             

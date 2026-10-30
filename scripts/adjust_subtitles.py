@@ -106,6 +106,21 @@ def generate_ass_from_file(input_path, output_path, project_folder,
 
         for segment in json_data.get('segments', []):
             words = segment.get('words', [])
+            if not words and segment.get('text'):
+                raw_text = segment.get('text', '').strip()
+                word_list = raw_text.split()
+                if word_list:
+                    s_start = float(segment.get('start', 0.0))
+                    s_end = float(segment.get('end', s_start + 2.0))
+                    dur = max(0.1, s_end - s_start)
+                    w_dur = dur / len(word_list)
+                    words = []
+                    for w_idx, w in enumerate(word_list):
+                        words.append({
+                            'word': w,
+                            'start': round(s_start + w_idx * w_dur, 3),
+                            'end': round(s_start + (w_idx + 1) * w_dur, 3)
+                        })
             total_words = len(words)
 
             i = 0

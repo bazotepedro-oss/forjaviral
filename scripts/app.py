@@ -199,13 +199,11 @@ def count_generated_cuts(project_folder_path, start_time=None):
     return 0
 
 GEMINI_MODELS = [
-    'gemini-3-pro-preview',
-    'gemini-2.5-flash',
-    'gemini-2.5-flash-preview-09-2025',
-    'gemini-2.5-flash-lite',
-    'gemini-2.5-flash-lite-preview-09-2025',
-    'gemini-2.5-pro',
     'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-2.5-flash-lite-preview-09-2025',
+    'gemini-1.5-pro',
+    'gemini-2.5-pro',
     'gemini-2.0-flash-lite'
 ]
 
@@ -770,7 +768,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     
                     # New Dynamic Inputs
                     with gr.Row():
-                        ai_model_input = gr.Dropdown(choices=GEMINI_MODELS, label=i18n("AI Model"), value=GEMINI_MODELS[1], allow_custom_value=True, visible=True, scale=5)
+                        ai_model_input = gr.Dropdown(choices=GEMINI_MODELS, label=i18n("AI Model"), value=GEMINI_MODELS[0], allow_custom_value=True, visible=True, scale=5)
                         refresh_models_btn = gr.Button("🔄", size="sm", visible=False, scale=0, min_width=50) # Only local
                         chunk_size_input = gr.Number(label=i18n("Chunk Size"), value=250000, precision=0, scale=2)
                     
@@ -786,7 +784,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                         
                         if backend == "gemini":
                             new_choices = GEMINI_MODELS
-                            new_val = GEMINI_MODELS[1]
+                            new_val = GEMINI_MODELS[0]
                             new_chunk = 250000
                         elif backend == "g4f":
                             new_choices = G4F_MODELS
