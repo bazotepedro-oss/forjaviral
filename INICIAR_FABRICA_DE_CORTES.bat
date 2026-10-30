@@ -14,6 +14,11 @@ if not exist ".venv\Scripts\python.exe" (
     exit /b 0
 )
 
+rem Auto-Update inteligente: sincroniza melhorias e arquivos do GitHub em 1-2 segundos
+if exist "%~dp0scripts\auto_update.py" (
+    "%~dp0.venv\Scripts\python.exe" "%~dp0scripts\auto_update.py"
+)
+
 echo ==============================================================
 echo.
 echo           INICIANDO FABRICA DE CORTES - EDICAO DE VIDEOS
