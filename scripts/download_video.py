@@ -7,27 +7,54 @@ i18n = I18nAuto()
 
 BROWSERS = ('chrome', 'edge', 'firefox', 'brave', 'opera', 'vivaldi', 'chromium', 'whale')
 
+def get_aria2c_path():
+    """Retorna o caminho do executavel aria2c se disponivel."""
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    venv_aria2 = os.path.join(project_root, '.venv', 'Scripts', 'aria2c.exe')
+    if os.path.exists(venv_aria2):
+        return venv_aria2
+    local_aria2 = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'aria2c.exe')
+    if os.path.exists(local_aria2):
+        return local_aria2
+    import shutil
+    sys_aria2 = shutil.which('aria2c')
+    if sys_aria2:
+        return sys_aria2
+    return None
+
 def download_with_browser_cookies(url, ydl_opts):
     """Download video directly; fallback to browser cookies only if authentication/bot check is required."""
+    def try_download(opts):
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            ydl.download([url])
+
     if ydl_opts.get('cookiefile'):
         try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([url])
+            try_download(ydl_opts)
             return
         except Exception as error:
             print(f"Cookies.txt recusado: {error}")
 
     # Tenta download direto (sem cookies). Funciona para a maioria dos videos publicos sem disparar erros de navegadores locais.
+    options = {key: value for key, value in ydl_opts.items() if key != 'cookiefile'}
     try:
-        options = {key: value for key, value in ydl_opts.items() if key != 'cookiefile'}
-        with yt_dlp.YoutubeDL(options) as ydl:
-            ydl.download([url])
+        try_download(options)
         return
     except Exception as first_error:
         error_str = str(first_error).lower()
-        # Se o erro for de legenda (ex: 429), nao adianta tentar cookies de navegadores, repassa para retry de video limpo
+        # Se o erro for de legenda (ex: 429), repassa para retry de video limpo
         if "unable to download video subtitles" in error_str or "429" in error_str:
             raise first_error
+
+        # Se falhou com aria2c, tenta com o multi-threading nativo
+        if options.get('external_downloader'):
+            try:
+                print("[TURBO] Tentando fallback para downloader nativo multi-thread...")
+                native_opts = {k: v for k, v in options.items() if k not in ('external_downloader', 'external_downloader_args')}
+                try_download(native_opts)
+                return
+            except Exception:
+                pass
 
         # Se falhou por autenticacao/bloqueio, tenta cookies dos navegadores instalados silenciosamente
         last_error = first_error
@@ -37,8 +64,7 @@ def download_with_browser_cookies(url, ydl_opts):
                 browser_opts['cookiesfrombrowser'] = (browser,)
                 browser_opts['quiet'] = True
                 browser_opts['no_warnings'] = True
-                with yt_dlp.YoutubeDL(browser_opts) as ydl:
-                    ydl.download([url])
+                try_download(browser_opts)
                 return
             except Exception as b_err:
                 last_error = b_err
@@ -151,14 +177,17 @@ def download(url, base_root="VIRALS", download_subs=True, quality="best", cookie
         except:
             pass
 
-    # Mapeamento de Qualidade
+    # Mapeamento de Qualidade Turbo
+    # Prioriza MP4 direto (H.264/AAC) em 1080p ou 720p. 
+    # Isso evita baixar 4K/WebM desnecessário de 3GB que trava o processador e demora 20 minutos.
     quality_map = {
-        "best": 'bestvideo+bestaudio/best',
-        "1080p": 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
-        "720p": 'bestvideo[height<=720]+bestaudio/best[height<=720]',
-        "480p": 'bestvideo[height<=480]+bestaudio/best[height<=480]'
+        "best": 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+        "1080p": 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+        "720p": 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]/best',
+        "480p": 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=480]+bestaudio/best[height<=480]/best',
+        "4k": 'bestvideo+bestaudio/best',
     }
-    selected_format = quality_map.get(quality, 'bestvideo+bestaudio/best')
+    selected_format = quality_map.get(quality, quality_map["best"])
     print(i18n("Configuring download quality: {} -> {}").format(quality, selected_format))
 
     ydl_opts = {
@@ -181,7 +210,31 @@ def download(url, base_root="VIRALS", download_subs=True, quality="best", cookie
         'quiet': False,
         'no_warnings': False,
         'force_ipv4': True,
+
+        # OTIMIZAÇÕES TURBO DE VELOCIDADE
+        'concurrent_fragment_downloads': 10,  # Baixa até 10 fragmentos simultâneos
+        'buffersize': 1024 * 1024 * 16,        # Buffer de 16MB em memória RAM
+        'http_chunk_size': 10485760,            # Blocos de 10MB
+        'retries': 10,
+        'fragment_retries': 10,
     }
+
+    # Ativa acelerador Aria2 se disponivel
+    aria2_path = get_aria2c_path()
+    if aria2_path:
+        print(f"[TURBO] Acelerador Aria2 detectado ({aria2_path}) - Ativando 16 conexões simultâneas!")
+        ydl_opts['external_downloader'] = aria2_path
+        ydl_opts['external_downloader_args'] = [
+            '-x', '16',
+            '-s', '16',
+            '-k', '1M',
+            '-j', '8',
+            '--min-split-size=1M',
+            '--max-connection-per-server=16',
+            '--summary-interval=2',
+        ]
+    else:
+        print("[TURBO] Multi-threading nativo ativado (10 downloads simultâneos de fragmentos)!")
     if cookies_file:
         ydl_opts['cookiefile'] = cookies_file
     
