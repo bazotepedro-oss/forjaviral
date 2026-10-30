@@ -33,6 +33,11 @@ for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":7860" ^| findstr "LI
     taskkill /F /PID %%a >nul 2>&1
 )
 
+rem Garante que o atalho oficial com ícone esteja na Área de Trabalho
+if exist "%~dp0scripts\create_shortcut.ps1" (
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\create_shortcut.ps1" >nul 2>&1
+)
+
 call ".venv\Scripts\activate.bat"
 python "webui\app.py"
 

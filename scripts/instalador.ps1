@@ -160,13 +160,21 @@ if ($choice -eq "1") {
 Write-Host " [OK] Todas as dependencias foram instaladas!" -ForegroundColor Green
 Write-Host ""
 
+# Passo 7: Atalho oficial na Area de Trabalho
+Write-Host "Criando atalho oficial na Area de Trabalho..." -ForegroundColor Cyan
+$setupShortcutScript = Join-Path $PSScriptRoot "create_shortcut.ps1"
+if (Test-Path $setupShortcutScript) {
+    & powershell.exe -ExecutionPolicy Bypass -File $setupShortcutScript
+}
+
 # Finalizacao
 Write-Host "==================================================================" -ForegroundColor Green
 Write-Host "              INSTALACAO CONCLUIDA COM SUCESSO!                  " -ForegroundColor Green
 Write-Host "==================================================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "Tudo pronto! Para abrir o app a qualquer momento, clique em:" -ForegroundColor White
-Write-Host " -> INICIAR_FABRICA_DE_CORTES.bat" -ForegroundColor Yellow
+Write-Host "Tudo pronto! Para abrir o app a qualquer momento, voce pode usar:" -ForegroundColor White
+Write-Host " -> O atalho oficial 'Fabrica dos Cortes' na sua Area de Trabalho" -ForegroundColor Yellow
+Write-Host " -> Ou clicar no arquivo INICIAR_FABRICA_DE_CORTES.bat" -ForegroundColor Yellow
 Write-Host ""
 
 $launch = Read-Host -Prompt "Deseja abrir a Fabrica de Cortes agora? (S/N) - Padrao e S: "
@@ -176,5 +184,5 @@ if ([string]::IsNullOrWhiteSpace($launch) -or $launch.ToUpper() -eq "S") {
     $runBat = Join-Path $projectRoot "INICIAR_FABRICA_DE_CORTES.bat"
     Start-Process -FilePath $runBat
 } else {
-    Write-Host "Tudo pronto. Voce pode iniciar quando quiser pelo INICIAR_FABRICA_DE_CORTES.bat" -ForegroundColor White
+    Write-Host "Tudo pronto. Voce pode iniciar quando quiser pelo atalho na Area de Trabalho!" -ForegroundColor White
 }
