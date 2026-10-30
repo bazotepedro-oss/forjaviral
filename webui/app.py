@@ -143,15 +143,19 @@ def convert_color_to_ass(hex_color, alpha="00"):
 
 def kill_process():
     global current_process
-    if current_process:
+    if current_process is not None:
         try:
-            parent = psutil.Process(current_process.pid)
+            proc = current_process
+            parent = psutil.Process(proc.pid)
             for child in parent.children(recursive=True):
-                child.kill()
-            parent.kill()
+                try: child.kill()
+                except Exception: pass
+            try: parent.kill()
+            except Exception: pass
             current_process = None
             return i18n("Process terminated.")
         except Exception as e:
+            current_process = None
             return i18n("Error terminating process: {}").format(e)
     return i18n("No process running.")
 
@@ -378,23 +382,33 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
              project_folder_path = os.path.join(VIRALS_DIR, project_name)
 
         last_update_time = time.time()
+        proc = current_process
         
-        while True:
-            line = current_process.stdout.readline()
-            if not line and current_process.poll() is not None:
+        while proc is not None:
+            if current_process is None:
+                logs += "\n[AVISO] Processo cancelado pelo usuário.\n"
+                break
+            try:
+                line = proc.stdout.readline() if proc.stdout else ""
+            except Exception:
                 break
             
-            if line:
-                logs += line
-                if "Project Folder:" in line:
-                    parts = line.split("Project Folder:")
-                    if len(parts) > 1: project_folder_path = parts[1].strip()
-                
-                # Throttle updates to avoid browser freeze (0.2s interval)
-                current_time = time.time()
-                if current_time - last_update_time > 0.2:
-                    yield logs, gr.update(visible=True, interactive=False), gr.update(visible=True), None, gr.update()
-                    last_update_time = current_time
+            if not line:
+                if proc.poll() is not None or current_process is None:
+                    break
+                time.sleep(0.05)
+                continue
+            
+            logs += line
+            if "Project Folder:" in line:
+                parts = line.split("Project Folder:")
+                if len(parts) > 1: project_folder_path = parts[1].strip()
+            
+            # Throttle updates to avoid browser freeze (0.2s interval)
+            current_time = time.time()
+            if current_time - last_update_time > 0.2:
+                yield logs, gr.update(visible=True, interactive=False), gr.update(visible=True), None, gr.update()
+                last_update_time = current_time
         
         # Final yield to ensure all logs are shown
         yield logs, gr.update(visible=True, interactive=False), gr.update(visible=True), None, gr.update()
@@ -402,16 +416,15 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
         logs += f"\nError running process: {str(e)}\n"
         yield logs, gr.update(visible=True, interactive=False), gr.update(visible=True), None, gr.update()
     finally:
-        if current_process:
-            if current_process.stdout:
-                try:
-                    current_process.stdout.close()
+        if current_process is not None:
+            proc = current_process
+            if proc.stdout:
+                try: proc.stdout.close()
                 except Exception: pass
-            if current_process.poll() is None:
-                try:
-                    current_process.wait()
+            if proc.poll() is None:
+                try: proc.wait(timeout=2)
                 except Exception: pass
-            return_code = current_process.returncode
+            return_code = proc.returncode if proc.returncode is not None else -1
             current_process = None
         else:
             return_code = -1
@@ -419,29 +432,30 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
     # Wait to ensure filesystem flush
     time.sleep(1.0)
     
-    # Verificação justa de créditos: só debita se os cortes realmente foram gerados com sucesso!
+    # Verificação justa de créditos: debita proporcionalmente pelos cortes efetivamente gerados!
     actual_cuts = count_generated_cuts(project_folder_path, start_time=process_start_time)
+    asked_segments = int(segments or 1)
+    to_debit = min(actual_cuts, asked_segments)
     
-    if return_code == 0 and actual_cuts > 0:
-        asked_segments = int(segments or 1)
-        to_debit = min(actual_cuts, asked_segments)
+    if actual_cuts > 0:
         try:
             debited = _gate.consume_n(to_debit)
             if debited:
                 logs += f"\n\n========================================================"
-                logs += f"\n[CRÉDITOS] Sucesso! {actual_cuts} corte(s) gerado(s) com sucesso."
-                logs += f"\n[CRÉDITOS] Foram debitados {to_debit} crédito(s). Saldo restante: {_gate.state.credits}."
+                if return_code == 0 and actual_cuts >= asked_segments:
+                    logs += f"\n[CRÉDITOS] Sucesso total! {actual_cuts} corte(s) gerado(s) com sucesso."
+                else:
+                    logs += f"\n[CRÉDITOS] Processo finalizado com {actual_cuts} corte(s) entregue(s) com sucesso."
+                logs += f"\n[CRÉDITOS] Foram debitados {to_debit} crédito(s) correspondentes aos vídeos entregues."
+                logs += f"\n[CRÉDITOS] Saldo restante: {_gate.state.credits} crédito(s)."
                 logs += f"\n========================================================\n"
             else:
-                logs += f"\n\n[AVISO CRÉDITOS] Cortes gerados com sucesso ({actual_cuts}), mas não foi possível conectar ao servidor de licença para sincronizar créditos.\n"
+                logs += f"\n\n[AVISO CRÉDITOS] Cortes gerados ({actual_cuts}), mas não foi possível conectar ao servidor para sincronizar créditos.\n"
         except Exception as e_cred:
             logs += f"\n\n[AVISO CRÉDITOS] Erro ao sincronizar créditos com o servidor: {e_cred}\n"
     else:
         logs += f"\n\n========================================================"
-        if actual_cuts == 0:
-            logs += f"\n[CRÉDITOS] Nenhum vídeo de corte foi gerado nesta execução."
-        else:
-            logs += f"\n[CRÉDITOS] O processo foi cancelado ou encerrou antes da conclusão total."
+        logs += f"\n[CRÉDITOS] Nenhum vídeo de corte foi finalizado nesta execução."
         logs += f"\n[CRÉDITOS] Seus créditos NÃO foram descontados (0 créditos consumidos)!"
         logs += f"\n[CRÉDITOS] Saldo preservado: {_gate.state.credits} crédito(s)."
         logs += f"\n========================================================\n"

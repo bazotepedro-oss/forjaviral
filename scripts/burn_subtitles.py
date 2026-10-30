@@ -83,14 +83,17 @@ def burn(project_folder="tmp"):
             # Extrai o nome base do vídeo (sem extensão)
             video_name = os.path.splitext(video_file)[0]
             
-            # Define o caminho para a legenda correspondente
+            # Busca inteligente da legenda correspondente por nome, _processed ou índice
             subtitle_file = os.path.join(subs_folder, f"{video_name}.ass")
-            
-            # Tentar também com sufixo _processed caso a convenção seja diferente
             if not os.path.exists(subtitle_file):
-                subtitle_file_processed = os.path.join(subs_folder, f"{video_name}_processed.ass")
-                if os.path.exists(subtitle_file_processed):
-                    subtitle_file = subtitle_file_processed
+                subtitle_file = os.path.join(subs_folder, f"{video_name}_processed.ass")
+            if not os.path.exists(subtitle_file) and os.path.exists(subs_folder):
+                idx_prefix = video_name.split('_')[0] if '_' in video_name else ""
+                if idx_prefix and idx_prefix.isdigit():
+                    for ass_f in os.listdir(subs_folder):
+                        if ass_f.endswith('.ass') and ass_f.startswith(idx_prefix):
+                            subtitle_file = os.path.join(subs_folder, ass_f)
+                            break
             
             # Verifica se a legenda existe
             if os.path.exists(subtitle_file):

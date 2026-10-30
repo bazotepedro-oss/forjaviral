@@ -114,11 +114,15 @@ def generate_ass_from_file(input_path, output_path, project_folder,
                 while len(block) < words_per_block and i < total_words:
                     current_word = words[i]
                     if 'word' in current_word:
+                        import html
+                        raw_w = html.unescape(str(current_word['word']))
+                        raw_w = re.sub(r'^(?:>>|>>>|\&gt;\&gt;|\&gt;\&gt;\&gt;)+', '', raw_w).strip()
+                        raw_w = re.sub(r'(?:>>|>>>|\&gt;\&gt;|\&gt;\&gt;\&gt;)+$', '', raw_w).strip()
                         if remove_punctuation:
-                            cleaned_word = re.sub(r'[.,!?;]', '', current_word['word'])
+                            cleaned_word = re.sub(r'[.,!?;]', '', raw_w)
                             block.append({**current_word, 'word': cleaned_word})
                         else:
-                            block.append(current_word)
+                            block.append({**current_word, 'word': raw_w})
 
                         if i + 1 < total_words:
                             next_word = words[i + 1]

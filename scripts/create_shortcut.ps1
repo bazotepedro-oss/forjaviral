@@ -29,3 +29,4 @@ try {
     Write-Host " [i] Erro ao criar atalho: $_" -ForegroundColor Yellow
     exit 1
 }
+

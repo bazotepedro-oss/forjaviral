@@ -339,10 +339,14 @@ def download(url, base_root="VIRALS", download_subs=True, quality="best", cookie
                             current_end = fix_time(end)
                             
                         elif clean_line:
-                             # Texto: remover tags complexas <00:00:00.560><c> etc
-                             # O YouTube usa formato karaoke. Ex: "Quanto<...> custa<...>"
-                             # Precisamos do texto limpo.
-                             text = re.sub(r'<[^>]+>', '', clean_line).strip()
+                             import html
+                             # 1. Decodifica entidades HTML (&gt; -> >, &quot; -> ", etc.)
+                             unescaped = html.unescape(clean_line)
+                             # 2. Remove tags complexas <00:00:00.560><c> etc
+                             text = re.sub(r'<[^>]+>', '', unescaped).strip()
+                             # 3. Remove marcadores de troca de orador do YouTube (>> ou >>> ou &gt;&gt;)
+                             text = re.sub(r'^(?:>>|>>>|\&gt;\&gt;|\&gt;\&gt;\&gt;)\s*', '', text)
+                             text = re.sub(r'\s*(?:>>|>>>|\&gt;\&gt;|\&gt;\&gt;\&gt;)\s*', ' ', text).strip()
                              
                              if not text: continue
                              

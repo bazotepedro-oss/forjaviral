@@ -607,10 +607,11 @@ OUTPUT JSON ONLY:
             else:
                 start = next_start
 
+    ask_amount = max(quantidade_de_virals + 2, int(quantidade_de_virals * 1.35))
     if viral_mode:
-        virality_instruction = f"""analyze the segment for potential virality and identify {quantidade_de_virals} most viral segments from the transcript"""
+        virality_instruction = f"""analyze the segment for potential virality and identify {ask_amount} candidate viral segments from the transcript (aiming for at least {quantidade_de_virals} top quality cuts)"""
     else:
-        virality_instruction = f"""analyze the segment for potential virality and identify {quantidade_de_virals} the best parts based on the list of themes {themes}."""
+        virality_instruction = f"""analyze the segment for potential virality and identify {ask_amount} the best parts based on the list of themes {themes}."""
 
     output_texts = []
     for i, chunk in enumerate(chunks):

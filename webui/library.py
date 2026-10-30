@@ -89,6 +89,8 @@ def generate_project_gallery(project_path_name, is_full_path=False):
                 potential_paths = [
                     os.path.join(project_folder_path, "burned_sub", f"final-output{idx_str}_processed_subtitled.mp4"),
                     os.path.join(project_folder_path, "burned_sub", f"output{idx_str}.mp4"),
+                    os.path.join(project_folder_path, "final", f"final-output{idx_str}_processed.mp4"),
+                    os.path.join(project_folder_path, "final", f"output{idx_str}.mp4"),
                     os.path.join(project_folder_path, f"final-output{idx_str}_processed.mp4"),
                     os.path.join(project_folder_path, f"output{idx_str}_original_scale.mp4"),
                     os.path.join(project_folder_path, f"output{idx_str}.mp4"),
@@ -107,7 +109,7 @@ def generate_project_gallery(project_path_name, is_full_path=False):
             
             # Loose search
             if not video_path:
-                 sub_dirs = [os.path.join(project_folder_path, "burned_sub"), os.path.join(project_folder_path, "cuts")]
+                 sub_dirs = [os.path.join(project_folder_path, "burned_sub"), os.path.join(project_folder_path, "final"), os.path.join(project_folder_path, "cuts")]
                  for sd in sub_dirs:
                      if os.path.exists(sd):
                          for f in sorted(os.listdir(sd)):
