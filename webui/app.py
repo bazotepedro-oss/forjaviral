@@ -373,8 +373,20 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
     
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
     try:
-        current_process = subprocess.Popen(cmd, cwd=WORKING_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True, env=env)
+        current_process = subprocess.Popen(
+            cmd,
+            cwd=WORKING_DIR,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
+            universal_newlines=True,
+            env=env
+        )
         logs = ""
         project_folder_path = None
         if input_source == "Existing Project" and project_name:
@@ -390,6 +402,9 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
                 break
             try:
                 line = proc.stdout.readline() if proc.stdout else ""
+            except (UnicodeDecodeError, OSError):
+                time.sleep(0.02)
+                continue
             except Exception:
                 break
             

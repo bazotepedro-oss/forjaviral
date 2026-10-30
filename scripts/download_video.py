@@ -72,20 +72,15 @@ def download_with_browser_cookies(url, ydl_opts):
         raise last_error
 
 def sanitize_filename(name):
-    """Remove caracteres inválidos e emojis para evitar erro de encoding no Windows."""
-    # Remove caracteres reservados do sistema de arquivos
-    cleaned = re.sub(r'[\\/*?:"<>|]', "", name)
-    
-    # Remove emojis e caracteres não suportados pelo console Windows (CP1252)
-    # Isso mantém acentos (á, ç, é) mas remove 😱, etc.
-    try:
-        cleaned = cleaned.encode('cp1252', 'ignore').decode('cp1252')
-    except:
-        # Fallback se não tiver CP1252: remove tudo não-ascii (remove acentos)
-        cleaned = cleaned.encode('ascii', 'ignore').decode('ascii')
-        
-    cleaned = cleaned.strip()
-    return cleaned
+    """Remove caracteres inválidos, acentos e emojis para evitar erro de encoding no Windows/FFmpeg/Aria2."""
+    import unicodedata
+    # Normaliza e remove acentos/diacríticos e emojis para garantir 100% de compatibilidade de caminhos no Windows
+    nfkd = unicodedata.normalize('NFKD', str(name))
+    cleaned = ''.join([c for c in nfkd if not unicodedata.combining(c)])
+    cleaned = re.sub(r'[\\/*?:"<>|]', '', cleaned)
+    cleaned = re.sub(r'[\r\n\t]+', ' ', cleaned)
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    return cleaned or "Video" 
 
 def progress_hook(d):
     if d['status'] == 'downloading':
