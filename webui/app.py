@@ -395,13 +395,14 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
 
         last_update_time = time.time()
         proc = current_process
+        is_last_download_line = False
         
         while proc is not None:
             if current_process is None:
                 logs += "\n[AVISO] Processo cancelado pelo usuário.\n"
                 break
             try:
-                line = proc.stdout.readline() if proc.stdout else ""
+                line = proc.stdout.readline() if (proc and proc.stdout) else ""
             except (UnicodeDecodeError, OSError):
                 time.sleep(0.02)
                 continue
@@ -409,14 +410,44 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
                 break
             
             if not line:
-                if proc.poll() is not None or current_process is None:
+                if current_process is None:
+                    break
+                try:
+                    if proc is None or getattr(proc, 'poll', lambda: 0)() is not None:
+                        break
+                except Exception:
                     break
                 time.sleep(0.05)
                 continue
             
-            logs += line
-            if "Project Folder:" in line:
-                parts = line.split("Project Folder:")
+            clean_line = line.strip('\r\n')
+            if not clean_line or clean_line.isspace():
+                continue
+            
+            # Suprime cabeçalhos vazios ou repetitivos do Aria2
+            if clean_line.startswith("*** Download Progress") or clean_line.startswith("FILE:"):
+                continue
+
+            is_download = (clean_line.startswith("[#") and "%" in clean_line) or (clean_line.startswith("[download]") and "%" in clean_line)
+            if clean_line.startswith("[#") and "%" in clean_line:
+                clean_line = f"[Download Turbo] {clean_line}"
+
+            if is_download:
+                if is_last_download_line:
+                    last_newline = logs.rfind('\n', 0, -1)
+                    if last_newline != -1:
+                        logs = logs[:last_newline + 1] + clean_line + "\n"
+                    else:
+                        logs = clean_line + "\n"
+                else:
+                    logs += clean_line + "\n"
+                    is_last_download_line = True
+            else:
+                is_last_download_line = False
+                logs += clean_line + "\n"
+
+            if "Project Folder:" in clean_line:
+                parts = clean_line.split("Project Folder:")
                 if len(parts) > 1: project_folder_path = parts[1].strip()
             
             # Throttle updates to avoid browser freeze (0.2s interval)
@@ -431,15 +462,18 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
         logs += f"\nError running process: {str(e)}\n"
         yield logs, gr.update(visible=True, interactive=False), gr.update(visible=True), None, gr.update()
     finally:
-        if current_process is not None:
-            proc = current_process
-            if proc.stdout:
+        proc = current_process
+        if proc is not None:
+            if getattr(proc, 'stdout', None):
                 try: proc.stdout.close()
                 except Exception: pass
-            if proc.poll() is None:
-                try: proc.wait(timeout=2)
-                except Exception: pass
-            return_code = proc.returncode if proc.returncode is not None else -1
+            try:
+                if getattr(proc, 'poll', lambda: 0)() is None:
+                    proc.wait(timeout=2)
+            except Exception: pass
+            return_code = getattr(proc, 'returncode', -1)
+            if return_code is None:
+                return_code = -1
             current_process = None
         else:
             return_code = -1

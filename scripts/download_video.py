@@ -176,10 +176,10 @@ def download(url, base_root="VIRALS", download_subs=True, quality="best", cookie
     # Prioriza MP4 direto (H.264/AAC) em 1080p ou 720p. 
     # Isso evita baixar 4K/WebM desnecessário de 3GB que trava o processador e demora 20 minutos.
     quality_map = {
-        "best": 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
-        "1080p": 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
-        "720p": 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]/best',
-        "480p": 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=480]+bestaudio/best[height<=480]/best',
+        "best": 'bestvideo[height<=1080][vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+        "1080p": 'bestvideo[height<=1080][vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+        "720p": 'bestvideo[height<=720][vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]/best',
+        "480p": 'bestvideo[height<=480][vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=480]+bestaudio/best[height<=480]/best',
         "4k": 'bestvideo+bestaudio/best',
     }
     selected_format = quality_map.get(quality, quality_map["best"])
@@ -226,7 +226,10 @@ def download(url, base_root="VIRALS", download_subs=True, quality="best", cookie
             '-j', '8',
             '--min-split-size=1M',
             '--max-connection-per-server=16',
-            '--summary-interval=2',
+            '--file-allocation=none',
+            '--summary-interval=0',
+            '--console-log-level=warn',
+            '--download-result=hide',
         ]
     else:
         print("[TURBO] Multi-threading nativo ativado (10 downloads simultâneos de fragmentos)!")
