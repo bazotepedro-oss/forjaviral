@@ -1,7 +1,7 @@
 {
     "selected_api": "gemini",
     "gemini": {
-        "api_key": "AIzaSyCi-vVVn1Dzbm4AptY8zzJt3gLErqLbbUA",
+        "api_key": "",
         "model": "gemini-2.0-flash",
         "chunk_size": 250000
     },

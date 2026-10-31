@@ -15,3 +15,4 @@ echo  Suas configuracoes, chaves e videos foram preservados.
 echo ==============================================================
 echo.
 pause
+

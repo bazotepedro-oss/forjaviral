@@ -1,3 +1,16 @@
+
+def get_saved_gemini_key():
+    try:
+        cfg_path = os.path.join(WORKING_DIR, "api_config.json")
+        if os.path.exists(cfg_path):
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                d = json.load(f)
+            k = d.get("gemini", {}).get("api_key", "").strip()
+            if k and not k.startswith("AIzaSyCi-vVVn1Dzbm4Apt"):
+                return k
+    except Exception:
+        pass
+    return ""
 import gradio as gr
 import subprocess
 import os
@@ -308,6 +321,19 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
     if themes: cmd.extend(["--themes", themes])
     cmd.extend(["--min-duration", str(int(min_duration))])
     cmd.extend(["--max-duration", str(int(max_duration))])
+    if api_key and api_key.strip():
+        try:
+            cfg_p = os.path.join(WORKING_DIR, "api_config.json")
+            if os.path.exists(cfg_p):
+                with open(cfg_p, "r", encoding="utf-8") as cf:
+                    cdata = json.load(cf)
+                if cdata.get("gemini", {}).get("api_key") != api_key.strip():
+                    cdata.setdefault("gemini", {})["api_key"] = api_key.strip()
+                    with open(cfg_p, "w", encoding="utf-8") as cf:
+                        json.dump(cdata, cf, indent=4)
+        except Exception:
+            pass
+
     cmd.extend(["--model", model])
     cmd.extend(["--ai-backend", ai_backend])
     if api_key: cmd.extend(["--api-key", api_key])
@@ -775,7 +801,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                 with gr.Column(scale=1):
                     with gr.Row():
                         ai_backend_input = gr.Dropdown(choices=[(i18n("Gemini"), "gemini"), (i18n("G4F"), "g4f"), (i18n("Local (GGUF)"), "local"), (i18n("Manual"), "manual")], label=i18n("AI Backend"), value="gemini", scale=2)
-                        api_key_input = gr.Textbox(label=i18n("Gemini API Key"), type="password", scale=3)
+                        api_key_input = gr.Textbox(label=i18n("Gemini API Key"), type="password", value=get_saved_gemini_key(), placeholder="Cole sua chave gratuita (AIzaSy...)", scale=3, info="Obtenha grátis em aistudio.google.com")
                     
                     # New Dynamic Inputs
                     with gr.Row():

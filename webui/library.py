@@ -65,12 +65,14 @@ def generate_project_gallery(project_path_name, is_full_path=False):
         # Fallback if list is empty
         if not segments_list:
              found_files = []
-             for subdir in ["burned_sub", "cuts", "."]:
+             for subdir in ["burned_sub", "final", "cuts"]:
                  d = os.path.join(project_folder_path, subdir)
                  if os.path.exists(d):
                      for f in os.listdir(d):
                          if f.endswith(".mp4") and "input" not in f.lower():
-                             found_files.append(os.path.join(d, f))
+                             fp = os.path.join(d, f)
+                             if os.path.exists(fp) and os.path.getsize(fp) > 1024:
+                                 found_files.append(fp)
              found_files = sorted(list(set(found_files)))
              segments_list = [{"title": os.path.basename(f), "score": "N/A", "description": "No metadata found.", "filepath": f} for f in found_files]
 
@@ -103,7 +105,7 @@ def generate_project_gallery(project_path_name, is_full_path=False):
                     potential_paths.insert(0, os.path.join(project_folder_path, "burned_sub", seg["filename"]))
 
                 for p in potential_paths:
-                    if os.path.exists(p):
+                    if os.path.exists(p) and os.path.getsize(p) > 1024:
                         video_path = p
                         break
             
@@ -115,8 +117,10 @@ def generate_project_gallery(project_path_name, is_full_path=False):
                          for f in sorted(os.listdir(sd)):
                              idx_str = f"{i:03d}"
                              if f.endswith(".mp4") and idx_str in f:
-                                 video_path = os.path.join(sd, f)
-                                 break
+                                 cand = os.path.join(sd, f)
+                                 if os.path.exists(cand) and os.path.getsize(cand) > 1024:
+                                     video_path = cand
+                                     break
                      if video_path: break
 
             video_tag = ""
@@ -219,7 +223,7 @@ def generate_project_gallery(project_path_name, is_full_path=False):
                     video_tag = f'<div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #222; color: #666;"><span>⚠️</span><br>{i18n("Error: {}").format(str(e))}</div>'
 
             else:
-                video_tag = f'<div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #222; color: #666;"><span>⚠️</span><br>{i18n("Not Found")}</div>'
+                video_tag = f'<div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #16171b; color: #888; text-align: center; padding: 20px; box-sizing: border-box;"><div style="width: 44px; height: 44px; border-radius: 50%; background: #222; display: flex; align-items: center; justify-content: center; margin-bottom: 10px;"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div><span style="font-weight: 600; color: #ccc; font-size: 13px;">Vídeo Pendente</span><span style="font-size: 11px; color: #666; margin-top: 4px;">Arquivo não finalizado nesta execução</span></div>'
             
             # Score
             score_color = "#22c55e"

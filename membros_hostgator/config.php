@@ -22,7 +22,7 @@ define('DB_PASS', 'SuaSenhaSegura123!'); // A senha criada no cPanel
 // Configurações do Portal
 define('APP_NAME', 'FÁBRICA DOS CORTES');
 define('APP_URL', 'https://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
-define('GOOGLE_DRIVE_URL', 'https://drive.google.com/drive/u/4/folders/16U_qUEtjAlgmgmeX_HWuqPw-3dYgoekf');
+define('GOOGLE_DRIVE_URL', 'https://drive.google.com/drive/folders/16U_qUEtjAlgmgmeX_HWuqPw-3dYgoekf');
 define('WHATSAPP_GROUP_URL', 'https://chat.whatsapp.com/JlJ6ZJjBNpS7E9ErFSyMvC');
 
 /**
@@ -144,7 +144,7 @@ function initSqliteDatabase($pdo) {
     $stmtAula->execute([5, 2, 'Aula 05: A anatomia do gancho perfeito (Hooks de 3 segundos)', 'Frases de quebra de padrão que seguram o espectador no TikTok e Reels.', 'https://www.youtube.com/embed/dQw4w9WgXcQ', 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80', '15:40', 2, 0]);
     $stmtAula->execute([6, 3, 'Aula 06: Rastreamento facial dinâmico (Active Speaker)', 'Enquadramento automático de rostos com InsightFace e divisão para 2 pessoas.', 'https://www.youtube.com/embed/dQw4w9WgXcQ', 'https://images.unsplash.com/photo-1536240478700-b869070f9279?auto=format&fit=crop&w=800&q=80', '25:30', 1, 0]);
     $stmtAula->execute([7, 3, 'Aula 07: Legendas magnéticas estilo Hormozi & MrBeast', 'Paletas de cores, destaque palavra por palavra e animações de texto.', 'https://www.youtube.com/embed/dQw4w9WgXcQ', 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=800&q=80', '19:15', 2, 0]);
-    $stmtAula->execute([8, 4, 'Bônus 01: Pack com 200+ Efeitos Sonoros (SFX) para Cortes', 'Swooshes, pops, risadas e transições sonoras para viralização.', 'https://drive.google.com/drive/u/4/folders/16U_qUEtjAlgmgmeX_HWuqPw-3dYgoekf', 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80', 'Download', 1, 0]);
+    $stmtAula->execute([8, 4, 'Bônus 01: Pack com 200+ Efeitos Sonoros (SFX) para Cortes', 'Swooshes, pops, risadas e transições sonoras para viralização.', 'https://drive.google.com/drive/folders/16U_qUEtjAlgmgmeX_HWuqPw-3dYgoekf', 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80', 'Download', 1, 0]);
     $stmtAula->execute([9, 4, 'Bônus 02: Acesso ao Grupo VIP no WhatsApp', 'Comunidade exclusiva de alunos da Fábrica dos Cortes para tirar dúvidas e networking.', 'https://chat.whatsapp.com/JlJ6ZJjBNpS7E9ErFSyMvC', 'https://images.unsplash.com/photo-1577563908411-5077b6dc7624?auto=format&fit=crop&w=800&q=80', 'Comunidade', 2, 0]);
 }
 

@@ -69,20 +69,13 @@ def cut(segments, project_folder="tmp", skip_video=False):
                     duration_seconds = 0
                     duration_str = duration
             
-            # Heurística para start_time:
+            # Normalização segura de start_time (segundos vs ms):
             if isinstance(start_time, (int, float)):
-                if start_time > 10000: # Se for milisegundos grandes? Assumindo segundos ou HHMMSS?
-                   # O código original: if start_time int -> start_time/1000.0.
-                   # Vamos manter a lógica original: int -> milisegundos
-                   pass
-            
-            # Refazendo a logica original exata para seguranca e capturando o float:
-            if isinstance(start_time, int):
-                start_time_seconds = start_time / 1000.0
+                if start_time > 10000:
+                    start_time_seconds = float(start_time) / 1000.0
+                else:
+                    start_time_seconds = float(start_time)
                 start_time_str = f"{start_time_seconds:.3f}"
-            elif isinstance(start_time, float):
-                 start_time_seconds = start_time
-                 start_time_str = f"{start_time_seconds:.3f}"
             else:
                 # String "00:00:00" ou "12.34"
                 try:

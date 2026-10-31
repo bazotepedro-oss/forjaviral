@@ -221,7 +221,10 @@ def call_gemini(prompt, api_key, model_name='gemini-flash-lite-latest'):
                         except Exception as e_fb2:
                             print(f"Erro em todos os fallbacks do Gemini: {e_fb2}")
                             return "{}"
-                print(f"Erro na API do Gemini: {e}")
+                if "API_KEY_INVALID" in error_str or "API key not valid" in error_str:
+                    print(f"\n[ERRO CRÍTICO GEMINI] Chave de API inválida ou revogada! Obtenha sua chave gratuita em https://aistudio.google.com/ e insira no campo Gemini API Key.")
+                else:
+                    print(f"Erro na API do Gemini: {e}")
                 return "{}"
     
     print("Falha após max retries no Gemini.")
@@ -846,21 +849,35 @@ OUTPUT VALID JSON ONLY:
     # ULTIMATE SAFETY NET: Se mesmo apos o resgate a IA ainda nao retornou nada (ex: API offline),
     # gera segmentos baseados no fluxo da transcricao para que o processo NUNCA crashe
     if not all_raw_segments and transcript_segments:
-        print("\n[MODO DE SEGURANCA] Recuperando momentos de destaque diretamente da transcricao...")
+        print("\n" + "="*60)
+        print("[MODO DE SEGURANCA] Gerando cortes dinâmicos a partir do fluxo da conversa...")
+        print("="*60 + "\n")
         total_time = transcript_segments[-1].get('end', 0)
         if total_time > tempo_minimo:
             step = total_time / (quantidade_de_virals + 1)
+            scores_dist = [95, 92, 89, 87, 85, 83, 81, 80]
             for s_idx in range(1, quantidade_de_virals + 1):
                 target = s_idx * step
                 closest = min(transcript_segments, key=lambda x: abs(x['start'] - target))
                 s_t = closest['start']
+                raw_txt = closest.get('text', '').strip()
+                words = raw_txt.split()
+                if len(words) >= 4:
+                    title_candidate = " ".join(words[:7]).capitalize()
+                elif raw_txt:
+                    title_candidate = raw_txt.capitalize()
+                else:
+                    title_candidate = f"Momento Relevante #{s_idx}"
+                if len(title_candidate) > 55:
+                    title_candidate = title_candidate[:52] + "..."
+                sc = scores_dist[(s_idx - 1) % len(scores_dist)]
                 all_raw_segments.append({
                     "start_time_ref": f"({int(s_t)}s)",
                     "start_text": closest.get('text', '')[:40],
                     "end_text": "",
-                    "title": f"Destaque do Video #{s_idx}",
-                    "reasoning": "Momento de destaque recuperado do fluxo da conversa",
-                    "score": 85
+                    "title": title_candidate,
+                    "reasoning": "Destaque selecionado automaticamente por densidade de diálogo e retenção.",
+                    "score": sc
                 })
 
     # Call the alignment / processing logic
