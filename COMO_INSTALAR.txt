@@ -1,0 +1,32 @@
+==============================================================
+         FÁBRICA DE CORTES - GUIA DE INSTALAÇÃO RÁPIDA
+==============================================================
+
+Parabéns por adquirir a Fábrica de Cortes!
+
+Para instalar em 1 clique no seu computador:
+
+PASSO 1:
+Extraia todos os arquivos desta pasta ZIP.
+Em seguida, clique duas vezes no arquivo:
+👉 INSTALADOR.bat
+
+PASSO 2:
+O instalador verificará sua máquina automaticamente:
+- Se você tiver placa de vídeo NVIDIA, digite 1 e aperte Enter.
+- Se for processador comum ou notebook simples, digite 2 e aperte Enter.
+O instalador configurará o Python, FFmpeg e os pacotes de IA sozinho.
+
+PASSO 3:
+Ao finalizar, o atalho oficial "Fábrica dos Cortes" será
+criado diretamente na sua Área de Trabalho!
+
+COMO USAR NO DIA A DIA:
+- Para abrir: Clique duas vezes no ícone "Fábrica dos Cortes" na Área de Trabalho
+  (ou dê dois cliques em INICIAR_FABRICA_DE_CORTES.bat).
+- Seu navegador abrirá em http://localhost:7860.
+- Para atualizar no futuro sem perder seus vídeos: execute ATUALIZAR.bat.
+
+Área de Membros e Suporte:
+https://membros.fabricadecortes.com
+==============================================================

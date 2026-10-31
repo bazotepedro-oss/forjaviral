@@ -56,6 +56,7 @@ renders/
 *.mp3
 *.srt
 *.ass
+*.zip
 *.log
 !i18n/locale/*.json
 !api_config.json
@@ -106,6 +107,7 @@ Thumbs.db
 # 🧾 Logs
 ############################
 logs/
+*.zip
 *.log
 
 #######################################
