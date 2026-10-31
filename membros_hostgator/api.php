@@ -1,0 +1,777 @@
+<?php
+/**
+ * FÁBRICA DOS CORTES - API BACKEND (HOSTGATOR & LOCAL)
+ * Processa autenticação real, progresso de aulas e operações completas de Administração
+ */
+
+require_once __DIR__ . '/config.php';
+
+header('Content-Type: application/json; charset=utf-8');
+
+$action = $_GET['action'] ?? $_POST['action'] ?? '';
+
+// Ler payload JSON se enviado via fetch
+$rawInput = file_get_contents('php://input');
+$jsonBody = json_decode($rawInput, true) ?? [];
+if (!empty($jsonBody['action'])) {
+    $action = $jsonBody['action'];
+}
+
+/**
+ * Validador de Autorização para endpoints administrativos
+ * Permite tanto a sessão do admin logado via web quanto chamadas seguras da API do Next.js via Secret
+ */
+function checkAdminAuth($jsonBody = []) {
+    $secret = $_POST['secret'] ?? $jsonBody['secret'] ?? ($_SERVER['HTTP_X_ADMIN_SECRET'] ?? '');
+    $configuredSecret = getenv('MEMBERS_ADMIN_SECRET') ?: '';
+    if (strlen($configuredSecret) >= 32 && hash_equals($configuredSecret, (string)$secret)) {
+        return true;
+    }
+    requireAdmin();
+    return true;
+}
+
+switch ($action) {
+
+    // ==========================================
+    // 1. LOGIN DE ALUNO E ADMIN (100% REAL - SEM MOCKUPS)
+    // ==========================================
+    case 'login':
+        $email = strtolower(trim($_POST['email'] ?? $jsonBody['email'] ?? ''));
+        $senha = trim($_POST['senha'] ?? $jsonBody['senha'] ?? '');
+
+        if (empty($email) || empty($senha)) {
+            jsonResponse(['success' => false, 'message' => 'Por favor, informe seu e-mail e sua senha.'], 400);
+        }
+
+        try {
+            $pdo = getDB();
+            $stmt = $pdo->prepare("SELECT id, nome, email, senha, role, status FROM usuarios WHERE LOWER(email) = ? LIMIT 1");
+            $stmt->execute([$email]);
+            $user = $stmt->fetch();
+
+            if (!$user) {
+                jsonResponse(['success' => false, 'message' => 'E-mail ou senha incorretos.'], 401);
+            } else {
+                // Verificar se o usuário está suspenso/bloqueado
+                if ($user['status'] === 'bloqueado') {
+                    jsonResponse(['success' => false, 'message' => 'Seu acesso foi suspenso ou cancelado. Entre em contato com o suporte.'], 403);
+                }
+
+                // Validação de senha por hash seguro BCRYPT
+                $valid = password_verify($senha, $user['senha']);
+
+                if (!$valid) {
+                    jsonResponse(['success' => false, 'message' => 'E-mail ou senha incorretos.'], 401);
+                }
+
+                // Atualizar último acesso
+                $upd = $pdo->prepare("UPDATE usuarios SET ultimo_acesso = CURRENT_TIMESTAMP WHERE id = ?");
+                $upd->execute([$user['id']]);
+            }
+
+            // Criar sessão segura
+            session_regenerate_id(true);
+            $_SESSION['usuario_id']    = $user['id'];
+            $_SESSION['usuario_nome']  = $user['nome'];
+            $_SESSION['usuario_email'] = $user['email'];
+            $_SESSION['usuario_role']  = $user['role'];
+            issueAuthCookie($user);
+
+            jsonResponse([
+                'success' => true,
+                'message' => 'Login realizado com sucesso!',
+                'redirect' => ($user['role'] === 'admin') ? 'admin.php' : 'index.php',
+                'user' => [
+                    'id'    => $user['id'],
+                    'nome'  => $user['nome'],
+                    'email' => $user['email'],
+                    'role'  => $user['role']
+                ]
+            ]);
+
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro no servidor: ' . 'Erro interno. Tente novamente.'], 500);
+        }
+        break;
+
+    // ==========================================
+    // 2. LOGOUT
+    // ==========================================
+    case 'logout':
+        $_SESSION = [];
+        clearAuthCookie();
+        if (ini_get("session.use_cookies")) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000,
+                $params["path"], $params["domain"],
+                $params["secure"], $params["httponly"]
+            );
+        }
+        session_destroy();
+        jsonResponse(['success' => true, 'redirect' => 'index.php']);
+        break;
+
+    // ==========================================
+    // 3. SALVAR PROGRESSO DA AULA
+    // ==========================================
+    case 'save_progress':
+        $user = getLoggedUser();
+        if (!$user) {
+            jsonResponse(['success' => false, 'message' => 'Não autenticado'], 401);
+        }
+
+        $aulaId = intval($_POST['aula_id'] ?? $jsonBody['aula_id'] ?? 0);
+        $concluido = intval($_POST['concluido'] ?? $jsonBody['concluido'] ?? 1);
+        $segundos = intval($_POST['segundos'] ?? $jsonBody['segundos'] ?? 0);
+
+        if ($aulaId > 0) {
+            try {
+                $pdo = getDB();
+                $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+
+                if ($driver === 'sqlite') {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO progresso (usuario_id, aula_id, concluido, segundos_assistidos)
+                        VALUES (?, ?, ?, ?)
+                        ON CONFLICT(usuario_id, aula_id) DO UPDATE SET 
+                            concluido = excluded.concluido, 
+                            segundos_assistidos = excluded.segundos_assistidos, 
+                            atualizado_em = CURRENT_TIMESTAMP
+                    ");
+                } else {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO progresso (usuario_id, aula_id, concluido, segundos_assistidos)
+                        VALUES (?, ?, ?, ?)
+                        ON DUPLICATE KEY UPDATE concluido = VALUES(concluido), segundos_assistidos = VALUES(segundos_assistidos), atualizado_em = NOW()
+                    ");
+                }
+                $stmt->execute([$user['id'], $aulaId, $concluido, $segundos]);
+                jsonResponse(['success' => true]);
+            } catch (Exception $e) {
+                jsonResponse(['success' => false, 'message' => 'Erro interno. Tente novamente.']);
+            }
+        }
+        jsonResponse(['success' => false, 'message' => 'ID inválido'], 400);
+        break;
+
+    // ==========================================
+    // 4. ADMIN - GESTÃO DE MÓDULOS (NOVO!)
+    // ==========================================
+    case 'admin_add_module':
+        checkAdminAuth($jsonBody);
+
+        $titulo = trim($_POST['titulo'] ?? $jsonBody['titulo'] ?? '');
+        $descricao = trim($_POST['descricao'] ?? $jsonBody['descricao'] ?? '');
+        $ordem = intval($_POST['ordem'] ?? $jsonBody['ordem'] ?? 0);
+        $icone = trim($_POST['icone'] ?? $jsonBody['icone'] ?? 'film');
+
+        if (empty($titulo)) {
+            jsonResponse(['success' => false, 'message' => 'O título do módulo é obrigatório.'], 400);
+        }
+
+        try {
+            $pdo = getDB();
+            if ($ordem <= 0) {
+                $maxOrdem = (int) $pdo->query("SELECT MAX(ordem) FROM modulos")->fetchColumn();
+                $ordem = $maxOrdem + 1;
+            }
+
+            $stmt = $pdo->prepare("INSERT INTO modulos (titulo, descricao, ordem, icone) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$titulo, $descricao, $ordem, $icone]);
+            $novoId = $pdo->lastInsertId();
+
+            jsonResponse([
+                'success' => true,
+                'message' => 'Módulo criado com sucesso!',
+                'modulo' => [
+                    'id' => (int)$novoId,
+                    'titulo' => $titulo,
+                    'descricao' => $descricao,
+                    'ordem' => $ordem
+                ]
+            ]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro ao criar módulo: ' . 'Erro interno. Tente novamente.'], 500);
+        }
+        break;
+
+    case 'admin_delete_module':
+        checkAdminAuth($jsonBody);
+
+        $moduloId = intval($_POST['modulo_id'] ?? $jsonBody['modulo_id'] ?? 0);
+        if ($moduloId <= 0) {
+            jsonResponse(['success' => false, 'message' => 'ID do módulo inválido.'], 400);
+        }
+
+        try {
+            $pdo = getDB();
+            // Remover progresso das aulas deste módulo
+            $pdo->prepare("DELETE FROM progresso WHERE aula_id IN (SELECT id FROM aulas WHERE modulo_id = ?)")->execute([$moduloId]);
+            // Remover aulas deste módulo
+            $pdo->prepare("DELETE FROM aulas WHERE modulo_id = ?")->execute([$moduloId]);
+            // Remover o módulo
+            $pdo->prepare("DELETE FROM modulos WHERE id = ?")->execute([$moduloId]);
+
+            jsonResponse(['success' => true, 'message' => 'Módulo e suas aulas foram excluídos com sucesso!']);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro ao excluir módulo: ' . 'Erro interno. Tente novamente.'], 500);
+        }
+        break;
+
+    case 'admin_list_modules':
+        checkAdminAuth($jsonBody);
+        try {
+            $pdo = getDB();
+            $modulos = $pdo->query("
+                SELECT m.*, (SELECT COUNT(*) FROM aulas a WHERE a.modulo_id = m.id) as total_aulas 
+                FROM modulos m 
+                ORDER BY m.ordem ASC
+            ")->fetchAll();
+            jsonResponse(['success' => true, 'modulos' => $modulos]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro interno. Tente novamente.'], 500);
+        }
+        break;
+
+    // ==========================================
+    // 5. ADMIN - ADICIONAR NOVA AULA
+    // ==========================================
+    case 'admin_add_lesson':
+        checkAdminAuth($jsonBody);
+
+        $moduloId  = intval($_POST['modulo_id'] ?? $jsonBody['modulo_id'] ?? 1);
+        $titulo    = trim($_POST['titulo'] ?? $jsonBody['titulo'] ?? '');
+        $descricao = trim($_POST['descricao'] ?? $jsonBody['descricao'] ?? '');
+        $videoUrl  = trim($_POST['video_url'] ?? $jsonBody['video_url'] ?? '');
+        $capaUrl   = trim($_POST['capa_url'] ?? $jsonBody['capa_url'] ?? '');
+        $duracao   = trim($_POST['duracao'] ?? $jsonBody['duracao'] ?? '15:00');
+        $destaque  = intval($_POST['destaque'] ?? $jsonBody['destaque'] ?? 0);
+
+        if (empty($titulo) || empty($videoUrl)) {
+            jsonResponse(['success' => false, 'message' => 'Título e URL do vídeo são obrigatórios.'], 400);
+        }
+
+        if (empty($capaUrl)) {
+            $capaUrl = 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=800&q=80';
+        }
+
+        try {
+            $pdo = getDB();
+            $stmt = $pdo->prepare("
+                INSERT INTO aulas (modulo_id, titulo, descricao, video_url, capa_url, duracao, destaque)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([$moduloId, $titulo, $descricao, $videoUrl, $capaUrl, $duracao, $destaque]);
+
+            jsonResponse(['success' => true, 'message' => 'Aula adicionada com sucesso!']);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro ao salvar no banco: ' . 'Erro interno. Tente novamente.'], 500);
+        }
+        break;
+
+    // ==========================================
+    // 6. ADMIN - EXCLUIR AULA
+    // ==========================================
+    case 'admin_delete_lesson':
+        checkAdminAuth($jsonBody);
+        $aulaId = intval($_POST['aula_id'] ?? $jsonBody['aula_id'] ?? 0);
+
+        if ($aulaId <= 0) {
+            jsonResponse(['success' => false, 'message' => 'ID inválido'], 400);
+        }
+
+        try {
+            $pdo = getDB();
+            $pdo->prepare("DELETE FROM progresso WHERE aula_id = ?")->execute([$aulaId]);
+            $stmt = $pdo->prepare("DELETE FROM aulas WHERE id = ?");
+            $stmt->execute([$aulaId]);
+            jsonResponse(['success' => true, 'message' => 'Aula excluída com sucesso!']);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro interno. Tente novamente.'], 500);
+        }
+        break;
+
+    // ==========================================
+    // 7. ADMIN - CADASTRAR / ATUALIZAR ALUNO
+    // ==========================================
+    case 'admin_add_student':
+        checkAdminAuth($jsonBody);
+
+        $nome  = trim($_POST['nome'] ?? $jsonBody['nome'] ?? '');
+        $email = strtolower(trim($_POST['email'] ?? $jsonBody['email'] ?? ''));
+        $senha = trim($_POST['senha'] ?? $jsonBody['senha'] ?? '');
+
+        if (empty($nome) || empty($email) || empty($senha)) {
+            jsonResponse(['success' => false, 'message' => 'Preencha nome, e-mail e senha.'], 400);
+        }
+
+        try {
+            $pdo = getDB();
+            $hash = password_hash($senha, PASSWORD_BCRYPT);
+
+            // Verificar se o usuário já existe
+            $check = $pdo->prepare("SELECT id FROM usuarios WHERE LOWER(email) = ? LIMIT 1");
+            $check->execute([$email]);
+            $exists = $check->fetch();
+
+            // Se o email estava na lista de excluídos, remove para reativar completamente
+            $pdo->prepare("DELETE FROM alunos_excluidos WHERE LOWER(email) = ?")->execute([$email]);
+
+            if ($exists) {
+                $upd = $pdo->prepare("UPDATE usuarios SET nome = ?, senha = ?, status = 'ativo' WHERE id = ?");
+                $upd->execute([$nome, $hash, $exists['id']]);
+                jsonResponse(['success' => true, 'message' => 'Aluno existente atualizado e ativado com sucesso!']);
+            } else {
+                $stmt = $pdo->prepare("INSERT INTO usuarios (nome, email, senha, role, status) VALUES (?, ?, ?, 'aluno', 'ativo')");
+                $stmt->execute([$nome, $email, $hash]);
+                jsonResponse(['success' => true, 'message' => 'Aluno cadastrado com sucesso!']);
+            }
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro interno. Tente novamente.'], 500);
+        }
+        break;
+
+    // ==========================================
+    // 7B. ADMIN - EDITAR DADOS DO ALUNO (NOME, EMAIL, SENHA)
+    // ==========================================
+    case 'admin_edit_student':
+        checkAdminAuth($jsonBody);
+
+        $email     = strtolower(trim($_POST['email'] ?? $jsonBody['email'] ?? ''));
+        $novoNome  = trim($_POST['nome'] ?? $jsonBody['nome'] ?? '');
+        $novoEmail = strtolower(trim($_POST['novo_email'] ?? $jsonBody['novo_email'] ?? ''));
+        $novaSenha = trim($_POST['senha'] ?? $jsonBody['senha'] ?? $_POST['nova_senha'] ?? $jsonBody['nova_senha'] ?? '');
+
+        if (empty($email) && empty($novoEmail)) {
+            jsonResponse(['success' => false, 'message' => 'E-mail do aluno obrigatório.'], 400);
+        }
+
+        try {
+            $pdo = getDB();
+            $searchEmail = !empty($email) ? $email : $novoEmail;
+            $chk = $pdo->prepare("SELECT id FROM usuarios WHERE LOWER(email) = ? LIMIT 1");
+            $chk->execute([$searchEmail]);
+            $existing = $chk->fetch();
+
+            if ($existing) {
+                $fields = [];
+                $params = [];
+                if (!empty($novoNome)) {
+                    $fields[] = "nome = ?";
+                    $params[] = $novoNome;
+                }
+                if (!empty($novoEmail) && $novoEmail !== $searchEmail) {
+                    $fields[] = "email = ?";
+                    $params[] = $novoEmail;
+                }
+                if (!empty($novaSenha)) {
+                    $hash = password_hash($novaSenha, PASSWORD_BCRYPT);
+                    $fields[] = "senha = ?";
+                    $params[] = $hash;
+                }
+                if (!empty($fields)) {
+                    $params[] = $existing['id'];
+                    $sql = "UPDATE usuarios SET " . implode(", ", $fields) . " WHERE id = ?";
+                    $pdo->prepare($sql)->execute($params);
+                }
+                jsonResponse(['success' => true, 'message' => 'Aluno atualizado com sucesso na Área de Membros.']);
+            } else {
+                $targetEmail = !empty($novoEmail) ? $novoEmail : $email;
+                $nome = !empty($novoNome) ? $novoNome : explode('@', $targetEmail)[0];
+                $pass = $novaSenha;
+                if ($pass === '') {
+                    jsonResponse(['success' => false, 'message' => 'Informe uma senha temporária para o novo aluno.'], 400);
+                }
+                $hash = password_hash($pass, PASSWORD_BCRYPT);
+                $stmt = $pdo->prepare("INSERT INTO usuarios (nome, email, senha, role, status) VALUES (?, ?, ?, 'aluno', 'ativo')");
+                $stmt->execute([$nome, $targetEmail, $hash]);
+                jsonResponse(['success' => true, 'message' => 'Aluno cadastrado e sincronizado com sucesso na Área de Membros.']);
+            }
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro ao editar aluno: ' . 'Erro interno. Tente novamente.'], 500);
+        }
+        break;
+
+    // ==========================================
+    // 8. ADMIN - ALTERAR STATUS DO ALUNO (BLOQUEAR/ATIVAR)
+    // ==========================================
+    case 'admin_toggle_student':
+        checkAdminAuth($jsonBody);
+
+        $alunoId = intval($_POST['aluno_id'] ?? $jsonBody['aluno_id'] ?? 0);
+        $email   = strtolower(trim($_POST['email'] ?? $jsonBody['email'] ?? ''));
+        $novoStatus = trim($_POST['status'] ?? $jsonBody['status'] ?? 'ativo');
+
+        if (!in_array($novoStatus, ['ativo', 'bloqueado'])) {
+            $novoStatus = 'ativo';
+        }
+
+        try {
+            $pdo = getDB();
+            if ($alunoId > 0) {
+                $stmt = $pdo->prepare("UPDATE usuarios SET status = ? WHERE id = ? AND role != 'admin'");
+                $stmt->execute([$novoStatus, $alunoId]);
+            } elseif (!empty($email)) {
+                $stmt = $pdo->prepare("UPDATE usuarios SET status = ? WHERE LOWER(email) = ? AND role != 'admin'");
+                $stmt->execute([$novoStatus, $email]);
+            } else {
+                jsonResponse(['success' => false, 'message' => 'Informe o ID ou e-mail do aluno.'], 400);
+            }
+            jsonResponse(['success' => true, 'message' => "Status do aluno atualizado para {$novoStatus}!"]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro interno. Tente novamente.'], 500);
+        }
+        break;
+
+    // ==========================================
+    // 9. ADMIN - EXCLUIR ALUNO (DESVINCULAR ACESSO)
+    // ==========================================
+    case 'admin_delete_student':
+        checkAdminAuth($jsonBody);
+
+        $alunoId = intval($_POST['aluno_id'] ?? $jsonBody['aluno_id'] ?? 0);
+        $email   = strtolower(trim($_POST['email'] ?? $jsonBody['email'] ?? ''));
+
+        if ($alunoId <= 0 && empty($email)) {
+            jsonResponse(['success' => false, 'message' => 'Informe o ID ou e-mail do aluno a ser excluído.'], 400);
+        }
+
+        try {
+            $pdo = getDB();
+
+            // Garantir tabela de alunos excluídos para sincronização com o CRM
+            $pdo->exec("CREATE TABLE IF NOT EXISTS alunos_excluidos (email VARCHAR(191) PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+
+            // Localizar o aluno
+            if ($alunoId > 0) {
+                $stmt = $pdo->prepare("SELECT id, email FROM usuarios WHERE id = ? AND role != 'admin' LIMIT 1");
+                $stmt->execute([$alunoId]);
+            } else {
+                $stmt = $pdo->prepare("SELECT id, email FROM usuarios WHERE LOWER(email) = ? AND role != 'admin' LIMIT 1");
+                $stmt->execute([$email]);
+            }
+            $target = $stmt->fetch();
+
+            $targetEmail = $target ? strtolower($target['email']) : $email;
+
+            if ($target) {
+                // Remover progresso de aulas
+                $pdo->prepare("DELETE FROM progresso WHERE usuario_id = ?")->execute([$target['id']]);
+                // Excluir usuário da tabela
+                $del = $pdo->prepare("DELETE FROM usuarios WHERE id = ?");
+                $del->execute([$target['id']]);
+            }
+
+            if (!empty($targetEmail)) {
+                $pdo->prepare("DELETE FROM alunos_excluidos WHERE LOWER(email) = ?")->execute([$targetEmail]);
+            }
+
+            jsonResponse(['success' => true, 'message' => "Acesso do aluno {$targetEmail} excluído com sucesso da Área de Membros."]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro ao excluir aluno: ' . 'Erro interno. Tente novamente.'], 500);
+        }
+        break;
+
+    // ==========================================
+    // 9B. ADMIN - REGISTRAR CHECKOUT EXCLUÍDO (IMPEDIR RESSUSCITAÇÃO)
+    // ==========================================
+    case 'admin_delete_checkout':
+        checkAdminAuth($jsonBody);
+        $checkoutId = trim($jsonBody['checkout_id'] ?? $_POST['checkout_id'] ?? '');
+        if (empty($checkoutId)) {
+            jsonResponse(['success' => false, 'message' => 'Checkout ID obrigatório.'], 400);
+        }
+        try {
+            $pdo = getDB();
+            $pdo->exec("CREATE TABLE IF NOT EXISTS checkouts_excluidos (checkout_id VARCHAR(191) PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+            $stmt = $pdo->prepare("REPLACE INTO checkouts_excluidos (checkout_id, excluido_em) VALUES (?, CURRENT_TIMESTAMP)");
+            $stmt->execute([$checkoutId]);
+            jsonResponse(['success' => true, 'message' => "Checkout {$checkoutId} registrado como excluído com sucesso."]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro ao salvar checkout excluído: ' . 'Erro interno. Tente novamente.'], 500);
+        }
+        break;
+
+    // ==========================================
+    // 10. ADMIN - LIMPAR TODOS OS ALUNOS (RESET DO CRM)
+    // ==========================================
+    case 'admin_clear_students':
+        checkAdminAuth($jsonBody);
+
+        try {
+            $pdo = getDB();
+            $pdo->exec("CREATE TABLE IF NOT EXISTS alunos_excluidos (email VARCHAR(191) PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+            $pdo->exec("CREATE TABLE IF NOT EXISTS checkouts_excluidos (checkout_id VARCHAR(191) PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+            $pdo->exec("CREATE TABLE IF NOT EXISTS crm_config (chave VARCHAR(191) PRIMARY KEY, valor TEXT, atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+
+            // Salva timestamp da limpeza total do CRM
+            $nowIso = !empty($jsonBody['cleared_at']) ? trim($jsonBody['cleared_at']) : gmdate('Y-m-d\TH:i:s\Z');
+            $pdo->prepare("REPLACE INTO crm_config (chave, valor) VALUES ('crm_cleared_at', ?)")->execute([$nowIso]);
+
+            // Limpa lista de alunos excluídos e checkouts excluídos para não bloquear compras futuras após o reset
+            $pdo->exec("DELETE FROM alunos_excluidos");
+            $pdo->exec("DELETE FROM checkouts_excluidos");
+
+            $pdo->exec("DELETE FROM progresso WHERE usuario_id IN (SELECT id FROM usuarios WHERE role = 'aluno')");
+            $pdo->exec("DELETE FROM usuarios WHERE role = 'aluno'");
+
+            jsonResponse(['success' => true, 'message' => 'Todos os alunos e histórico foram removidos com sucesso da Área de Membros.', 'cleared_at' => $nowIso]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro ao limpar alunos: ' . 'Erro interno. Tente novamente.'], 500);
+        }
+        break;
+
+    // ==========================================
+    // 10B. ADMIN - LISTAR ALUNOS E CHECKOUTS EXCLUÍDOS E STATUS DO CRM
+    // ==========================================
+    case 'admin_list_deleted':
+        checkAdminAuth($jsonBody);
+
+        try {
+            $pdo = getDB();
+            $pdo->exec("CREATE TABLE IF NOT EXISTS alunos_excluidos (email VARCHAR(191) PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+            $pdo->exec("CREATE TABLE IF NOT EXISTS checkouts_excluidos (checkout_id VARCHAR(191) PRIMARY KEY, excluido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+            $pdo->exec("CREATE TABLE IF NOT EXISTS crm_config (chave VARCHAR(191) PRIMARY KEY, valor TEXT, atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+
+            $rows = $pdo->query("SELECT email, excluido_em FROM alunos_excluidos")->fetchAll(PDO::FETCH_ASSOC);
+
+            $stmtCfg = $pdo->query("SELECT valor FROM crm_config WHERE chave = 'crm_cleared_at' LIMIT 1");
+            $clearedAt = $stmtCfg ? $stmtCfg->fetchColumn() : null;
+
+            $checkouts = $pdo->query("SELECT checkout_id FROM checkouts_excluidos")->fetchAll(PDO::FETCH_COLUMN);
+
+            jsonResponse([
+                'success' => true,
+                'deleted' => $rows ?: [],
+                'deleted_checkouts' => $checkouts ?: [],
+                'cleared_at' => $clearedAt
+            ]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'deleted' => [], 'deleted_checkouts' => [], 'cleared_at' => null]);
+        }
+        break;
+
+
+    // ==========================================
+    // 11. ADMIN - ALTERAR / REDEFINIR SENHA DO ALUNO
+    // ==========================================
+    case 'admin_set_password':
+        checkAdminAuth($jsonBody);
+
+        $alunoId   = intval($_POST['aluno_id'] ?? $jsonBody['aluno_id'] ?? 0);
+        $email     = strtolower(trim($_POST['email'] ?? $jsonBody['email'] ?? ''));
+        $novaSenha = trim($_POST['nova_senha'] ?? $jsonBody['nova_senha'] ?? $_POST['senha'] ?? $jsonBody['senha'] ?? '');
+
+        if (empty($novaSenha)) {
+            jsonResponse(['success' => false, 'message' => 'A nova senha não pode ser vazia.'], 400);
+        }
+
+        try {
+            $pdo = getDB();
+            $hash = password_hash($novaSenha, PASSWORD_BCRYPT);
+
+            if ($alunoId > 0) {
+                $stmt = $pdo->prepare("UPDATE usuarios SET senha = ? WHERE id = ?");
+                $stmt->execute([$hash, $alunoId]);
+            } elseif (!empty($email)) {
+                $chk = $pdo->prepare("SELECT id FROM usuarios WHERE LOWER(email) = ? LIMIT 1");
+                $chk->execute([$email]);
+                $existing = $chk->fetch();
+                if ($existing) {
+                    $stmt = $pdo->prepare("UPDATE usuarios SET senha = ?, status = 'ativo' WHERE id = ?");
+                    $stmt->execute([$hash, $existing['id']]);
+                } else {
+                    $nome = explode('@', $email)[0];
+                    $ins = $pdo->prepare("INSERT INTO usuarios (nome, email, senha, role, status) VALUES (?, ?, ?, 'aluno', 'ativo')");
+                    $ins->execute([$nome, $email, $hash]);
+                }
+            } else {
+                jsonResponse(['success' => false, 'message' => 'Informe o ID ou e-mail do aluno.'], 400);
+            }
+
+            jsonResponse(['success' => true, 'message' => 'Senha atualizada com sucesso.']);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro ao alterar senha: ' . 'Erro interno. Tente novamente.'], 500);
+        }
+        break;
+
+    // ==========================================
+    // 12. ADMIN - LISTAR ALUNOS EM JSON
+    // ==========================================
+    case 'admin_list_students':
+        checkAdminAuth($jsonBody);
+
+        try {
+            $pdo = getDB();
+            $alunos = $pdo->query("
+                SELECT id, nome, email, status, criado_em, ultimo_acesso
+                FROM usuarios 
+                WHERE role = 'aluno' 
+                ORDER BY id DESC
+            ")->fetchAll();
+
+            jsonResponse(['success' => true, 'alunos' => $alunos]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro interno. Tente novamente.'], 500);
+        }
+        break;
+
+    // ==========================================
+    // 13. ADMIN - SALVAR / SINCRONIZAR AFILIADO / YOUTUBER
+    // ==========================================
+    case 'admin_save_affiliate':
+        checkAdminAuth($jsonBody);
+
+        $id                = trim($_POST['id'] ?? $jsonBody['id'] ?? '');
+        $name              = trim($_POST['name'] ?? $jsonBody['name'] ?? '');
+        $email             = strtolower(trim($_POST['email'] ?? $jsonBody['email'] ?? ''));
+        $slug              = strtolower(trim($_POST['slug'] ?? $jsonBody['slug'] ?? ''));
+        $token             = trim($_POST['token'] ?? $jsonBody['token'] ?? '');
+        $couponCode        = strtoupper(trim($_POST['coupon_code'] ?? $jsonBody['coupon_code'] ?? ''));
+        $discountPercent   = intval($_POST['discount_percent'] ?? $jsonBody['discount_percent'] ?? 0);
+        $commissionPercent = intval($_POST['commission_percent'] ?? $jsonBody['commission_percent'] ?? 20);
+        $pixKey            = trim($_POST['pix_key'] ?? $jsonBody['pix_key'] ?? '');
+        $pixKeyType        = trim($_POST['pix_key_type'] ?? $jsonBody['pix_key_type'] ?? 'cpf');
+        $notes             = trim($_POST['notes'] ?? $jsonBody['notes'] ?? '');
+        $active            = intval($_POST['active'] ?? $jsonBody['active'] ?? 1);
+
+        if (empty($email) || empty($name) || empty($slug)) {
+            jsonResponse(['success' => false, 'message' => 'Nome, e-mail e slug são obrigatórios.'], 400);
+        }
+
+        if (empty($id)) {
+            $id = 'aff_' . substr(md5($email . time()), 0, 16);
+        }
+        if (empty($token)) {
+            $token = 'tok_' . substr(md5($slug . time()), 0, 20);
+        }
+        if (empty($couponCode)) {
+            $couponCode = strtoupper($slug);
+        }
+
+        try {
+            $pdo = getDB();
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS afiliados (
+                    id VARCHAR(191) PRIMARY KEY,
+                    name VARCHAR(191) NOT NULL,
+                    email VARCHAR(191) NOT NULL UNIQUE,
+                    slug VARCHAR(191) NOT NULL UNIQUE,
+                    token VARCHAR(191) NOT NULL UNIQUE,
+                    coupon_code VARCHAR(191) NOT NULL UNIQUE,
+                    discount_percent INTEGER DEFAULT 0,
+                    commission_percent INTEGER DEFAULT 20,
+                    pix_key VARCHAR(191) NOT NULL,
+                    pix_key_type VARCHAR(50) DEFAULT 'cpf',
+                    active INTEGER DEFAULT 1,
+                    notes TEXT NULL,
+                    criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    atualizado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+
+            $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            $conflict = $driver === 'sqlite'
+                ? "ON CONFLICT(email) DO UPDATE SET
+                    name = excluded.name,
+                    slug = excluded.slug,
+                    coupon_code = excluded.coupon_code,
+                    discount_percent = excluded.discount_percent,
+                    commission_percent = excluded.commission_percent,
+                    pix_key = excluded.pix_key,
+                    pix_key_type = excluded.pix_key_type,
+                    active = excluded.active,
+                    notes = excluded.notes,
+                    atualizado_em = CURRENT_TIMESTAMP"
+                : "ON DUPLICATE KEY UPDATE
+                    name = VALUES(name),
+                    slug = VALUES(slug),
+                    coupon_code = VALUES(coupon_code),
+                    discount_percent = VALUES(discount_percent),
+                    commission_percent = VALUES(commission_percent),
+                    pix_key = VALUES(pix_key),
+                    pix_key_type = VALUES(pix_key_type),
+                    active = VALUES(active),
+                    notes = VALUES(notes),
+                    atualizado_em = CURRENT_TIMESTAMP";
+
+            $stmt = $pdo->prepare("
+                INSERT INTO afiliados (id, name, email, slug, token, coupon_code, discount_percent, commission_percent, pix_key, pix_key_type, active, notes, atualizado_em)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                $conflict
+            ");
+            $stmt->execute([
+                $id, $name, $email, $slug, $token, $couponCode,
+                $discountPercent, $commissionPercent, $pixKey, $pixKeyType,
+                $active, $notes
+            ]);
+
+            jsonResponse(['success' => true, 'message' => 'Afiliado salvo com sucesso!', 'id' => $id, 'token' => $token]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro ao salvar afiliado: ' . 'Erro interno. Tente novamente.'], 500);
+        }
+        break;
+
+    // ==========================================
+    // 14. ADMIN - LISTAR AFILIADOS EM JSON
+    // ==========================================
+    case 'admin_list_affiliates':
+        checkAdminAuth($jsonBody);
+
+        try {
+            $pdo = getDB();
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS afiliados (
+                    id VARCHAR(191) PRIMARY KEY,
+                    name VARCHAR(191) NOT NULL,
+                    email VARCHAR(191) NOT NULL UNIQUE,
+                    slug VARCHAR(191) NOT NULL UNIQUE,
+                    token VARCHAR(191) NOT NULL UNIQUE,
+                    coupon_code VARCHAR(191) NOT NULL UNIQUE,
+                    discount_percent INTEGER DEFAULT 0,
+                    commission_percent INTEGER DEFAULT 20,
+                    pix_key VARCHAR(191) NOT NULL,
+                    pix_key_type VARCHAR(50) DEFAULT 'cpf',
+                    active INTEGER DEFAULT 1,
+                    notes TEXT NULL,
+                    criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    atualizado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+
+            $affiliates = $pdo->query("SELECT * FROM afiliados ORDER BY criado_em DESC")->fetchAll();
+            jsonResponse(['success' => true, 'affiliates' => $affiliates ?: []]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro interno. Tente novamente.', 'affiliates' => []], 500);
+        }
+        break;
+
+    // ==========================================
+    // 15. ADMIN - EXCLUIR AFILIADO
+    // ==========================================
+    case 'admin_delete_affiliate':
+        checkAdminAuth($jsonBody);
+
+        $id    = trim($_POST['id'] ?? $jsonBody['id'] ?? '');
+        $email = strtolower(trim($_POST['email'] ?? $jsonBody['email'] ?? ''));
+        $slug  = strtolower(trim($_POST['slug'] ?? $jsonBody['slug'] ?? ''));
+
+        if (empty($id) && empty($email) && empty($slug)) {
+            jsonResponse(['success' => false, 'message' => 'ID, e-mail ou slug obrigatório.'], 400);
+        }
+
+        try {
+            $pdo = getDB();
+            $stmt = $pdo->prepare("DELETE FROM afiliados WHERE (? != '' AND id = ?) OR (? != '' AND LOWER(email) = ?) OR (? != '' AND LOWER(slug) = ?)");
+            $stmt->execute([$id, $id, $email, $email, $slug, $slug]);
+
+            jsonResponse(['success' => true, 'message' => 'Afiliado excluído com sucesso da Área de Membros.']);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Erro ao excluir afiliado: ' . 'Erro interno. Tente novamente.'], 500);
+        }
+        break;
+
+    default:
+        jsonResponse(['success' => false, 'message' => 'Ação não especificada'], 400);
+}

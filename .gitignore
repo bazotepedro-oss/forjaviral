@@ -1,0 +1,128 @@
+#######################################
+# 🔥 FÁBRICA DE CORTES - GITIGNORE OFICIAL
+#######################################
+
+# 🌐 Site / Landing Page (Hospedado na Hostinger - não distribuir para clientes)
+site/
+run_site.bat
+
+############################
+# 🐍 Python
+############################
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+pip-wheel-metadata/
+
+############################
+# 🧪 Virtual Environment
+############################
+.venv/
+venv/
+env/
+ENV/
+ForjaViral/.venv/
+
+############################
+# 💾 Modelos / Pesados
+############################
+models/
+checkpoints/
+weights/
+*.ckpt
+*.onnx
+*.bin
+*.pt
+*.pth
+
+############################
+# 🎬 Outputs Gerados
+############################
+VIRALS/
+outputs/
+exports/
+renders/
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.wav
+*.mp3
+*.srt
+*.ass
+*.zip
+*.log
+!i18n/locale/*.json
+!api_config.json
+
+############################
+# 🧠 Cache / Temp
+############################
+.cache/
+tmp/
+temp/
+*.tmp
+
+############################
+# 🔐 Segredos (CRÍTICO)
+############################
+.env
+.env.*
+!**/.env.example
+!**/.env.staging.example
+membros_hostgator/database.sqlite*
+.env.*
+*.key
+*.pem
+secrets.json
+config_local.py
+membros_hostgator/config.local.php
+
+############################
+# 🗄 Banco / SQLite
+############################
+*.db
+*.sqlite
+*.sqlite3
+KEY.txt
+
+############################
+# 💻 Sistema Operacional
+############################
+.DS_Store
+Thumbs.db
+
+############################
+# 📦 Jupyter / Colab
+############################
+.ipynb_checkpoints/
+
+############################
+# 🚀 Railway
+############################
+.railway/
+
+############################
+# 🧾 Logs
+############################
+logs/
+*.zip
+*.log
+
+#######################################
+# FIM
+#######################################
+
+############################
+# Auto-Update
+############################
+_update_backup/
+.update.lock
+temp_update*
+

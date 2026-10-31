@@ -1,0 +1,5 @@
+# Forja Viral lockfile (core compatibility pins)
+numpy==1.26.4
+transformers==4.46.3
+# If you use these, keep them pinned to avoid surprise breaks:
+protobuf<5

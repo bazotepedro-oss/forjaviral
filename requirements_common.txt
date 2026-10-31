@@ -1,0 +1,20 @@
+# Common deps (both CPU/GPU). Torch is installed separately by installer.
+numpy==1.26.4
+transformers==4.46.3
+g4f[all]
+yt-dlp
+ffmpeg-python
+whisperx
+mediapipe
+google-genai
+insightface
+onnxruntime-gpu
+gradio
+opencv-python
+psutil
+fastapi
+uvicorn
+deep-translator
+tqdm
+requests
+cryptography

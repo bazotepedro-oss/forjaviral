@@ -1,0 +1,10 @@
+<?php
+// Copie para config.local.php na HostGator e preencha com os dados do cPanel.
+// config.local.php é ignorado pelo Git e bloqueado pelo .htaccess.
+putenv('APP_ENV=production');
+putenv('DB_HOST=localhost');
+putenv('DB_NAME=sabri769_fabricadecortes');
+putenv('DB_USER=sabri769_fdc');
+putenv('DB_PASS=TROQUE_ESTA_SENHA');
+putenv('MEMBERS_ADMIN_SECRET=GERE_UM_SEGREDO_COM_48_CARACTERES');
+putenv('MEMBERS_AUTH_SECRET=GERE_OUTRO_SEGREDO_COM_48_CARACTERES');

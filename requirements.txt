@@ -1,0 +1,19 @@
+# Dependencias essenciais do Forja Viral
+numpy<2.1.0
+g4f[all]
+yt-dlp
+ffmpeg-python
+whisperx
+mediapipe
+google-genai
+insightface
+gradio==6.6.0
+opencv-python
+psutil
+fastapi
+uvicorn
+deep-translator
+tqdm
+google-generativeai
+requests
+cryptography
