@@ -736,7 +736,18 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     video_upload = gr.File(label=i18n("Upload Video"), file_count="single", file_types=["video"], visible=False)
                     
                     with gr.Row():
-                        video_quality_input = gr.Dropdown(choices=["best", "1080p", "720p", "480p", "4k"], label=i18n("Video Quality"), value="best")
+                        video_quality_input = gr.Dropdown(
+                            choices=[
+                                ("720p (Ultra Rápido - Recomendado)", "720p"),
+                                ("1080p (Alta Definição)", "1080p"),
+                                ("480p (Super Leve)", "480p"),
+                                ("Melhor Disponível (Original)", "best"),
+                                ("4K Ultra HD", "4k")
+                            ],
+                            label=i18n("Video Quality"),
+                            value="720p",
+                            info="720p baixa 4x mais rápido e é ideal para vídeos de celular."
+                        )
                         translate_input = gr.Dropdown(choices=["None", "pt", "en", "es", "fr", "de", "it", "ru", "ja", "ko", "zh-CN"], label=i18n("Translate Subtitles To"), value="None")
                         use_youtube_subs_input = gr.Checkbox(label=i18n("Use YouTube Subs"), value=True, info=i18n("Download and use official subtitles if available. (Recommended, it speeds up the process)"))
 
