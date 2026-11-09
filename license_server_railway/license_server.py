@@ -746,6 +746,9 @@ def admin_create_license(data: Dict[str, Any], req: Request) -> JSONResponse:
                     "INSERT INTO licenses (license_key, exp, credits, plan, status) VALUES (%s,%s,%s,%s,'active')",
                     (license_key, exp, credits, plan),
                 )
+                # Remove registros de operacao orfaos de uma chave que foi apagada
+                # anteriormente; sem isso o UNIQUE(license_key) impede recria-la.
+                cur.execute("DELETE FROM license_creation_operations WHERE license_key=%s", (license_key,))
                 cur.execute(
                     "INSERT INTO license_creation_operations (operation_id, license_key, credits, days, plan) VALUES (%s,%s,%s,%s,%s)",
                     (operation_id, license_key, credits, days, plan),
