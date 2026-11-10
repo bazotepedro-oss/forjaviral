@@ -152,10 +152,11 @@ Write-Host ""
 # Passo 6: Dependencias do App
 Write-Host "[Passo 6/6] Instalando dependencias (WhisperX, MediaPipe, Gradio, etc)..." -ForegroundColor Cyan
 $reqFile = Join-Path $projectRoot "requirements.txt"
+$constraintsFile = Join-Path $projectRoot "constraints.txt"
 if ($choice -eq "1") {
-    & uv pip install --link-mode=copy -r $reqFile --extra-index-url https://download.pytorch.org/whl/cu121
+    & uv pip install --link-mode=copy -r $reqFile -c $constraintsFile --extra-index-url https://download.pytorch.org/whl/cu121
 } else {
-    & uv pip install --link-mode=copy -r $reqFile --extra-index-url https://download.pytorch.org/whl/cpu
+    & uv pip install --link-mode=copy -r $reqFile -c $constraintsFile --extra-index-url https://download.pytorch.org/whl/cpu
 }
 if ($LASTEXITCODE -ne 0) { Stop-InstallError "instalar as dependencias do aplicativo (Gradio, WhisperX, etc.)" }
 Write-Host " [OK] Todas as dependencias foram instaladas!" -ForegroundColor Green
@@ -178,6 +179,22 @@ if ($LASTEXITCODE -ne 0) {
 & $venvPython -c "import ctranslate2, sys; v=tuple(int(x) for x in ctranslate2.__version__.split('.')[:2]); sys.exit(0 if v >= (4,5) else 1)"
 if ($LASTEXITCODE -ne 0) {
     Stop-InstallError "confirmar a versao do CTranslate2 (esperado 4.5+)"
+}
+
+if ($choice -eq "1") {
+    Write-Host "[Verificacao] Conferindo a GPU (CUDA)..." -ForegroundColor Cyan
+    & $venvPython -c "import torch, sys; sys.exit(0 if torch.cuda.is_available() else 1)"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host " [AVISO] O PyTorch nao esta vendo a GPU. Reinstalando a versao CUDA..." -ForegroundColor Yellow
+        & uv pip install --link-mode=copy --reinstall torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121
+        if ($LASTEXITCODE -ne 0) { Stop-InstallError "reinstalar o PyTorch com CUDA" }
+        & $venvPython -c "import torch, sys; sys.exit(0 if torch.cuda.is_available() else 1)"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "[DICA] Se este PC nao tem placa NVIDIA, rode o INSTALADOR.bat e escolha a opcao 2 (CPU)." -ForegroundColor Yellow
+            Stop-InstallError "validar a GPU (CUDA indisponivel)"
+        }
+    }
+    & $venvPython -c "import torch; print('torch', torch.__version__, '| cuda', torch.cuda.is_available())"
 }
 Write-Host " [OK] Dependencias verificadas!" -ForegroundColor Green
 Write-Host ""

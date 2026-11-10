@@ -1,5 +1,11 @@
 # Forja Viral lockfile (core compatibility pins)
-numpy==1.26.4
-transformers==4.46.3
+# Stack validado: funciona com GPU (cu121) e CPU.
+numpy==2.0.2
+transformers==4.48.0
+whisperx==3.4.5
+pyannote-audio==3.4.0
+torch==2.5.1
+torchvision==0.20.1
+torchaudio==2.5.1
 # If you use these, keep them pinned to avoid surprise breaks:
 protobuf<5

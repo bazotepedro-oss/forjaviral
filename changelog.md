@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.6 — PyTorch travado e GPU validada
+
+### Correções
+- **Stack do PyTorch travado**: `constraints.txt` agora fixa `torch/torchvision/torchaudio 2.5.1`, `pyannote-audio 3.4.0`, `transformers 4.48.0`, `whisperx 3.4.5` e `numpy 2.0.2`. Sem isso, o passo de dependências trocava o PyTorch CUDA pelo 2.14.1 CPU do PyPI e quebrava o `torchaudio` do pyannote.
+- **Instalação das dependências com constraints**: o `INSTALADOR` passa `-c constraints.txt`, então o PyTorch escolhido (GPU ou CPU) não é substituído.
+- **Verificação de GPU**: no modo GPU, o instalador confere `torch.cuda.is_available()`, reinstala o build CUDA se precisar e avisa para escolher o modo CPU em PCs sem placa NVIDIA.
+
 ## 1.3.5 — Dependências resolvidas de vez
 
 ### Correções
