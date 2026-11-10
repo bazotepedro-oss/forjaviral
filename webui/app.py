@@ -3,10 +3,10 @@ def get_saved_gemini_key():
     try:
         cfg_path = os.path.join(WORKING_DIR, "api_config.json")
         if os.path.exists(cfg_path):
-            with open(cfg_path, "r", encoding="utf-8") as f:
+            with open(cfg_path, "r", encoding="utf-8-sig") as f:
                 d = json.load(f)
             k = d.get("gemini", {}).get("api_key", "").strip()
-            if k and not k.startswith("AIzaSyCi-vVVn1Dzbm4Apt"):
+            if k:
                 return k
     except Exception:
         pass
@@ -376,7 +376,7 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
         try:
             cfg_p = os.path.join(WORKING_DIR, "api_config.json")
             if os.path.exists(cfg_p):
-                with open(cfg_p, "r", encoding="utf-8") as cf:
+                with open(cfg_p, "r", encoding="utf-8-sig") as cf:
                     cdata = json.load(cf)
                 if cdata.get("gemini", {}).get("api_key") != api_key.strip():
                     cdata.setdefault("gemini", {})["api_key"] = api_key.strip()

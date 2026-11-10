@@ -755,7 +755,7 @@ def create(num_segments, viral_mode, themes, tempo_minimo, tempo_maximo, ai_mode
 
     if os.path.exists(config_path):
         try:
-            with open(config_path, 'r', encoding='utf-8') as f:
+            with open(config_path, 'r', encoding='utf-8-sig') as f:
                 loaded_config = json.load(f)
                 if "gemini" in loaded_config: config["gemini"].update(loaded_config["gemini"])
                 if "g4f" in loaded_config: config["g4f"].update(loaded_config["g4f"])

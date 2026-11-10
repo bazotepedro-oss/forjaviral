@@ -293,7 +293,7 @@ def main():
         api_config = {}
         if os.path.exists(config_path):
             try:
-                with open(config_path, 'r', encoding='utf-8') as f:
+                with open(config_path, 'r', encoding='utf-8-sig') as f:
                     api_config = json.load(f)
             except:
                 pass

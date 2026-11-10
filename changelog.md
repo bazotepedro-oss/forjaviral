@@ -8,6 +8,7 @@
 - **Título completo no card**: o título não é mais cortado em duas linhas; as hashtags ficam separadas e o texto completo aparece.
 - **Prompt mais rígido**: a IA agora precisa devolver `start_text`/`end_text` de frases completas, `end_time_ref`, título curto sem hashtags e campo `hashtags` separado.
 - **Aviso de chave**: se a chave Gemini não estiver configurada, o app avisa claramente em vez de gerar cortes falsos.
+- **Correção do `api_config.json`**: o arquivo agora é lido/gravado sem BOM, evitando o erro que impedia a chave Gemini de carregar.
 
 ## Fixes for Manual/Raw JSON Input
 

@@ -111,7 +111,8 @@ if (Test-Path $apiConfigPath) {
     try {
         $apiConfig = Get-Content $apiConfigPath -Raw | ConvertFrom-Json
         if ($apiConfig.gemini) { $apiConfig.gemini.api_key = "" }
-        $apiConfig | ConvertTo-Json -Depth 8 | Set-Content $apiConfigPath -Encoding UTF8
+        $jsonText = ($apiConfig | ConvertTo-Json -Depth 8) + "`n"
+        [System.IO.File]::WriteAllText($apiConfigPath, $jsonText, (New-Object System.Text.UTF8Encoding($false)))
     } catch {
         throw "api_config.json invalido: $($_.Exception.Message)"
     }
