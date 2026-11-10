@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.5 — Dependências resolvidas de vez
+
+### Correções
+- **Transformers 4.48.0**: atende a exigência do WhisperX 3.4.5 (`>=4.48`) e continua funcionando com o PyTorch 2.5.1 CUDA 12.1. As versões 5.x desativavam o PyTorch e quebravam o alinhamento palavra por palavra.
+- **Resolução completa validada**: o `requirements.txt` foi testado com o resolvedor antes da publicação; a única mudança é o CTranslate2 voltar para 4.4.0, e o instalador o atualiza para 4.8.4 logo depois com `--no-deps`.
+- **Instalação limpa**: o passo 6.1 garante CTranslate2 4.5+ e a verificação final confere Gradio, WhisperX, PyTorch e CTranslate2.
+
 ## 1.3.4 — Instalação compatível e atualização pelo .bat
 
 ### Correções
