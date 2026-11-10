@@ -67,6 +67,52 @@ PROTECTED_NAMES = {
     ".env", ".env.local",
     "api_config.json", "temp_subtitle_config.json",
     "site",
+    "membros_hostgator", "membros_hostgator.zip",
+    "license_server_railway", "forja-license-main",
+    "fabricadecortes-site",
+    "license_server_versionlock.py", "INICIAR_AREA_DE_MEMBROS.bat",
+}
+
+# Somente estes arquivos e pastas fazem parte do aplicativo do cliente.
+CLIENT_ROOT_FILES = {
+    "main_improved.py",
+    "requirements.txt",
+    "requirements_common.txt",
+    "constraints.txt",
+    "INSTALADOR.bat",
+    "INICIAR_FABRICA_DE_CORTES.bat",
+    "ATUALIZAR.bat",
+    "install.bat",
+    "install_cpu.bat",
+    "install_gpu.bat",
+    "install_dependencies.bat",
+    "install_dependencies_advanced_LocalLLM.bat",
+    "run.bat",
+    "run_webui.bat",
+    "COMO_INSTALAR.txt",
+    "README_RELEASE.txt",
+    "README_en.md",
+    "LICENSE",
+    "app.ico",
+    "api_config.json",
+    "temp_subtitle_config.json",
+    "prompt.txt",
+    "version.json",
+    "ViralCutter.ipynb",
+    "changelog.md",
+}
+CLIENT_DIRS = {"webui", "scripts", "branding", "i18n", "models"}
+
+# Pastas/arquivos internos que nunca devem existir na maquina do cliente.
+FORBIDDEN_CLIENT_NAMES = {
+    "membros_hostgator",
+    "membros_hostgator.zip",
+    "license_server_railway",
+    "forja-license-main",
+    "fabricadecortes-site",
+    "license_server_versionlock.py",
+    "INICIAR_AREA_DE_MEMBROS.bat",
+    "config.local.php",
 }
 
 REQUIRED_PAYLOAD_FILES = (
@@ -202,6 +248,44 @@ def find_payload_root(base: Path) -> Path | None:
     return None
 
 
+def _is_client_payload(rel: Path) -> bool:
+    """True apenas para arquivos que fazem parte do aplicativo do cliente."""
+    parts = rel.parts
+    if not parts:
+        return False
+    if any(part in FORBIDDEN_CLIENT_NAMES for part in parts):
+        return False
+    if any(part in PROTECTED_NAMES for part in parts):
+        return False
+    if parts[0] in CLIENT_DIRS:
+        if rel.suffix.lower() in {".pyc", ".pyo"}:
+            return False
+        if rel.name == "a":
+            return False
+        return True
+    return len(parts) == 1 and rel.name in CLIENT_ROOT_FILES
+
+
+def cleanup_internal_folders(quiet: bool = False) -> None:
+    """Remove do cliente pastas internas que nunca deveriam ter sido distribuidas."""
+    removed: list[str] = []
+    for name in ("membros_hostgator", "license_server_railway", "forja-license-main", "fabricadecortes-site"):
+        path = PROJECT_ROOT / name
+        if path.exists():
+            shutil.rmtree(path, ignore_errors=True)
+            removed.append(name)
+    for name in ("membros_hostgator.zip", "license_server_versionlock.py", "INICIAR_AREA_DE_MEMBROS.bat", "config.local.php"):
+        path = PROJECT_ROOT / name
+        if path.is_file():
+            try:
+                path.unlink()
+                removed.append(name)
+            except OSError:
+                pass
+    if removed:
+        log("Arquivos internos removidos do cliente: " + ", ".join(removed), quiet)
+
+
 def validate_payload(root: Path) -> int:
     missing = [rel for rel in REQUIRED_PAYLOAD_FILES if not (root / rel).is_file()]
     if missing:
@@ -210,7 +294,8 @@ def validate_payload(root: Path) -> int:
     compiled = 0
     failures: list[str] = []
     for py_file in root.rglob("*.py"):
-        if any(part in PROTECTED_NAMES for part in py_file.relative_to(root).parts):
+        rel = py_file.relative_to(root)
+        if not _is_client_payload(rel):
             continue
         if py_file.stat().st_size > 3 * 1024 * 1024:
             continue
@@ -244,7 +329,7 @@ def apply_payload(source_root: Path, backup_root: Path, quiet: bool = False) -> 
         if not src.is_file():
             continue
         rel = src.relative_to(source_root)
-        if _is_protected(rel) or rel.as_posix() == "version.json":
+        if _is_protected(rel) or rel.as_posix() == "version.json" or not _is_client_payload(rel):
             continue
 
         dst = PROJECT_ROOT / rel
@@ -332,6 +417,8 @@ def run(args: argparse.Namespace) -> int:
     if is_dev_checkout() and not args.force:
         log("Ambiente de desenvolvimento (.git) detectado; atualizacao automatica ignorada.", quiet)
         return 0
+
+    cleanup_internal_folders(quiet)
 
     if not acquire_lock():
         log("Outra atualizacao ja esta em andamento; seguindo com a versao atual.", quiet)

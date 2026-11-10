@@ -17,37 +17,14 @@ Write-Host "                      https://fabricadecortes.com                " -
 Write-Host "==================================================================" -ForegroundColor DarkYellow
 Write-Host ""
 
-# 0. Sincronizacao / Download do Codigo Fonte do GitHub se necessario
+# 0. Verificacao do pacote oficial (nunca baixa o repositorio inteiro)
 $appPath = Join-Path $projectRoot "webui\app.py"
 if (-not (Test-Path $appPath)) {
-    Write-Host "[i] Codigo-fonte nao encontrado nesta pasta." -ForegroundColor Cyan
-    Write-Host "Baixando versao oficial diretamente do GitHub..." -ForegroundColor Yellow
-    
-    $hasGit = Get-Command git -ErrorAction SilentlyContinue
-    if ($hasGit) {
-        & git clone https://github.com/bazotepedro-oss/forjaviral.git temp_git
-        Copy-Item -Path "temp_git\*" -Destination $projectRoot -Recurse -Force
-        Remove-Item "temp_git" -Recurse -Force -ErrorAction SilentlyContinue
-    } else {
-        $zipPath = Join-Path $env:TEMP "fabrica_src.zip"
-        $extractPath = Join-Path $env:TEMP "fabrica_extract"
-        Invoke-WebRequest -Uri "https://github.com/bazotepedro-oss/forjaviral/archive/refs/heads/main.zip" -OutFile $zipPath -UseBasicParsing
-        Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
-        Copy-Item -Path "$extractPath\forjaviral-main\*" -Destination $projectRoot -Recurse -Force
-        Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
-        Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
-    }
-    Write-Host "[OK] Codigo-fonte baixado com sucesso!" -ForegroundColor Green
-    Write-Host ""
-} else {
-    $gitDir = Join-Path $projectRoot ".git"
-    if (Test-Path $gitDir) {
-        $hasGit = Get-Command git -ErrorAction SilentlyContinue
-        if ($hasGit) {
-            Write-Host "[i] Sincronizando ultimas atualizacoes do GitHub..." -ForegroundColor Cyan
-            & git pull origin main 2>$null | Out-Null
-        }
-    }
+    Write-Host "[ERRO] Pacote incompleto: webui\app.py nao encontrado." -ForegroundColor Red
+    Write-Host "Baixe novamente o ZIP oficial do aplicativo e extraia por completo." -ForegroundColor Yellow
+    Write-Host "Nao baixe arquivos de fontes nao oficiais." -ForegroundColor Yellow
+    Read-Host "Pressione Enter para sair"
+    exit 1
 }
 
 # 1. Deteccao automatica de Placa de Video (GPU NVIDIA)

@@ -16,6 +16,10 @@ __pycache__/
 *.so
 *.egg
 *.egg-info/
+############################
+# 🏗️ Build de release do cliente
+############################
+release/
 dist/
 build/
 pip-wheel-metadata/
