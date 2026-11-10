@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.3 — Instalação à prova de falha
+
+### Correções
+- **Instalador honesto**: agora ele para na primeira etapa que falhar e mostra o motivo, em vez de exibir "instalação concluída" mesmo com dependências faltando.
+- **Verificação real no final**: só declara sucesso se `gradio`, `whisperx` e `torch` importarem de verdade dentro do `.venv`.
+- **Reparo automático ao abrir**: o `INICIAR_FABRICA_DE_CORTES.bat` confere o Gradio antes de subir o app e chama o instalador sozinho quando a instalação estiver incompleta.
+
 ## 1.3.2 — Interface nova e cortes consistentes
 
 ### Interface

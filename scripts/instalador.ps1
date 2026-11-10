@@ -9,6 +9,19 @@ Set-Location $projectRoot
 $env:PATH = "$env:USERPROFILE\.local\bin;$env:LOCALAPPDATA\uv;C:\Program Files\Git\cmd;$projectRoot\.venv\Scripts;$env:PATH"
 $env:UV_LINK_MODE = "copy"
 
+function Stop-InstallError {
+    param([string]$Step)
+    Write-Host ""
+    Write-Host "==================================================================" -ForegroundColor Red
+    Write-Host "[ERRO] Falha na etapa: $Step" -ForegroundColor Red
+    Write-Host "==================================================================" -ForegroundColor Red
+    Write-Host "Verifique a conexao com a internet e o antivirus e rode o INSTALADOR.bat de novo." -ForegroundColor Yellow
+    Write-Host "Se o erro citar espaco em disco, libere alguns GB e repita." -ForegroundColor Yellow
+    Write-Host ""
+    Read-Host "Pressione Enter para sair"
+    exit 1
+}
+
 Clear-Host
 Write-Host "==================================================================" -ForegroundColor DarkYellow
 Write-Host "                FABRICA DE CORTES - INSTALADOR OFICIAL           " -ForegroundColor Yellow
@@ -82,6 +95,7 @@ if (-not $hasUv) {
     if (-not (Test-Path $uvLocal)) {
         Write-Host " - Baixando uv oficial..." -ForegroundColor Yellow
         Invoke-Expression (Invoke-RestMethod "https://astral.sh/uv/install.ps1")
+        if ($LASTEXITCODE -ne 0) { Stop-InstallError "baixar o gerenciador uv" }
     }
     $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
 }
@@ -91,6 +105,7 @@ Write-Host ""
 # Passo 2: Python 3.10
 Write-Host "[Passo 2/6] Garantindo Python 3.10 standalone oficial..." -ForegroundColor Cyan
 & uv python install 3.10
+if ($LASTEXITCODE -ne 0) { Stop-InstallError "instalar o Python 3.10" }
 Write-Host " [OK] Python 3.10 pronto!" -ForegroundColor Green
 Write-Host ""
 
@@ -99,6 +114,7 @@ Write-Host "[Passo 3/6] Criando ambiente virtual isolado (.venv)..." -Foreground
 $venvPython = Join-Path $projectRoot ".venv\Scripts\python.exe"
 if (-not (Test-Path $venvPython)) {
     & uv venv .venv --python 3.10
+    if ($LASTEXITCODE -ne 0) { Stop-InstallError "criar o ambiente virtual (.venv)" }
 } else {
     Write-Host " - Ambiente virtual ja existente, mantendo..." -ForegroundColor Gray
 }
@@ -108,7 +124,10 @@ Write-Host ""
 # Passo 4: FFmpeg
 Write-Host "[Passo 4/6] Verificando e configurando o FFmpeg..." -ForegroundColor Cyan
 $setupFfmpegScript = Join-Path $PSScriptRoot "setup_ffmpeg.ps1"
-& powershell.exe -ExecutionPolicy Bypass -File $setupFfmpegScript
+if (Test-Path $setupFfmpegScript) {
+    & powershell.exe -ExecutionPolicy Bypass -File $setupFfmpegScript
+    if ($LASTEXITCODE -ne 0) { Stop-InstallError "baixar/configurar o FFmpeg" }
+}
 Write-Host " [OK] FFmpeg configurado em .venv\Scripts!" -ForegroundColor Green
 Write-Host ""
 
@@ -117,11 +136,15 @@ Write-Host "[Passo 5/6] Instalando PyTorch e aceleradores de IA..." -ForegroundC
 if ($choice -eq "1") {
     Write-Host " - Modo GPU: Instalando PyTorch com aceleracao CUDA 12.1..." -ForegroundColor Yellow
     & uv pip install --link-mode=copy torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+    if ($LASTEXITCODE -ne 0) { Stop-InstallError "instalar o PyTorch (GPU/CUDA)" }
     & uv pip install --link-mode=copy onnxruntime-gpu
+    if ($LASTEXITCODE -ne 0) { Stop-InstallError "instalar o onnxruntime-gpu" }
 } else {
     Write-Host " - Modo CPU: Instalando PyTorch para processador..." -ForegroundColor Yellow
     & uv pip install --link-mode=copy torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+    if ($LASTEXITCODE -ne 0) { Stop-InstallError "instalar o PyTorch (CPU)" }
     & uv pip install --link-mode=copy onnxruntime
+    if ($LASTEXITCODE -ne 0) { Stop-InstallError "instalar o onnxruntime" }
 }
 Write-Host " [OK] PyTorch instalado com sucesso!" -ForegroundColor Green
 Write-Host ""
@@ -134,7 +157,17 @@ if ($choice -eq "1") {
 } else {
     & uv pip install --link-mode=copy -r $reqFile --extra-index-url https://download.pytorch.org/whl/cpu
 }
+if ($LASTEXITCODE -ne 0) { Stop-InstallError "instalar as dependencias do aplicativo (Gradio, WhisperX, etc.)" }
 Write-Host " [OK] Todas as dependencias foram instaladas!" -ForegroundColor Green
+Write-Host ""
+
+# Verificacao real: so declara sucesso se o app conseguir importar as bibliotecas
+Write-Host "[Verificacao] Conferindo Gradio, WhisperX e PyTorch..." -ForegroundColor Cyan
+& $venvPython -c "import gradio, whisperx, torch; print('dependencias ok')"
+if ($LASTEXITCODE -ne 0) {
+    Stop-InstallError "verificar as dependencias (Gradio/WhisperX/PyTorch)"
+}
+Write-Host " [OK] Dependencias verificadas!" -ForegroundColor Green
 Write-Host ""
 
 # Passo 7: Atalho oficial na Area de Trabalho

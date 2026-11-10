@@ -19,6 +19,20 @@ if exist "%~dp0scripts\auto_update.py" (
     "%~dp0.venv\Scripts\python.exe" "%~dp0scripts\auto_update.py"
 )
 
+rem Confere se as dependencias foram instaladas de verdade. O instalador antigo
+rem podia falhar no meio e mesmo assim dizer que estava tudo pronto.
+if exist "%~dp0.venv\Scripts\python.exe" (
+    "%~dp0.venv\Scripts\python.exe" -c "import gradio" >nul 2>&1
+    if errorlevel 1 (
+        echo.
+        echo [AVISO] As dependencias do aplicativo nao foram instaladas por completo.
+        echo Abrindo o instalador para reparar agora...
+        echo.
+        call "%~dp0INSTALADOR.bat"
+        exit /b 0
+    )
+)
+
 echo ==============================================================
 echo.
 echo           INICIANDO FABRICA DE CORTES - EDICAO DE VIDEOS
