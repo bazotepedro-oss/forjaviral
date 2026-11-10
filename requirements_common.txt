@@ -4,8 +4,7 @@ transformers==4.46.3
 g4f[all]
 yt-dlp
 ffmpeg-python
-whisperx
-ctranslate2>=4.5.4
+whisperx==3.4.5
 mediapipe
 google-genai
 insightface

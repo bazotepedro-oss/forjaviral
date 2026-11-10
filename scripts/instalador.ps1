@@ -161,11 +161,23 @@ if ($LASTEXITCODE -ne 0) { Stop-InstallError "instalar as dependencias do aplica
 Write-Host " [OK] Todas as dependencias foram instaladas!" -ForegroundColor Green
 Write-Host ""
 
+# Passo 6.1: CTranslate2 novo (cuDNN 9 do PyTorch). O WhisperX pede uma versao
+# antiga, mas o runtime funciona com a nova; instalamos sem deps para nao conflitar.
+Write-Host "[Passo 6.1] Ajustando o CTranslate2 para usar o cuDNN do PyTorch..." -ForegroundColor Cyan
+& uv pip install --link-mode=copy --no-deps ctranslate2==4.8.4
+if ($LASTEXITCODE -ne 0) { Stop-InstallError "ajustar o CTranslate2" }
+Write-Host " [OK] CTranslate2 ajustado!" -ForegroundColor Green
+Write-Host ""
+
 # Verificacao real: so declara sucesso se o app conseguir importar as bibliotecas
-Write-Host "[Verificacao] Conferindo Gradio, WhisperX e PyTorch..." -ForegroundColor Cyan
-& $venvPython -c "import gradio, whisperx, torch; print('dependencias ok')"
+Write-Host "[Verificacao] Conferindo Gradio, WhisperX, PyTorch e CTranslate2..." -ForegroundColor Cyan
+& $venvPython -c "import gradio, whisperx, torch, ctranslate2; print('ctranslate2', ctranslate2.__version__)"
 if ($LASTEXITCODE -ne 0) {
-    Stop-InstallError "verificar as dependencias (Gradio/WhisperX/PyTorch)"
+    Stop-InstallError "verificar as dependencias (Gradio/WhisperX/PyTorch/CTranslate2)"
+}
+& $venvPython -c "import ctranslate2, sys; v=tuple(int(x) for x in ctranslate2.__version__.split('.')[:2]); sys.exit(0 if v >= (4,5) else 1)"
+if ($LASTEXITCODE -ne 0) {
+    Stop-InstallError "confirmar a versao do CTranslate2 (esperado 4.5+)"
 }
 Write-Host " [OK] Dependencias verificadas!" -ForegroundColor Green
 Write-Host ""

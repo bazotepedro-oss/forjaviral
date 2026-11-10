@@ -12,19 +12,11 @@ echo ==============================================================
 echo            FABRICA DOS CORTES - INSTALADOR RAPIDO
 echo ==============================================================
 echo.
-echo  Este instalador baixa a versao mais recente do aplicativo e
-echo  instala tudo automaticamente. Basta estar conectado a internet.
+echo  Este instalador SEMPRE baixa a versao mais recente do GitHub e
+echo  atualiza o aplicativo. Seus videos e projetos sao preservados.
 echo.
 echo  Pasta de instalacao: %TARGET%
 echo.
-
-if exist "%TARGET%\INICIAR_FABRICA_DE_CORTES.bat" (
-    echo  O aplicativo ja esta instalado nesta pasta.
-    echo  Abrindo o instalador para reparar/atualizar as dependencias...
-    echo.
-    call "%TARGET%\INSTALADOR.bat"
-    exit /b 0
-)
 
 echo [1/4] Verificando conexao com a internet...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "try { (Invoke-WebRequest -Uri 'https://github.com' -UseBasicParsing -TimeoutSec 12).StatusCode | Out-Null; exit 0 } catch { exit 1 }"

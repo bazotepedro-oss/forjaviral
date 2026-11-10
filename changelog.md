@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.4 — Instalação compatível e atualização pelo .bat
+
+### Correções
+- **Conflito de versões resolvido**: o instalador fixa WhisperX 3.4.5 e Transformers 4.46.3, que funcionam com o PyTorch 2.5.1 CUDA 12.1. O CTranslate2 4.8.4 é instalado num passo separado, sem conflitar com o WhisperX.
+- **Alinhamento de legendas de volta**: o Transformers 5.x desativava o PyTorch e quebrava o alinhamento palavra por palavra; a versão fixada mantém o Wav2Vec2 funcionando.
+- **Instalador rápido sempre baixa**: o `INSTALAR_FABRICA_DE_CORTES.bat` agora baixa a versão mais recente em toda execução e atualiza os arquivos, preservando `VIRALS`, modelos e a chave Gemini.
+- **Verificação final** confere Gradio, WhisperX, PyTorch e CTranslate2 4.5+ antes de declarar sucesso.
+
 ## 1.3.3 — Instalação à prova de falha
 
 ### Correções
