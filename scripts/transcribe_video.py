@@ -10,6 +10,66 @@ from i18n.i18n import I18nAuto
 
 i18n = I18nAuto()
 
+
+def _register_torch_cuda_dlls():
+    """No Windows, o CTranslate2 usa o CUDA/cuDNN que o PyTorch instala em torch/lib.
+
+    Sem registrar essa pasta, o WhisperX falha com "cudnn_ops_infer64_8.dll" ou
+    "cublas64_12.dll not found" mesmo com a GPU funcionando.
+    """
+    if os.name != "nt":
+        return None
+    try:
+        lib_dir = os.path.join(os.path.dirname(torch.__file__), "lib")
+        if not os.path.isdir(lib_dir):
+            return None
+        os.add_dll_directory(lib_dir)
+        os.environ["PATH"] = lib_dir + os.pathsep + os.environ.get("PATH", "")
+        return lib_dir
+    except (AttributeError, OSError):
+        return None
+
+
+_TORCH_LIB_DIR = _register_torch_cuda_dlls()
+
+
+def _detect_subtitle_language(sub_path, output_folder, segments):
+    """Descobre o idioma da legenda pelo sufixo do arquivo, por legendas irmas ou pelo texto.
+
+    Nao basta procurar "en" no caminho: nomes como "Inteligencia" contem "en" e
+    faziam um video em portugues ser alinhado com o modelo em ingles.
+    """
+    def _code_from_name(value):
+        tokens = re.split(r"[._\-\s]+", value.lower())
+        for code in ("pt", "es", "en"):
+            if code in tokens:
+                return code
+        return None
+
+    from_name = _code_from_name(os.path.basename(sub_path))
+    if from_name:
+        return from_name
+
+    try:
+        for sibling in os.listdir(output_folder):
+            low = sibling.lower()
+            if low.startswith("input.") and low.endswith((".vtt", ".srt")):
+                code = _code_from_name(low)
+                if code:
+                    return code
+    except OSError:
+        pass
+
+    sample = " " + " ".join(str(s.get("text") or "") for s in segments[:60]).lower() + " "
+    score = {
+        "pt": sum(sample.count(w) for w in [" nao ", " não ", " voce ", " você ", " isso ", " uma ", " com ", " para ", " pra "]),
+        "es": sum(sample.count(w) for w in [" pero ", " tambien ", " también ", " mucho ", " aqui ", " aquí ", " esto ", " con "]),
+        "en": sum(sample.count(w) for w in [" the ", " and ", " that ", " you ", " with ", " this ", " have "]),
+    }
+    best = max(score, key=score.get)
+    return best if score[best] > 0 else "en"
+
+
 def apply_safe_globals_hack():
     """
     Workaround for 'Weights only load failed' error in newer PyTorch versions.
@@ -242,16 +302,8 @@ def transcribe(input_file, model_name='large-v3', project_folder='tmp'):
                 start_segments = parsed
                 alignment_only = True
                 
-                # Detecção inteligente do idioma a partir do nome ou conteúdo da legenda
-                sub_name_low = sub_path.lower()
-                if 'pt' in sub_name_low:
-                    detected_language = 'pt'
-                elif 'es' in sub_name_low or 'sp' in sub_name_low:
-                    detected_language = 'es'
-                elif 'en' in sub_name_low:
-                    detected_language = 'en'
-                else:
-                    detected_language = 'pt'
+                # Detecção pelo sufixo da legenda (input.pt-orig.vtt) e, se preciso, pelo texto.
+                detected_language = _detect_subtitle_language(sub_path, output_folder, parsed)
                 print(f"Idioma detectado para alinhamento: {detected_language}")
                 
                 print("--- MODO ALINHAMENTO RÁPIDO ATIVADO ---")
@@ -268,27 +320,38 @@ def transcribe(input_file, model_name='large-v3', project_folder='tmp'):
             # 3. Transcrever (Caminho Normal)
             print("Nenhuma legenda válida encontrada. Realizando transcrição completa (WhisperX)...")
             print(f"Carregando modelo {model_name}...")
-            model = whisperx.load_model(
-                model_name, 
-                device, 
-                compute_type=compute_type,
-                asr_options={"hotwords": None}
-            )
 
-            result = model.transcribe(
-                audio, 
-                batch_size=16, 
-                chunk_size=10
-            )
-            
+            def _transcribe_on(dev, ctype):
+                _register_torch_cuda_dlls()
+                local_model = whisperx.load_model(
+                    model_name,
+                    dev,
+                    compute_type=ctype,
+                    asr_options={"hotwords": None}
+                )
+                local_result = local_model.transcribe(
+                    audio,
+                    batch_size=16,
+                    chunk_size=10
+                )
+                del local_model
+                gc.collect()
+                if dev == "cuda":
+                    torch.cuda.empty_cache()
+                return local_result
+
+            try:
+                result = _transcribe_on(device, compute_type)
+            except Exception as gpu_error:
+                if device != "cuda":
+                    raise
+                print(f"[AVISO] Falha ao transcrever na GPU ({gpu_error}). Tentando na CPU...")
+                device = "cpu"
+                compute_type = "float32"
+                result = _transcribe_on(device, compute_type)
+
             detected_language = result["language"]
             start_segments = result["segments"]
-            
-            # Limpar modelo de transcrição
-            if device == "cuda":
-                del model
-                gc.collect()
-                torch.cuda.empty_cache()
 
         # 4. Alinhar (Sempre executado, seja com subs parsed ou transcritos)
         print(f"Alinhando transcrição (Idioma: {detected_language}) para obter timestamps precisos...")

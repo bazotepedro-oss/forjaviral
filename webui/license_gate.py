@@ -78,6 +78,10 @@ class LicenseGate:
         self.license_key: str = ""
         self.hwid: str = compute_hwid_hash()
         self.state = GateState(hwid=self.hwid)
+        # O Gradio executa cada "next" do gerador em um contexto diferente, então
+        # o ContextVar sozinho não sobrevive até o finally. Guardamos também na
+        # instância para liquidar a reserva e liberar o token com segurança.
+        self._active_debit: Optional[ActiveDebit] = None
 
     # ---- persistence ----
     def load_local(self) -> None:
@@ -255,7 +259,7 @@ class LicenseGate:
         return updated or self.state.reason in {"blocked", "expired"}
 
     def settle_delivered(self, actual_n: int) -> bool:
-        active = _active_debit.get()
+        active = _active_debit.get() or self._active_debit
         if active is None:
             return False
         refund = max(0, active.requested - min(max(0, int(actual_n)), active.requested))
@@ -337,6 +341,7 @@ class LicenseGate:
                 if not self.consume_n(required, operation_id):
                     self._raise_block()
                 active = ActiveDebit(operation_id, required)
+                self._active_debit = active
                 token = _active_debit.set(active)
                 try:
                     yield from fn(*args, **kwargs)
@@ -344,7 +349,13 @@ class LicenseGate:
                     if not active.settled:
                         # A callback that exits before reporting outputs releases its reservation.
                         self.refund_n(required, operation_id, operation_id + ":settle")
-                    _active_debit.reset(token)
+                    self._active_debit = None
+                    try:
+                        _active_debit.reset(token)
+                    except (ValueError, RuntimeError):
+                        # O Gradio troca de contexto entre os yields; o token antigo
+                        # nao pode ser resetado aqui, mas a reserva ja foi tratada.
+                        pass
             return _wrapped
 
         def _wrapped(*args: Any, **kwargs: Any) -> Any:
@@ -369,13 +380,18 @@ class LicenseGate:
             if not self.consume_n(required, operation_id):
                 self._raise_block()
             active = ActiveDebit(operation_id, required)
+            self._active_debit = active
             token = _active_debit.set(active)
             try:
                 return fn(*args, **kwargs)
             finally:
                 if not active.settled:
                     self.refund_n(required, operation_id, operation_id + ":settle")
-                _active_debit.reset(token)
+                self._active_debit = None
+                try:
+                    _active_debit.reset(token)
+                except (ValueError, RuntimeError):
+                    pass
 
         return _wrapped
 
@@ -392,6 +408,7 @@ class LicenseGate:
                 value=self.base_url,
                 placeholder="https://forja-license-production.up.railway.app",
                 scale=2,
+                visible=False,
             )
             license_key_txt = gr.Textbox(
                 label="Chave de licença",
@@ -400,7 +417,7 @@ class LicenseGate:
                 scale=2,
             )
 
-        check_btn = gr.Button("Verificar / Ativar", variant="primary")
+        check_btn = gr.Button("Verificar / Ativar", variant="primary", elem_id="license_check_btn")
 
         def _do_check(url: str, key: str) -> str:
             self.set_base_url(url)

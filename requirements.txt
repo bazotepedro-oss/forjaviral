@@ -4,6 +4,7 @@ g4f[all]
 yt-dlp
 ffmpeg-python
 whisperx
+ctranslate2>=4.5.4
 mediapipe
 google-genai
 insightface

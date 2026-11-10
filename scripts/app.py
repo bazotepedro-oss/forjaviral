@@ -263,12 +263,13 @@ def count_generated_cuts(project_folder_path, start_time=None):
     return 0
 
 GEMINI_MODELS = [
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
-    'gemini-2.5-flash-lite-preview-09-2025',
-    'gemini-1.5-pro',
+    'gemini-2.5-flash',
+    'gemini-flash-latest',
+    'gemini-2.5-flash-lite',
+    'gemini-flash-lite-latest',
+    'gemini-3.8-flash',
     'gemini-2.5-pro',
-    'gemini-2.0-flash-lite'
+    'gemini-pro-latest'
 ]
 
 G4F_MODELS = [

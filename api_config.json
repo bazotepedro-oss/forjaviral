@@ -1,12 +1,12 @@
 {
-    "selected_api": "gemini",
-    "gemini": {
-        "api_key": "",
-        "model": "gemini-2.0-flash",
-        "chunk_size": 250000
-    },
-    "g4f": {
-        "model": "gpt-4o-mini",
-        "chunk_size": 25000
-    }
+    "selected_api":  "gemini",
+    "gemini":  {
+                   "api_key":  "",
+                   "model":  "gemini-2.5-flash",
+                   "chunk_size":  250000
+               },
+    "g4f":  {
+                "model":  "gpt-4o-mini",
+                "chunk_size":  25000
+            }
 }

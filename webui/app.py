@@ -263,12 +263,13 @@ def count_generated_cuts(project_folder_path, start_time=None):
     return 0
 
 GEMINI_MODELS = [
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
-    'gemini-2.5-flash-lite-preview-09-2025',
-    'gemini-1.5-pro',
+    'gemini-2.5-flash',
+    'gemini-flash-latest',
+    'gemini-2.5-flash-lite',
+    'gemini-flash-lite-latest',
+    'gemini-3.8-flash',
     'gemini-2.5-pro',
-    'gemini-2.0-flash-lite'
+    'gemini-pro-latest'
 ]
 
 G4F_MODELS = [
@@ -318,20 +319,20 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
     global current_process
     process_start_time = time.time()
     return_code = -1
-    yield "", gr.update(value=i18n("Running..."), interactive=False), gr.update(visible=True), None, gr.update()
+    yield "", gr.update(value="Gerando...", interactive=False), gr.update(visible=True), None, gr.update(), _render_progress_html(3, "Iniciando...")
 
     cmd = [sys.executable, MAIN_SCRIPT_PATH]
     
     # Input Source Logic
     if input_source == "Existing Project":
         if not project_name:
-             yield i18n("Error: No project selected."), gr.update(value=i18n("Start Processing"), interactive=True), gr.update(visible=False), None, gr.update()
+             yield "Selecione um projeto.", gr.update(value="Gerar Cortes", interactive=True), gr.update(visible=False), None, gr.update(), _render_progress_html(0, "Selecione um projeto.")
              return
         full_project_path = os.path.join(VIRALS_DIR, project_name)
         cmd.extend(["--project-path", full_project_path])
     elif input_source == "Upload Video":
         if not video_file:
-             yield i18n("Error: No video file uploaded."), gr.update(value=i18n("Start Processing"), interactive=True), gr.update(visible=False), None, gr.update()
+             yield "Envie um vídeo para continuar.", gr.update(value="Gerar Cortes", interactive=True), gr.update(visible=False), None, gr.update(), _render_progress_html(0, "Envie um vídeo.")
              return
         
         # Determine project name from filename
@@ -450,12 +451,14 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
     env["PYTHONUNBUFFERED"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
     if not processing_lock.acquire(blocking=False):
-        yield "Já existe um processamento ativo. Aguarde ou cancele a execução atual.", gr.update(value=i18n("Start Processing"), interactive=True), gr.update(visible=False), None, gr.update()
+        yield "Já existe um processamento ativo. Aguarde ou cancele a execução atual.", gr.update(value="Gerar Cortes", interactive=True), gr.update(visible=False), None, gr.update(), _render_progress_html(0, "Já existe um processamento ativo.")
         return
     proc = None
     logs = ""
     project_folder_path = None
     actual_cuts = 0
+    progress_percent = 3
+    progress_label = "Iniciando..."
     asked_segments = int(segments or 1)
     to_debit = 0
     settlement_ok = False
@@ -533,18 +536,39 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
             if "Project Folder:" in clean_line:
                 parts = clean_line.split("Project Folder:")
                 if len(parts) > 1: project_folder_path = parts[1].strip()
+
+            # Atualiza a barra de progresso conforme o estagio do backend.
+            lower_line = clean_line.lower()
+            if "transcribing" in lower_line or "whisper" in lower_line or "transcrevendo" in lower_line:
+                if progress_percent < 30:
+                    progress_percent, progress_label = 30, "Transcrevendo o audio..."
+            elif "creating viral" in lower_line or "analyzing" in lower_line or "gemini" in lower_line or "g4f" in lower_line or "viral segments" in lower_line:
+                if progress_percent < 50:
+                    progress_percent, progress_label = 50, "Analisando os melhores cortes..."
+            elif "cutting" in lower_line or "cut segments" in lower_line or "cortando" in lower_line:
+                if progress_percent < 70:
+                    progress_percent, progress_label = 70, "Cortando os videos..."
+            elif "subtitle" in lower_line or "legend" in lower_line or "burn" in lower_line:
+                if progress_percent < 85:
+                    progress_percent, progress_label = 85, "Aplicando legendas..."
+            elif "download" in lower_line or "baixando" in lower_line:
+                if progress_percent < 15:
+                    progress_percent, progress_label = 15, "Baixando o video..."
+            elif "done" in lower_line or "completed" in lower_line or "conclu" in lower_line:
+                if progress_percent < 95:
+                    progress_percent, progress_label = 95, "Finalizando..."
             
             # Throttle updates to avoid browser freeze (0.2s interval)
             current_time = time.time()
             if current_time - last_update_time > 0.2:
-                yield logs, gr.update(visible=True, interactive=False), gr.update(visible=True), None, gr.update()
+                yield logs, gr.update(visible=True, interactive=False), gr.update(visible=True), None, gr.update(), _render_progress_html(progress_percent, progress_label)
                 last_update_time = current_time
         
         # Final yield to ensure all logs are shown
-        yield logs, gr.update(visible=True, interactive=False), gr.update(visible=True), None, gr.update()
+        yield logs, gr.update(visible=True, interactive=False), gr.update(visible=True), None, gr.update(), _render_progress_html(progress_percent, progress_label)
     except Exception as e:
-        logs += f"\nError running process: {str(e)}\n"
-        yield logs, gr.update(visible=True, interactive=False), gr.update(visible=True), None, gr.update()
+        logs += f"\nErro ao executar o processo: {str(e)}\n"
+        yield logs, gr.update(visible=True, interactive=False), gr.update(visible=True), None, gr.update(), _render_progress_html(0, "Erro no processamento.")
     finally:
         if proc is not None:
             try:
@@ -614,76 +638,913 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
     if project_folder_path and os.path.exists(project_folder_path):
         html_output = library.generate_project_gallery(project_folder_path, is_full_path=True)
     else:
-        html_output = f"<h3>{i18n('Error: Project folder could not be determined from logs.')}</h3>"
-    yield logs, gr.update(value=i18n("Start Processing"), interactive=True), gr.update(visible=False), html_output, _render_topbar_html()
+        html_output = "<h3>Não foi possível localizar a pasta do projeto.</h3>"
+    final_progress = (
+        _render_progress_html(100, "Cortes prontos!")
+        if actual_cuts > 0
+        else _render_progress_html(0, "Nenhum corte foi gerado.")
+    )
+    yield logs, gr.update(value="Gerar Cortes", interactive=True), gr.update(visible=False), html_output, _render_topbar_html(), final_progress
 
 css = """
-/* Forja Viral — Minimal dark UI */
-body, .gradio-container {
-    background-color: #0f1115 !important;
-    color: rgba(255,255,255,.92) !important;
+/* ===== Fábrica dos Cortes • tema laranja estilo Opus ===== */
+:root {
+    --fdc-grad: linear-gradient(135deg, #FF8A2A 0%, #FF5C00 55%, #E04800 100%);
+    --body-background-fill: #070504;
+    --background-fill-primary: #070504;
+    --background-fill-secondary: #0f0a07;
+    --block-background-fill: transparent;
+    --block-border-color: transparent;
+    --block-shadow: none;
+    --block-label-text-color: #cbb9ab;
+    --block-title-text-color: #ffffff;
+    --body-text-color: #f7efe9;
+    --body-text-color-subdued: #a99a8d;
+    --input-background-fill: #0c0908;
+    --input-border-color: rgba(255, 255, 255, 0.09);
+    --color-accent: #FF5C00;
+    --color-accent-soft: rgba(255, 92, 0, 0.16);
+    --checkbox-background-color-selected: #FF5C00;
+    --checkbox-border-color-selected: #FF5C00;
+    --button-primary-background-fill: linear-gradient(135deg, #FF8A2A 0%, #FF5C00 55%, #E04800 100%);
+    --button-primary-background-fill-hover: linear-gradient(135deg, #FF9A3A 0%, #FF6A10 55%, #E85200 100%);
+    --button-primary-text-color: #ffffff;
+    --button-primary-border-color: transparent;
+    --slider-color: #FF5C00;
 }
 
-/* Inputs */
-input[type="password"], textarea, select, input[type="text"], input[type="number"] {
-    background-color: rgba(255,255,255,.04) !important;
-    color: rgba(255,255,255,.92) !important;
-    border: 1px solid rgba(255,255,255,.12) !important;
+html,
+body {
+    background: #070504 !important;
 }
 
-/* Buttons */
-button, .gr-button {
-    border-radius: 12px !important;
+body {
+    background:
+        radial-gradient(1000px 520px at 100% -12%, rgba(255, 92, 0, 0.16), transparent 62%),
+        radial-gradient(800px 420px at -8% 112%, rgba(255, 92, 0, 0.07), transparent 60%),
+        #070504 !important;
+    color: #f7efe9 !important;
 }
 
-/* Cards / groups */
-.gr-group, .gr-panel, .block, .gr-box, .gr-form, .wrap, .gradio-container .prose {
-    border-color: rgba(255,255,255,.10) !important;
-}
-
-/* Hide Gradio footer */
-footer { visibility: hidden !important; height: 0 !important; }
-
-/* Container width */
+/* O Gradio redefine estas variáveis no próprio .gradio-container; o !important mantém o tema escuro */
 .gradio-container {
-    max-width: 98% !important;
-    width: 98% !important;
+    --background-fill-primary: #070504 !important;
+    --background-fill-secondary: #0f0a07 !important;
+    --block-background-fill: transparent !important;
+    --block-border-color: transparent !important;
+    --block-label-text-color: #cbb9ab !important;
+    --block-title-text-color: #ffffff !important;
+    --body-text-color: #f7efe9 !important;
+    --body-text-color-subdued: #a99a8d !important;
+    --input-background-fill: #0c0908 !important;
+    --input-background-fill-focus: #0c0908 !important;
+    --input-border-color: rgba(255, 255, 255, 0.09) !important;
+    --input-border-color-focus: rgba(255, 107, 26, 0.75) !important;
+    --input-placeholder-color: #6f625a !important;
+    --checkbox-label-background-fill: transparent !important;
+    --checkbox-label-background-fill-hover: rgba(255, 92, 0, 0.06) !important;
+    --checkbox-label-background-fill-selected: transparent !important;
+    --checkbox-label-border-color: transparent !important;
+    --checkbox-label-text-color: #f7efe9 !important;
+    --checkbox-label-text-color-selected: #ffffff !important;
+    --checkbox-background-color: #0c0908 !important;
+    --checkbox-border-color: rgba(255, 255, 255, 0.18) !important;
+    --checkbox-background-color-selected: #FF5C00 !important;
+    --checkbox-border-color-selected: #FF5C00 !important;
+    --button-secondary-background-fill: rgba(255, 92, 0, 0.10) !important;
+    --button-secondary-background-fill-hover: rgba(255, 92, 0, 0.18) !important;
+    --button-secondary-border-color: rgba(255, 92, 0, 0.35) !important;
+    --button-secondary-text-color: #FFB27A !important;
+    --button-primary-background-fill: linear-gradient(135deg, #FF8A2A 0%, #FF5C00 55%, #E04800 100%) !important;
+    --button-primary-background-fill-hover: linear-gradient(135deg, #FF9A3A 0%, #FF6A10 55%, #E85200 100%) !important;
+    --button-primary-text-color: #ffffff !important;
+    --color-accent: #FF5C00 !important;
+    --color-accent-soft: rgba(255, 92, 0, 0.16) !important;
+    --border-color-primary: rgba(255, 107, 26, 0.16) !important;
+    --panel-background-fill: #120c09 !important;
+    --table-even-background-fill: #120c09 !important;
+    --table-odd-background-fill: #0f0a07 !important;
+    --slider-color: #FF5C00 !important;
+    background: transparent !important;
+    max-width: 1240px !important;
+    width: 100% !important;
     margin: 0 auto !important;
+    padding: 20px 28px 48px 124px !important;
+    box-sizing: border-box !important;
+    color: #f7efe9 !important;
+    font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif !important;
 }
 
-/* Forja Viral — Credits Topbar */
-.fv-topbar{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
-    padding:12px 14px;
-    border-radius:14px;
-    margin: 0 0 14px 0;
-    border: 1px solid rgba(255,255,255,.10);
-    background: rgba(255,255,255,.04);
-    box-shadow: 0 10px 24px rgba(0,0,0,.25);
+footer {
+    visibility: hidden !important;
+    height: 0 !important;
 }
-.fv-topbar-left{display:flex;flex-direction:column;gap:4px;min-width:0;}
-.fv-credits{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:.2px;}
-.fv-credits span{font-size:14px;color: rgba(255,255,255,.92);}
-.fv-sub{font-size:12px;color: rgba(255,255,255,.70);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width: 680px;}
-.fv-status{
-    font-weight: 900;
-    padding: 8px 12px;
+
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 107, 26, 0.28);
     border-radius: 999px;
-    border: 1px solid rgba(255,255,255,.10);
-    background: rgba(0,0,0,.20);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+/* ----- Barra lateral ----- */
+#fdc-rail {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    width: 92px !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    z-index: 60 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+#fdc-rail .block,
+#fdc-rail .prose {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+}
+
+.fdc-rail {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 0 18px 0;
+    background: linear-gradient(180deg, #0c0907 0%, #070504 100%);
+    border-right: 1px solid rgba(255, 107, 26, 0.10);
+    box-shadow: 14px 0 40px rgba(0, 0, 0, 0.35);
+}
+
+.fdc-rail-logo {
+    width: 46px;
+    height: 46px;
+    margin-bottom: 26px;
+}
+
+.fdc-rail-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 6px 16px rgba(255, 92, 0, 0.45));
+}
+
+.fdc-rail-item {
+    position: relative;
+    width: 50px;
+    height: 50px;
+    margin: 6px 0;
+    border: none;
+    border-radius: 16px;
+    background: transparent;
+    color: #8c7d71;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.fdc-rail-item:hover {
+    color: #FFB27A;
+    background: rgba(255, 92, 0, 0.08);
+}
+
+.fdc-rail-item.active {
+    color: #FF6A1A;
+    background: rgba(255, 92, 0, 0.13);
+    box-shadow: inset 0 0 0 1px rgba(255, 92, 0, 0.28);
+}
+
+.fdc-rail-item.active::before {
+    content: "";
+    position: absolute;
+    left: -21px;
+    top: 12px;
+    bottom: 12px;
+    width: 4px;
+    border-radius: 0 6px 6px 0;
+    background: var(--fdc-grad);
+    box-shadow: 0 0 16px rgba(255, 92, 0, 0.6);
+}
+
+.fdc-rail-foot {
+    margin-top: auto;
+    font-size: 10px;
+    letter-spacing: 0.6px;
+    color: #6d6056;
+}
+
+/* ----- Blocos sem moldura (wrappers do Gradio) ----- */
+.fdc-bare,
+.fdc-bare .block,
+.fdc-bare .prose {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+#progress_panel {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+/* ----- Barra superior (créditos + atualizar) ----- */
+#fdc-topbar {
+    align-items: center !important;
+    gap: 12px !important;
+    margin: 0 0 14px 0 !important;
+}
+
+.fv-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 16px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(27, 18, 12, 0.92), rgba(14, 10, 7, 0.92));
+    border: 1px solid rgba(255, 107, 26, 0.14);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+}
+
+.fv-topbar-left {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.fv-credits {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+}
+
+.fv-credits span {
+    font-size: 14px;
+    color: #ffffff;
+}
+
+.fv-sub {
     font-size: 12px;
-    letter-spacing: .2px;
+    color: #a99a8d;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 560px;
+}
+
+.fv-status {
+    font-weight: 900;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.25);
+    font-size: 11px;
+    letter-spacing: 0.3px;
     white-space: nowrap;
 }
-.fv-status.ok{ color: rgba(34,197,94,.95); border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.10); }
-.fv-status.bad{ color: rgba(239,68,68,.95); border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.10); }
 
+.fv-status.ok {
+    color: #4ade80;
+    border-color: rgba(34, 197, 94, 0.35);
+    background: rgba(34, 197, 94, 0.10);
+}
+
+.fv-status.bad {
+    color: #f87171;
+    border-color: rgba(239, 68, 68, 0.38);
+    background: rgba(239, 68, 68, 0.10);
+}
+
+#refresh_credits {
+    height: 52px !important;
+    border-radius: 16px !important;
+    font-weight: 800 !important;
+    background: rgba(255, 92, 0, 0.10) !important;
+    color: #FFB27A !important;
+    border: 1px solid rgba(255, 92, 0, 0.35) !important;
+}
+
+#refresh_credits:hover {
+    background: rgba(255, 92, 0, 0.18) !important;
+}
+
+/* ----- Abas no topo ----- */
+.tab-wrapper {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07) !important;
+    margin-bottom: 22px !important;
+}
+
+.tab-container {
+    gap: 4px !important;
+}
+
+.tab-container button {
+    position: relative !important;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 9px;
+    padding: 13px 18px !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    color: #9d8e82 !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    transition: color 0.2s ease;
+}
+
+.tab-container button::before {
+    content: "";
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+    background: currentColor;
+    -webkit-mask: var(--fdc-ico, none) center / contain no-repeat;
+    mask: var(--fdc-ico, none) center / contain no-repeat;
+}
+
+.tab-container button:hover {
+    color: #ffd2b5 !important;
+}
+
+.tab-container button.selected {
+    color: #ffffff !important;
+}
+
+.tab-container button.selected::after {
+    content: "";
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: -1px;
+    height: 3px;
+    border-radius: 3px;
+    background: var(--fdc-grad);
+    box-shadow: 0 0 14px rgba(255, 92, 0, 0.65);
+}
+
+/* ----- Cards ----- */
+.fdc-card {
+    position: relative;
+    background: linear-gradient(180deg, rgba(31, 21, 15, 0.92) 0%, rgba(15, 10, 7, 0.95) 100%) !important;
+    border: 1px solid rgba(255, 107, 26, 0.16) !important;
+    border-radius: 22px !important;
+    padding: 18px 18px 16px 18px !important;
+    box-shadow: 0 16px 44px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.035) !important;
+    gap: 12px !important;
+}
+
+.fdc-card .block {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+.gradio-container .form {
+    background: transparent !important;
+}
+
+.fdc-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 12px 0;
+}
+
+.fdc-head .ico {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FF8A4C;
+    background: linear-gradient(135deg, rgba(255, 122, 26, 0.22), rgba(255, 92, 0, 0.05));
+    border: 1px solid rgba(255, 107, 26, 0.28);
+    box-shadow: 0 8px 22px rgba(255, 92, 0, 0.12);
+}
+
+.fdc-head .t {
+    font-size: 15px;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.2;
+}
+
+.fdc-head .s {
+    font-size: 12px;
+    color: #a99a8d;
+    margin-top: 3px;
+    line-height: 1.35;
+}
+
+.fdc-head .s a {
+    color: #FF8A4C;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.fdc-head-lg .ico {
+    width: 48px;
+    height: 48px;
+    border-radius: 15px;
+}
+
+.fdc-head-lg .t {
+    font-size: 20px;
+}
+
+.fdc-head-lg .s {
+    font-size: 13px;
+}
+
+/* ----- Campos ----- */
+.gradio-container input:not([type="checkbox"]):not([type="radio"]):not(.border-none),
+.gradio-container textarea,
+.gradio-container select {
+    background-color: #0c0908 !important;
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+    border-radius: 14px !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+}
+
+.gradio-container input:not([type="checkbox"]):not([type="radio"]):not(.border-none):focus,
+.gradio-container textarea:focus {
+    border-color: rgba(255, 107, 26, 0.75) !important;
+    box-shadow: 0 0 0 3px rgba(255, 92, 0, 0.16) !important;
+    outline: none !important;
+}
+
+.gradio-container input::placeholder,
+.gradio-container textarea::placeholder {
+    color: #6f625a !important;
+    font-weight: 500 !important;
+}
+
+.gradio-container input.border-none {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.gradio-container ul.options {
+    background: #120c09 !important;
+    border: 1px solid rgba(255, 107, 26, 0.22) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55) !important;
+}
+
+.gradio-container ul.options li {
+    color: #f7efe9 !important;
+}
+
+.gradio-container ul.options li:hover,
+.gradio-container ul.options li.selected {
+    background: rgba(255, 92, 0, 0.16) !important;
+    color: #ffffff !important;
+}
+
+.fdc-card input[type="number"] {
+    font-size: 22px !important;
+    font-weight: 800 !important;
+    height: 54px !important;
+    padding-left: 16px !important;
+}
+
+#url_input textarea,
+#url_input input {
+    padding-left: 46px !important;
+    min-height: 52px !important;
+    font-size: 14px !important;
+}
+
+#video_upload {
+    border: 1.5px dashed rgba(255, 107, 26, 0.42) !important;
+    border-radius: 18px !important;
+    background: rgba(255, 92, 0, 0.035) !important;
+    padding: 12px !important;
+}
+
+/* ----- Seleção segmentada (Fonte de entrada) ----- */
+.fdc-seg .wrap {
+    display: flex !important;
+    gap: 10px !important;
+    flex-wrap: wrap !important;
+    background: transparent !important;
+}
+
+.fdc-seg label {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 9px !important;
+    padding: 13px 12px !important;
+    margin: 0 !important;
+    border-radius: 16px !important;
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+    background: rgba(255, 255, 255, 0.025) !important;
+    color: #d7c9bd !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease;
+}
+
+.fdc-seg label::before {
+    content: "";
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    background: currentColor;
+    -webkit-mask: var(--fdc-seg-ico, none) center / contain no-repeat;
+    mask: var(--fdc-seg-ico, none) center / contain no-repeat;
+}
+
+.fdc-seg label:hover {
+    border-color: rgba(255, 107, 26, 0.42) !important;
+    color: #ffffff !important;
+}
+
+.fdc-seg label:has(input:checked) {
+    background: linear-gradient(135deg, #FF8A2A 0%, #FF5C00 55%, #E04800 100%) !important;
+    border-color: transparent !important;
+    color: #ffffff !important;
+    box-shadow: 0 12px 28px rgba(255, 92, 0, 0.32) !important;
+}
+
+.fdc-seg input[type="radio"] {
+    position: absolute !important;
+    opacity: 0 !important;
+    width: 1px !important;
+    height: 1px !important;
+    margin: 0 !important;
+    pointer-events: none !important;
+}
+
+/* ----- Chave liga/desliga ----- */
+.fdc-switch label {
+    display: flex !important;
+    flex-direction: row-reverse !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #f7efe9 !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+}
+
+.fdc-switch input[type="checkbox"] {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    width: 46px !important;
+    height: 27px !important;
+    min-width: 46px !important;
+    margin: 0 !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    background-color: #2b211b !important;
+    background-image: radial-gradient(circle 10px at 14px 13px, #ffffff 96%, transparent 100%) !important;
+    background-repeat: no-repeat !important;
+    cursor: pointer !important;
+    transition: background-color 0.2s ease;
+}
+
+.fdc-switch input[type="checkbox"]:checked {
+    background-color: #FF5C00 !important;
+    background-image: radial-gradient(circle 10px at 32px 13px, #ffffff 96%, transparent 100%) !important;
+    border-color: transparent !important;
+    box-shadow: 0 6px 18px rgba(255, 92, 0, 0.35);
+}
+
+/* ----- Hero ----- */
+.fdc-hero {
+    position: relative;
+    min-height: 176px;
+    padding: 30px 34px;
+    margin: 2px 0 18px 0;
+    border-radius: 26px;
+    border: 1px solid rgba(255, 107, 26, 0.2);
+    overflow: hidden;
+    background:
+        radial-gradient(560px 260px at 88% 35%, rgba(255, 92, 0, 0.34), transparent 64%),
+        linear-gradient(118deg, #160b06 0%, #241109 46%, #0c0705 100%);
+    box-shadow: 0 26px 70px rgba(255, 92, 0, 0.12);
+}
+
+.fdc-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: var(--fdc-hero-bg, none) right center / cover no-repeat;
+    opacity: 0.6;
+    mix-blend-mode: screen;
+}
+
+.fdc-hero-title {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.fdc-hero-ico {
+    display: flex;
+    color: #FF5C00;
+    filter: drop-shadow(0 6px 18px rgba(255, 92, 0, 0.45));
+}
+
+.fdc-hero h2 {
+    margin: 0 !important;
+    font-size: 46px !important;
+    font-weight: 900 !important;
+    letter-spacing: -1.2px !important;
+    line-height: 1.02 !important;
+    color: #ffffff !important;
+}
+
+.fdc-hero h2 span {
+    background: linear-gradient(135deg, #FF8A2A 0%, #FF5C00 55%, #E04800 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent !important;
+}
+
+.fdc-hero-sub {
+    position: relative;
+    z-index: 2;
+    margin: 10px 0 0 0;
+    font-size: 15px;
+    color: #cbb9ab;
+}
+
+.fdc-pill {
+    position: absolute;
+    right: 30px;
+    top: 26px;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 107, 26, 0.36);
+    background: rgba(12, 7, 4, 0.6);
+    color: #FFB27A;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.fdc-hero-art {
+    position: absolute;
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 1;
+    height: 210px;
+    width: auto;
+    object-fit: contain;
+    pointer-events: none;
+    filter: drop-shadow(0 18px 44px rgba(255, 92, 0, 0.5));
+}
+
+/* ----- Como funciona ----- */
+.fdc-howto-art {
+    position: absolute;
+    right: 8px;
+    top: 10px;
+    opacity: 0.2;
+    color: #FF5C00;
+    pointer-events: none;
+    filter: drop-shadow(0 0 22px rgba(255, 92, 0, 0.45));
+}
+
+.fdc-howto-art svg {
+    width: 120px;
+    height: 120px;
+}
+
+.fdc-step {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin-top: 14px;
+}
+
+.fdc-step .n {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #FF8A2A 0%, #FF5C00 55%, #E04800 100%);
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 900;
+    box-shadow: 0 8px 18px rgba(255, 92, 0, 0.35);
+}
+
+.fdc-step .tx {
+    font-size: 13px;
+    line-height: 1.45;
+    color: #ead9cc;
+    padding-top: 4px;
+}
+
+.fdc-step .tx b {
+    color: #FF8A4C;
+}
+
+/* ----- Alerta de licença ----- */
+.fdc-alert-wrap {
+    margin: 0 0 14px 0 !important;
+}
+
+.fdc-alert-wrap textarea {
+    min-height: 116px !important;
+    resize: vertical !important;
+    line-height: 1.5 !important;
+}
+
+/* ----- Progresso ----- */
+.fdc-progress {
+    background: linear-gradient(180deg, rgba(31, 21, 15, 0.92) 0%, rgba(15, 10, 7, 0.95) 100%);
+    border: 1px solid rgba(255, 107, 26, 0.16);
+    border-radius: 20px;
+    padding: 16px 18px;
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.3);
+    margin: 2px 0 14px 0;
+}
+
+.fdc-progress-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.fdc-progress-ico {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FF8A4C;
+    background: rgba(255, 92, 0, 0.12);
+    border: 1px solid rgba(255, 92, 0, 0.22);
+}
+
+.fdc-progress-label {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 700;
+    color: #f1e4d9;
+}
+
+.fdc-progress-pct {
+    font-size: 15px;
+    font-weight: 900;
+    color: #FF7A1A;
+}
+
+.fdc-progress-track {
+    margin-top: 13px;
+    height: 7px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.fdc-progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #FF8A2A 0%, #FF5C00 55%, #E04800 100%);
+    box-shadow: 0 0 16px rgba(255, 92, 0, 0.6);
+    transition: width 0.45s ease;
+}
+
+/* ----- Botão principal (o próprio <button> recebe o id) ----- */
+#start_btn {
+    width: 100% !important;
+    height: 64px !important;
+    border: none !important;
+    border-radius: 20px !important;
+    background: linear-gradient(135deg, #FF8A2A 0%, #FF5C00 55%, #E04800 100%) !important;
+    color: #ffffff !important;
+    font-size: 17px !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.3px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    box-shadow: 0 20px 46px rgba(255, 92, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease !important;
+}
+
+#start_btn::before {
+    content: "";
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    background: #ffffff;
+    -webkit-mask: var(--fdc-start-ico, none) center / contain no-repeat;
+    mask: var(--fdc-start-ico, none) center / contain no-repeat;
+}
+
+#start_btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+    box-shadow: 0 24px 56px rgba(255, 92, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
+}
+
+#start_btn:disabled {
+    opacity: 0.42 !important;
+    box-shadow: none !important;
+    cursor: not-allowed !important;
+}
+
+#license_check_btn {
+    height: 52px !important;
+    border-radius: 16px !important;
+    background: linear-gradient(135deg, #FF8A2A 0%, #FF5C00 55%, #E04800 100%) !important;
+    color: #ffffff !important;
+    font-weight: 900 !important;
+    font-size: 15px !important;
+    border: none !important;
+    box-shadow: 0 16px 36px rgba(255, 92, 0, 0.3) !important;
+}
+
+/* ----- Licença ----- */
+#license-card {
+    max-width: 640px;
+    margin: 12px auto 0 auto !important;
+}
+
+/* ----- Detalhes técnicos ----- */
+.fdc-logs {
+    background: linear-gradient(180deg, rgba(31, 21, 15, 0.92) 0%, rgba(15, 10, 7, 0.95) 100%) !important;
+    border: 1px solid rgba(255, 107, 26, 0.16) !important;
+    border-radius: 18px !important;
+    margin-top: 6px !important;
+}
+
+/* Itens técnicos ocultos para o cliente (continuam no código) */
+#advanced-face,
+#subtitle-settings {
+    display: none !important;
+}
 """
 
 import header
+import ui_assets
+import ui_icons
+from html import escape as _esc
 import license_gate
 import license_client
 
@@ -758,6 +1619,124 @@ def _render_topbar_html() -> str:
 
 
 
+def _app_version() -> str:
+    try:
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with open(os.path.join(root, "version.json"), "r", encoding="utf-8-sig") as fh:
+            return str(json.load(fh).get("version") or "")
+    except Exception:
+        return ""
+
+
+def _render_progress_html(percent: int, label: str) -> str:
+    """Barra de progresso do app: ícone, rótulo, percentual e trilha laranja."""
+    pct = max(0, min(100, int(percent)))
+    return (
+        '<div class="fdc-progress">'
+        '<div class="fdc-progress-top">'
+        f'<span class="fdc-progress-ico">{ui_icons.svg("rocket", 18)}</span>'
+        f'<span class="fdc-progress-label">{_esc(str(label or ""))}</span>'
+        f'<span class="fdc-progress-pct">{pct}%</span>'
+        "</div>"
+        f'<div class="fdc-progress-track"><div class="fdc-progress-fill" style="width:{pct}%"></div></div>'
+        "</div>"
+    )
+
+
+def _card_head(icon: str, title: str, desc: str = "", desc_html: str = "") -> str:
+    text = desc_html or _esc(desc)
+    sub = f'<div class="s">{text}</div>' if text else ""
+    return (
+        '<div class="fdc-head">'
+        f'<span class="ico">{ui_icons.svg(icon, 19)}</span>'
+        f'<div><div class="t">{_esc(title)}</div>{sub}</div>'
+        "</div>"
+    )
+
+
+def _license_head_html() -> str:
+    return (
+        '<div class="fdc-head fdc-head-lg">'
+        f'<span class="ico">{ui_icons.svg("key-round", 22)}</span>'
+        '<div><div class="t">Ativar licença</div>'
+        '<div class="s">Cole a chave que chegou no seu e-mail de compra para liberar seus créditos.</div></div>'
+        "</div>"
+    )
+
+
+def _hero_html() -> str:
+    art = ui_assets.data_uri("hero_logo.webp")
+    art_html = f'<img class="fdc-hero-art" src="{art}" alt="" />' if art else ""
+    return (
+        '<div class="fdc-hero">'
+        '<div class="fdc-hero-title">'
+        f'<span class="fdc-hero-ico">{ui_icons.svg("scissors", 38, 1.9)}</span>'
+        "<h2>Criar <span>Cortes</span></h2>"
+        "</div>"
+        '<p class="fdc-hero-sub">Transforme seus vídeos em cortes virais com poucos cliques.</p>'
+        f'<div class="fdc-pill">{ui_icons.svg("zap", 14)}<span>Rápido. Inteligente. Profissional.</span></div>'
+        f"{art_html}"
+        "</div>"
+    )
+
+
+def _howto_html() -> str:
+    steps = [
+        "Cole o link do vídeo ou envie um arquivo.",
+        "Escolha quantos cortes quer e a duração.",
+        "Clique em <b>Gerar Cortes</b> e acompanhe a barra de progresso.",
+    ]
+    items = "".join(
+        f'<div class="fdc-step"><span class="n">{number}</span><div class="tx">{text}</div></div>'
+        for number, text in enumerate(steps, 1)
+    )
+    art = f'<div class="fdc-howto-art">{ui_icons.svg("film", 120, 1.2)}</div>'
+    return art + _card_head("lightbulb", "Como funciona", "Do link ao corte pronto em 3 passos") + items
+
+
+def _rail_html() -> str:
+    logo = ui_assets.data_uri("logo_rail.webp") or ui_assets.data_uri("logo.png")
+    logo_html = f'<img src="{logo}" alt="Fábrica dos Cortes" />' if logo else ""
+    items = [
+        ("scissors", "Criar Cortes", True),
+        ("key-round", "Licença", False),
+    ]
+    buttons = []
+    for icon, label, active in items:
+        safe = _esc(label, quote=True)
+        classes = "fdc-rail-item active" if active else "fdc-rail-item"
+        buttons.append(
+            f'<button type="button" class="{classes}" data-goto="{safe}" title="{safe}" aria-label="{safe}">'
+            f"{ui_icons.svg(icon, 22, 1.9)}</button>"
+        )
+    return (
+        '<div class="fdc-rail">'
+        f'<div class="fdc-rail-logo">{logo_html}</div>'
+        + "".join(buttons)
+        + f'<div class="fdc-rail-foot">v{_app_version()}</div>'
+        + "</div>"
+    )
+
+
+def _dynamic_css() -> str:
+    rules = []
+    hero_bg = ui_assets.data_uri("bg_streaks.webp")
+    if hero_bg:
+        rules.append(f':root {{ --fdc-hero-bg: url("{hero_bg}"); }}')
+    for index, icon in enumerate(["key-round", "scissors"], 1):
+        rules.append(f".tab-container button:nth-child({index}) {{ --fdc-ico: {ui_icons.mask_uri(icon)}; }}")
+    for index, icon in enumerate(["youtube", "folder-open", "upload"], 1):
+        rules.append(f".fdc-seg label:nth-child({index}) {{ --fdc-seg-ico: {ui_icons.mask_uri(icon)}; }}")
+    rules.append(f"#start_btn {{ --fdc-start-ico: {ui_icons.mask_uri('zap')}; }}")
+    link_icon = ui_icons.color_uri("link", "#FF8A4C")
+    if link_icon:
+        rules.append(
+            f"#url_input textarea, #url_input input {{ background-image: {link_icon} !important; "
+            "background-repeat: no-repeat; background-position: 16px center; background-size: 18px 18px; }"
+        )
+    return "\n".join(rules)
+
+
 def _render_blocked_banner() -> tuple[str, bool]:
     st = getattr(_gate, "state", None)
     ok = bool(getattr(st, "ok", False))
@@ -788,10 +1767,10 @@ def _render_blocked_banner() -> tuple[str, bool]:
         msg = "Não foi possível validar agora. Verifique sua internet e tente novamente."
 
     support_msg = (
-        "Olá! Quero renovar minha licença da Fábrica dos Cortes (fabricadecortes.com).\\n"
-        f"Chave: {lk or '[sua-chave]'}\\n"
-        f"Motivo: {reason}\\n"
-        f"Créditos: {credits}\\n"
+        "Olá! Quero renovar minha licença da Fábrica dos Cortes (fabricadecortes.com).\n"
+        f"Chave: {lk or '[sua-chave]'}\n"
+        f"Motivo: {reason}\n"
+        f"Créditos: {credits}\n"
         f"Exp: {_fmt_exp_ts(exp)}"
     )
 
@@ -817,130 +1796,92 @@ _gate.load_local()
 _gate.check_on_start()
 
 
+css = css + _dynamic_css()
+
 with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue="orange", neutral_hue="slate"), css=css) as demo:
-    # Header
-    gr.HTML(header.description)
-    topbar_html = gr.HTML(value=_render_topbar_html())
-    topbar_refresh = gr.Button(i18n('Atualizar créditos'), variant='secondary')
+    gr.HTML(_rail_html(), elem_id="fdc-rail")
+    with gr.Row(elem_id="fdc-topbar"):
+        with gr.Column(scale=6, min_width=260):
+            topbar_html = gr.HTML(value=_render_topbar_html(), elem_classes="fdc-bare")
+        with gr.Column(scale=1, min_width=170):
+            topbar_refresh = gr.Button(i18n('Atualizar créditos'), variant='secondary', size="sm", elem_id="refresh_credits")
     if hasattr(gr, 'Timer'):
         _t = gr.Timer(12)
         _t.tick(fn=lambda: (_gate.check_now(), _render_topbar_html())[1], inputs=[], outputs=[topbar_html])
     with gr.Tabs():
-        with gr.Tab(i18n('License')):
-            gr.Markdown('### ' + i18n('Licença / Ativação'))
-            _gate.ui_block()
-        with gr.Tab(i18n("Create New")):
-             blocked_banner = gr.HTML(value=_render_blocked_banner()[0], visible=_render_blocked_banner()[1])
-             with gr.Row():
-                with gr.Column(scale=1):
-                    input_source = gr.Radio([(i18n("YouTube URL"), "YouTube URL"), (i18n("Existing Project"), "Existing Project"), (i18n("Upload Video"), "Upload Video")], label=i18n("Input Source"), value="YouTube URL")
-                    
-                    url_input = gr.Textbox(label=i18n("YouTube URL"), placeholder="https://www.youtube.com/watch?v=...", visible=True)
-                    video_upload = gr.File(label=i18n("Upload Video"), file_count="single", file_types=["video"], visible=False)
-                    
-                    with gr.Row():
-                        video_quality_input = gr.Dropdown(
-                            choices=[
-                                ("720p (Ultra Rápido - Recomendado)", "720p"),
-                                ("1080p (Alta Definição)", "1080p"),
-                                ("480p (Super Leve)", "480p"),
-                                ("Melhor Disponível (Original)", "best"),
-                                ("4K Ultra HD", "4k")
-                            ],
-                            label=i18n("Video Quality"),
-                            value="720p",
-                            info="720p baixa 4x mais rápido e é ideal para vídeos de celular."
-                        )
-                        translate_input = gr.Dropdown(choices=["None", "pt", "en", "es", "fr", "de", "it", "ru", "ja", "ko", "zh-CN"], label=i18n("Translate Subtitles To"), value="None")
-                        use_youtube_subs_input = gr.Checkbox(label=i18n("Use YouTube Subs"), value=True, info=i18n("Download and use official subtitles if available. (Recommended, it speeds up the process)"))
+        with gr.Tab("Licença"):
+            with gr.Column(elem_classes="fdc-card", elem_id="license-card"):
+                gr.HTML(_license_head_html(), elem_classes="fdc-bare")
+                _gate.ui_block()
+        with gr.Tab("Criar Cortes"):
+             _banner_html, _banner_visible = _render_blocked_banner()
+             blocked_banner = gr.HTML(value=_banner_html, visible=_banner_visible, elem_classes="fdc-bare fdc-alert-wrap")
+             gr.HTML(_hero_html(), elem_classes="fdc-bare")
+             with gr.Row(equal_height=True):
+                 with gr.Column(scale=3, elem_classes="fdc-card"):
+                     gr.HTML(_card_head("link", "Fonte de entrada", "Cole o link do YouTube, use um projeto salvo ou envie um vídeo"))
+                     input_source = gr.Radio(
+                         [(i18n("YouTube URL"), "YouTube URL"), (i18n("Existing Project"), "Existing Project"), ("Usar Vídeo", "Upload Video")],
+                         value="YouTube URL",
+                         show_label=False,
+                         container=False,
+                         elem_classes="fdc-seg",
+                     )
+                     url_input = gr.Textbox(show_label=False, container=False, placeholder="https://www.youtube.com/watch?v=...", visible=True, elem_id="url_input")
+                     video_upload = gr.File(show_label=False, file_count="single", file_types=["video"], visible=False, elem_id="video_upload")
+                     project_selector = gr.Dropdown(choices=[], show_label=False, container=False, visible=False)
+                 with gr.Column(scale=2, elem_classes="fdc-card fdc-howto"):
+                     gr.HTML(_howto_html())
+             with gr.Row(equal_height=True):
+                 with gr.Column(min_width=160, elem_classes="fdc-card"):
+                     gr.HTML(_card_head("key", "Chave API Gemini", desc_html='Grátis em <a href="https://aistudio.google.com" target="_blank">aistudio.google.com</a>'))
+                     api_key_input = gr.Textbox(type="password", value=get_saved_gemini_key(), placeholder="Cole sua chave (AIza...)", show_label=False, container=False)
+                 with gr.Column(min_width=160, elem_classes="fdc-card"):
+                     gr.HTML(_card_head("sliders-horizontal", "Qualidade", "720p é o mais rápido e ideal para celular"))
+                     video_quality_input = gr.Dropdown(
+                         choices=[("720p (Ultra Rápido)", "720p"), ("1080p (Alta Definição)", "1080p"), ("480p (Super Leve)", "480p"), ("Melhor Disponível", "best"), ("4K Ultra HD", "4k")],
+                         value="720p",
+                         show_label=False,
+                         container=False,
+                     )
+                 with gr.Column(min_width=160, elem_classes="fdc-card"):
+                     gr.HTML(_card_head("languages", "Traduzir legendas", "Opcional, para outro idioma"))
+                     translate_input = gr.Dropdown(choices=["None", "pt", "en", "es", "fr", "de", "it", "ru", "ja", "ko", "zh-CN"], value="None", show_label=False, container=False)
+                 with gr.Column(min_width=160, elem_classes="fdc-card"):
+                     gr.HTML(_card_head("youtube", "Legendas oficiais", "Mais rápido quando o YouTube já tem"))
+                     use_youtube_subs_input = gr.Checkbox(label="Usar legendas do YouTube", value=True, elem_classes="fdc-switch")
+             with gr.Row(equal_height=True):
+                 with gr.Column(min_width=160, elem_classes="fdc-card"):
+                     gr.HTML(_card_head("scissors", "Cortes", "Quantos vídeos gerar"))
+                     segments_input = gr.Number(value=3, precision=0, show_label=False, container=False)
+                 with gr.Column(min_width=160, elem_classes="fdc-card"):
+                     gr.HTML(_card_head("timer", "Duração mínima", "Em segundos"))
+                     min_dur_input = gr.Number(value=15, show_label=False, container=False)
+                 with gr.Column(min_width=160, elem_classes="fdc-card"):
+                     gr.HTML(_card_head("clock", "Duração máxima", "Em segundos"))
+                     max_dur_input = gr.Number(value=90, show_label=False, container=False)
+             viral_input = gr.Checkbox(value=True, visible=False)
+             themes_input = gr.Textbox(visible=False)
+             ai_backend_input = gr.Dropdown(choices=[(i18n("Gemini"), "gemini")], value="gemini", visible=False)
+             ai_model_input = gr.Dropdown(choices=GEMINI_MODELS, label=i18n("AI Model"), value=GEMINI_MODELS[0], allow_custom_value=True, visible=False)
+             chunk_size_input = gr.Number(label=i18n("Chunk Size"), value=250000, precision=0, visible=False)
+             model_input = gr.Dropdown(["tiny", "small", "medium", "large", "large-v1", "large-v2", "large-v3", "turbo", "large-v3-turbo", "distil-large-v2", "distil-medium.en", "distil-small.en", "distil-large-v3"], label=i18n("Whisper Model"), value="large-v3-turbo", visible=False)
+             workflow_input = gr.Dropdown(choices=[(i18n("Full"), "Full"), (i18n("Cut Only"), "Cut Only"), (i18n("Subtitles Only"), "Subtitles Only")], label=i18n("Workflow"), value="Full", visible=False)
+             face_model_input = gr.Dropdown(["insightface", "mediapipe"], label=i18n("Face Model"), value="insightface", visible=False)
+             face_mode_input = gr.Dropdown(choices=[(i18n("Auto"), "auto"), ("1", "1"), ("2", "2")], label=i18n("Face Mode"), value="auto", visible=False)
+             face_detect_interval_input = gr.Textbox(label=i18n("Face Det. Interval"), value="0.17,1.0", visible=False)
+             no_face_mode_input = gr.Dropdown(choices=[(i18n("Padding (9:16)"), "padding"), (i18n("Zoom (Center)"), "zoom")], label=i18n("No Face Fallback"), value="zoom", visible=False)
 
-                    project_selector = gr.Dropdown(choices=[], label=i18n("Select Project"), visible=False)
-                    
-                    def on_source_change(source):
-                        if source == "YouTube URL":
-                            return gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(value="Full") 
-                        elif source == "Upload Video":
-                             return gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(value="Full")
-                        else:
-                            # Load projects
-                            projs = library.get_existing_projects()
-                            return gr.update(visible=False), gr.update(choices=projs, visible=True), gr.update(visible=False), gr.update(value="Subtitles Only")
-                    
-                    
-                    with gr.Row():
-                        segments_input = gr.Number(label=i18n("Segments"), value=3, precision=0)
-                        viral_input = gr.Checkbox(label=i18n("Viral Mode"), value=True)
-                    themes_input = gr.Textbox(label=i18n("Themes"), placeholder=i18n("funny, sad..."), visible=False)
-                    viral_input.change(lambda x: gr.update(visible=not x), viral_input, themes_input)
-                    with gr.Row():
-                        min_dur_input = gr.Number(label=i18n("Min Duration (s)"), value=15)
-                        max_dur_input = gr.Number(label=i18n("Max Duration (s)"), value=90)
-                with gr.Column(scale=1):
-                    with gr.Row():
-                        ai_backend_input = gr.Dropdown(choices=[(i18n("Gemini"), "gemini"), (i18n("G4F"), "g4f"), (i18n("Local (GGUF)"), "local"), (i18n("Manual"), "manual")], label=i18n("AI Backend"), value="gemini", scale=2)
-                        api_key_input = gr.Textbox(label=i18n("Gemini API Key"), type="password", value=get_saved_gemini_key(), placeholder="Cole sua chave gratuita (AIzaSy...)", scale=3, info="Obtenha grátis em aistudio.google.com")
-                    
-                    # New Dynamic Inputs
-                    with gr.Row():
-                        ai_model_input = gr.Dropdown(choices=GEMINI_MODELS, label=i18n("AI Model"), value=GEMINI_MODELS[0], allow_custom_value=True, visible=True, scale=5)
-                        refresh_models_btn = gr.Button("🔄", size="sm", visible=False, scale=0, min_width=50) # Only local
-                        chunk_size_input = gr.Number(label=i18n("Chunk Size"), value=250000, precision=0, scale=2)
-                    
-                    # Update listeners with logic to hide/show API key
-                    def update_ai_ui(backend):
-                        show_api = (backend == "gemini")
-                        show_refresh = (backend == "local")
-                        
-                        # Definições padrão para evitar que fiquem vazios
-                        new_choices = []
-                        new_val = ""
-                        new_chunk = 250000
-                        
-                        if backend == "gemini":
-                            new_choices = GEMINI_MODELS
-                            new_val = GEMINI_MODELS[0]
-                            new_chunk = 250000
-                        elif backend == "g4f":
-                            new_choices = G4F_MODELS
-                            new_val = G4F_MODELS[5]
-                            new_chunk = 25000
-                        elif backend == "local":
-                            models = get_local_models()
-                            new_choices = models if models else [i18n("No models found")]
-                            new_val = new_choices[0]
-                            new_chunk = 15000
-                        else: # Manual
-                             pass
+             def on_source_change(source):
+                 if source == "YouTube URL":
+                     return gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(value="Full")
+                 elif source == "Upload Video":
+                     return gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(value="Full")
+                 projs = library.get_existing_projects()
+                 return gr.update(visible=False), gr.update(choices=projs, visible=True), gr.update(visible=False), gr.update(value="Subtitles Only")
 
-                        return (
-                            gr.update(visible=show_api), # API Key Visibility (Fixes hole 1)
-                            gr.update(choices=new_choices, value=new_val, visible=(backend != "manual")), # Model Dropdown
-                            gr.update(visible=show_refresh), # Refresh Button
-                            gr.update(value=new_chunk) # Chunk Size
-                        )
-
-                    def refresh_local_models():
-                        models = get_local_models()
-                        val = models[0] if models else i18n("No models found")
-                        return gr.update(choices=models, value=val)
-
-                    refresh_models_btn.click(refresh_local_models, outputs=ai_model_input)
-                    ai_backend_input.change(update_ai_ui, inputs=ai_backend_input, outputs=[api_key_input, ai_model_input, refresh_models_btn, chunk_size_input])
-
-                    model_input = gr.Dropdown(["tiny", "small", "medium", "large", "large-v1", "large-v2", "large-v3", "turbo", "large-v3-turbo", "distil-large-v2", "distil-medium.en", "distil-small.en", "distil-large-v3"], label=i18n("Whisper Model"), value="large-v3-turbo")
-                    with gr.Row():
-                        workflow_input = gr.Dropdown(choices=[(i18n("Full"), "Full"), (i18n("Cut Only"), "Cut Only"), (i18n("Subtitles Only"), "Subtitles Only")], label=i18n("Workflow"), value="Full")
-                        face_model_input = gr.Dropdown(["insightface", "mediapipe"], label=i18n("Face Model"), value="insightface")
-                    with gr.Row():
-                        face_mode_input = gr.Dropdown(choices=[(i18n("Auto"), "auto"), ("1", "1"), ("2", "2")], label=i18n("Face Mode"), value="auto")
-                        face_detect_interval_input = gr.Textbox(label=i18n("Face Det. Interval"), value="0.17,1.0")
-                        no_face_mode_input = gr.Dropdown(choices=[(i18n("Padding (9:16)"), "padding"), (i18n("Zoom (Center)"), "zoom")], label=i18n("No Face Fallback"), value="zoom")
-                    
-                    
-                    # Update listeners now that all components are defined
-                    input_source.change(on_source_change, inputs=input_source, outputs=[url_input, project_selector, video_upload, workflow_input])
-             
-             with gr.Accordion(i18n("Advanced Face Settings"), open=False):
+             input_source.change(on_source_change, inputs=input_source, outputs=[url_input, project_selector, video_upload, workflow_input])
+             with gr.Accordion(i18n("Advanced Face Settings"), open=False, elem_id="advanced-face"):
                  face_preset_input = gr.Dropdown(choices=[(i18n(k), k) for k in FACE_PRESETS.keys()], label=i18n("Configuration Presets"), value="Default (Balanced)", interactive=True)
                  with gr.Row():
                       face_filter_thresh_input = gr.Slider(label=i18n("Ignore Small Faces (0.0 - 1.0)"), minimum=0.0, maximum=1.0, value=0.35, step=0.05, info=i18n("Relative size to ignore background."))
@@ -966,7 +1907,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                             active_speaker_decay_input = gr.Slider(label=i18n("Switch Speed"), minimum=0.5, maximum=5.0, value=2.0, step=0.5, info=i18n("Speed to lose focus."))
 
                         experimental_preset_input.change(apply_experimental_preset, inputs=experimental_preset_input, outputs=[focus_active_speaker_input, active_speaker_mar_input, active_speaker_score_diff_input, include_motion_input, active_speaker_motion_threshold_input, active_speaker_motion_sensitivity_input, active_speaker_decay_input])
-             with gr.Accordion(i18n("Subtitle Settings (alpha)"), open=False):
+             with gr.Accordion(i18n("Subtitle Settings (alpha)"), open=False, elem_id="subtitle-settings"):
                 preset_input = gr.Dropdown(choices=[(i18n("Manual"), "Manual")] + [(i18n(k), k) for k in subs.SUBTITLE_PRESETS.keys()], label=i18n("Quick Presets"), value="Hormozi (Classic)")
                 use_custom_subs = gr.Checkbox(label=i18n("Enable Subtitle Customization (Includes Preset)"), value=True)
                 
@@ -1040,9 +1981,10 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                 demo.load(subs.generate_preview_html, inputs=manual_inputs, outputs=preview_html)
                 demo.load(subs.apply_preset, inputs=[preset_input], outputs=manual_inputs) # Apply default preset on load
 
+             progress_html = gr.HTML(value=_render_progress_html(0, "Pronto para gerar"), elem_id="progress_panel")
              with gr.Row():
-                 start_btn = gr.Button(i18n("Start Processing"), variant="primary", interactive=bool(getattr(getattr(_gate,"state",None),"ok",False)))
-                 stop_btn = gr.Button(i18n("Stop"), variant="stop", visible=False)
+                 start_btn = gr.Button("Gerar Cortes", variant="primary", interactive=bool(getattr(getattr(_gate,"state",None),"ok",False)), elem_id="start_btn", scale=4)
+                 stop_btn = gr.Button("Parar", variant="stop", visible=False, scale=1)
              stop_btn.click(kill_process, outputs=[])
              def _sync_license_ui():
                  _gate.check_now()
@@ -1057,7 +1999,9 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
              # Atualiza topo + bloqueio + botão principal
              topbar_refresh.click(fn=_sync_license_ui, inputs=[], outputs=[topbar_html, blocked_banner, start_btn])
 
-             logs_output = gr.Textbox(label=i18n("Logs"), lines=10, autoscroll=True, elem_id="logs_output")
+             results_html = gr.HTML(label="Resultados", elem_classes="fdc-results")
+             with gr.Accordion("Detalhes técnicos", open=False, elem_classes="fdc-logs"):
+                 logs_output = gr.Textbox(label="Logs", lines=8, autoscroll=True, elem_id="logs_output")
              
              # Force scroll to bottom via JS
              logs_output.change(fn=None, inputs=[], outputs=[], js="""
@@ -1086,7 +2030,6 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     }
                 }
              """)
-             results_html = gr.HTML(label=i18n("Results"))
              
              # MUST pass all all new inputs to the run function
              start_btn.click(
@@ -1110,197 +2053,45 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                  highlight_size_input, words_per_block_input, gap_limit_input, mode_input, 
                  underline_input, strikeout_input, border_style_input, remove_punc_input,
                  video_quality_input, use_youtube_subs_input, translate_input
-             ], outputs=[logs_output, start_btn, stop_btn, results_html, topbar_html])
+             ], outputs=[logs_output, start_btn, stop_btn, results_html, topbar_html, progress_html])
 
 
-        with gr.Tab(i18n("Subtitle Editor")):
-            gr.Markdown(f"### {i18n('Edit Subtitles (Smart Mode)')}")
-            
-            with gr.Group():
-                editor_project_dropdown = gr.Dropdown(choices=library.get_existing_projects(), label=i18n("Select Project"), value=None)
-                editor_refresh_btn = gr.Button(i18n("Refresh"), size="sm")
-            
-            with gr.Group():
-                editor_file_dropdown = gr.Dropdown(choices=[], label=i18n("Select Subtitle File"), interactive=True)
-                editor_load_btn = gr.Button(i18n("Load Subtitles"), variant="secondary")
-
-            # Hidden state to store full path of currently loaded JSON
-            current_json_path = gr.State()
-
-            # The Dataframe Editor
-            # Headers: Start, End, Text
-            subtitle_dataframe = gr.Dataframe(
-                headers=["Start", "End", "Text"],
-                datatype=["str", "str", "str"],
-                col_count=(3, "fixed"),
-                interactive=True,
-                label=i18n("Subtitle Segments"),
-                wrap=True
-            )
-
-            with gr.Row():
-                editor_save_btn = gr.Button(i18n("💾 Save Changes"), variant="primary")
-                editor_render_single_btn = gr.Button(i18n("⚡ Render This Segment (Very-Fast)"), variant="secondary", interactive=bool(getattr(getattr(_gate,"state",None),"ok",False)))
-                editor_render_all_btn = gr.Button(i18n("🎬 Render All (Fast)"), variant="stop", interactive=bool(getattr(getattr(_gate,"state",None),"ok",False)))
-
-                def _sync_license_ui_editor():
-                    _gate.check_now()
-                    html_block, vis = _render_blocked_banner()
-                    ok = bool(getattr(getattr(_gate,"state",None),"ok",False))
-                    return (
-                        _render_topbar_html(),
-                        gr.update(value=html_block, visible=vis),
-                        gr.update(interactive=ok),
-                        gr.update(interactive=ok),
-                    )
-
-                # Atualiza topo + bloqueio + botões do editor
-                topbar_refresh.click(fn=_sync_license_ui_editor, inputs=[], outputs=[topbar_html, blocked_banner, editor_render_single_btn, editor_render_all_btn])
-
-            
-            editor_status = gr.Textbox(label=i18n("Status"), interactive=False)
-
-            # --- Callbacks for Editor ---
-            editor_refresh_btn.click(library.refresh_projects, outputs=editor_project_dropdown)
-
-            def update_file_list(proj_name):
-                if not proj_name: return gr.update(choices=[])
-                proj_path = os.path.join(VIRALS_DIR, proj_name)
-                files = editor.list_editable_files(proj_path)
-                return gr.update(choices=files, value=files[0] if files else None)
-
-            editor_project_dropdown.change(update_file_list, inputs=editor_project_dropdown, outputs=editor_file_dropdown)
-
-            def load_subs(proj_name, file_name):
-                if not proj_name or not file_name:
-                    return [], None, i18n("Please select project and file.")
-                
-                full_path = os.path.join(VIRALS_DIR, proj_name, 'subs', file_name)
-                data = editor.load_transcription_for_editor(full_path)
-                return data, full_path, i18n("Loaded {} segments.").format(len(data))
-
-            editor_load_btn.click(load_subs, inputs=[editor_project_dropdown, editor_file_dropdown], outputs=[subtitle_dataframe, current_json_path, editor_status])
-
-            def save_subs(json_path, df):
-                if not json_path: return i18n("No file loaded.")
-                data_list = df.values.tolist() if hasattr(df, 'values') else df
-                msg = editor.save_editor_changes(json_path, data_list)
-                return msg
-
-            editor_save_btn.click(save_subs, inputs=[current_json_path, subtitle_dataframe], outputs=editor_status)
-
-            def render_single(json_path, use_custom, font_name, font_size, font_color, highlight_color, 
-                              outline_color, outline_thickness, shadow_color, shadow_size, 
-                              is_bold, is_italic, is_uppercase, 
-                              h_size, w_block, gap, mode, under, strike, border_s, 
-                              vertical_pos, alignment, remove_punc):
-                
-                if not json_path: return i18n("No file loaded.")
-                
-                subtitle_config_path = os.path.join(WORKING_DIR, "temp_subtitle_config.json")
-                
-                # Save config if custom subs enabled
-                if use_custom:
-                    subtitle_config = {
-                        "font": font_name, "base_size": int(font_size), 
-                        "base_color": convert_color_to_ass(font_color), 
-                        "highlight_color": convert_color_to_ass(highlight_color),
-                        "outline_color": convert_color_to_ass(outline_color), 
-                        "outline_thickness": outline_thickness, 
-                        "shadow_color": convert_color_to_ass(shadow_color),
-                        "shadow_size": shadow_size, "vertical_position": vertical_pos, 
-                        "alignment": alignment, "bold": 1 if is_bold else 0, 
-                        "italic": 1 if is_italic else 0, 
-                        "underline": 1 if under else 0, "strikeout": 1 if strike else 0, 
-                        "border_style": border_s, "words_per_block": int(w_block), 
-                        "gap_limit": gap, "mode": mode, "highlight_size": int(h_size),
-                        "uppercase": 1 if is_uppercase else 0,
-                        "remove_punctuation": remove_punc
-                    }
-                    try:
-                        with open(subtitle_config_path, "w", encoding="utf-8") as f:
-                            json.dump(subtitle_config, f, indent=4)
-                    except Exception: pass
-                else:
-                    # Remove temp config if it exists to ensure defaults are used
-                    try:
-                        if os.path.exists(subtitle_config_path):
-                            os.remove(subtitle_config_path)
-                    except Exception: pass
-                
-                # We expect user to SAVE first, but we could auto-save.
-                # For now assume saved.
-                msg = editor.render_specific_video(json_path)
-                return msg
-
-            editor_render_single_btn.click(
-                render_single, 
-                inputs=[current_json_path, use_custom_subs] + manual_inputs, 
-                outputs=editor_status
-            )
-
-            def render_all(proj_name, use_custom, font_name, font_size, font_color, highlight_color, 
-                           outline_color, outline_thickness, shadow_color, shadow_size, 
-                           is_bold, is_italic, is_uppercase, 
-                           h_size, w_block, gap, mode, under, strike, border_s, 
-                           vertical_pos, alignment, remove_punc):
-                if not proj_name: return i18n("No project selected.")
-                
-                # Save config
-                if use_custom:
-                    subtitle_config = {
-                        "font": font_name, "base_size": int(font_size), 
-                        "base_color": convert_color_to_ass(font_color), 
-                        "highlight_color": convert_color_to_ass(highlight_color),
-                        "outline_color": convert_color_to_ass(outline_color), 
-                        "outline_thickness": outline_thickness, 
-                        "shadow_color": convert_color_to_ass(shadow_color),
-                        "shadow_size": shadow_size, "vertical_position": vertical_pos, 
-                        "alignment": alignment, "bold": 1 if is_bold else 0, 
-                        "italic": 1 if is_italic else 0, 
-                        "underline": 1 if under else 0, "strikeout": 1 if strike else 0, 
-                        "border_style": border_s, "words_per_block": int(w_block), 
-                        "gap_limit": gap, "mode": mode, "highlight_size": int(h_size),
-                        "uppercase": 1 if is_uppercase else 0,
-                        "remove_punctuation": remove_punc
-                    }
-                    subtitle_config_path = os.path.join(WORKING_DIR, "temp_subtitle_config.json")
-                    try:
-                        with open(subtitle_config_path, "w", encoding="utf-8") as f:
-                            json.dump(subtitle_config, f, indent=4)
-                    except Exception: pass
-
-                proj_path = os.path.join(VIRALS_DIR, proj_name)
-                
-                # IMPORTANT: Pass the config file path to the command
-                subtitle_config_path = os.path.join(WORKING_DIR, "temp_subtitle_config.json")
-                cmd = [sys.executable, MAIN_SCRIPT_PATH, "--project-path", proj_path, "--workflow", "3", "--skip-prompts"]
-                
-                if use_custom and os.path.exists(subtitle_config_path):
-                     cmd.extend(["--subtitle-config", subtitle_config_path])
-
-                try:
-                    subprocess.Popen(cmd, cwd=WORKING_DIR)
-                    return i18n("Render All started in background... Check terminal/logs.")
-                except Exception as e:
-                    return i18n("Error starting render: {}").format(e)
-
-            editor_render_all_btn.click(
-                render_all, 
-                inputs=[editor_project_dropdown, use_custom_subs] + manual_inputs, 
-                outputs=editor_status
-            )
-
-
-        with gr.Tab(i18n("Library")):
-            gr.Markdown(f"### {i18n('Existing Projects')}")
-            with gr.Row():
-                project_dropdown = gr.Dropdown(choices=library.get_existing_projects(), label=i18n("Select Project"), value=None)
-                refresh_btn = gr.Button(i18n("Refresh List"))
-            project_gallery_html = gr.HTML()
-            refresh_btn.click(library.refresh_projects, outputs=project_dropdown)
-            def on_select_project(proj_name): return library.generate_project_gallery(proj_name)
-            project_dropdown.change(on_select_project, project_dropdown, project_gallery_html)
+    # Navegação lateral: liga os ícones às abas e mantém o ícone ativo sincronizado.
+    demo.load(
+        fn=None,
+        inputs=None,
+        outputs=None,
+        js="""
+        () => {
+          if (window.__fdcNavReady) return;
+          window.__fdcNavReady = true;
+          const visibleTabs = () => Array.from(document.querySelectorAll('.tab-container button'))
+            .filter((b) => !b.closest('.visually-hidden'));
+          const findTab = (label) => visibleTabs().find((b) => (b.textContent || '').trim() === label);
+          const syncRail = () => {
+            const selected = visibleTabs().find((b) => b.classList.contains('selected'));
+            const current = selected ? (selected.textContent || '').trim() : '';
+            document.querySelectorAll('.fdc-rail-item').forEach((el) => {
+              const shouldBeActive = el.getAttribute('data-goto') === current;
+              if (shouldBeActive !== el.classList.contains('active')) el.classList.toggle('active', shouldBeActive);
+            });
+          };
+          document.addEventListener('click', (event) => {
+            const item = event.target && event.target.closest ? event.target.closest('.fdc-rail-item') : null;
+            if (!item) return;
+            const tab = findTab(item.getAttribute('data-goto'));
+            if (tab) tab.click();
+            setTimeout(syncRail, 80);
+          });
+          new MutationObserver(syncRail).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
+          setTimeout(() => {
+            const create = findTab('Criar Cortes');
+            if (create && !create.classList.contains('selected')) create.click();
+            syncRail();
+          }, 500);
+        }
+        """,
+    )
 if __name__ == "__main__":
     import webbrowser
     import threading

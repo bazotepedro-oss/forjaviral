@@ -53,7 +53,9 @@ def cut(segments, project_folder="tmp", skip_video=False):
 
             # Heurística para duration:
             if isinstance(duration, (int, float)):
-                if duration < 1000:
+                # Só trata como milissegundos acima de 24h. Antes, qualquer corte
+                # maior que 1000s (um video inteiro, por exemplo) virava 6 segundos.
+                if duration < 86400:
                     duration_seconds = float(duration)
                 else:
                     duration_seconds = duration / 1000.0
@@ -71,7 +73,7 @@ def cut(segments, project_folder="tmp", skip_video=False):
             
             # Normalização segura de start_time (segundos vs ms):
             if isinstance(start_time, (int, float)):
-                if start_time > 10000:
+                if start_time > 86400:
                     start_time_seconds = float(start_time) / 1000.0
                 else:
                     start_time_seconds = float(start_time)

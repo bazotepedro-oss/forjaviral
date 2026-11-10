@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.3.2 — Interface nova e cortes consistentes
+
+### Interface
+- **Nova interface no estilo Opus**: barra lateral com ícones, abas Licença/Criar Cortes, hero com a logo, cards escuros com detalhes laranja e botão grande de gerar.
+- **Tela mais limpa**: Editor de Legendas e Biblioteca saíram da interface; o backend ficou fixo em Gemini e o Modo viral passou a ficar sempre ativo.
+- **Console recolhido**: os logs ficam em "Detalhes técnicos" e a barra de progresso mostra a etapa e a porcentagem.
+
+### Cortes
+- **Candidatos extras**: a IA agora gera mais opções do que o pedido (pedir 4 gera 7, pedir 5 gera 9) e o app entrega apenas os melhores, evitando entregar menos cortes quando há sobreposição.
+- **Fim do colapso dos cortes**: legendas automáticas sem pontuação faziam o vídeo inteiro virar um único bloco, e todos os cortes apontavam para 0 – duração total. Agora os blocos são limitados e cada corte fica no trecho certo.
+- **Duração correta**: cortes com mais de 1000s não são mais tratados como milissegundos (um corte de 77s não vira 6s).
+- **Timestamps flexíveis**: referências em `1:02:45` agora são interpretadas corretamente.
+- **Hook de verdade**: o campo `hook` recebe a primeira frase falada no corte, não o título. O título fica separado e a nota é real, validada entre 0 e 100.
+
+### IA, GPU e legendas
+- **Gemini atualizado**: modelo padrão `gemini-2.5-flash`, com troca automática de modelo quando a API responde 404 ou 429 (em vez de esperar minutos no mesmo modelo).
+- **Transcrição na GPU corrigida**: CTranslate2 4.8.4 com o cuDNN que acompanha o PyTorch, além de fallback automático para CPU.
+- **Idioma da legenda**: a detecção não confunde mais nomes como "Inteligência" com inglês; vídeos em português são alinhados com o modelo em português.
+- **Legendas completas**: como o corte começa em frase completa, a primeira legenda também começa inteira.
+
+### Créditos
+- **Devolução confirmada**: corrigido o erro de contexto do Gradio que impedia confirmar a devolução de créditos e derrubava a resposta final do processamento.
+
 ## 1.3.1 — Cortes completos e erro claro da IA
 
 ### Correções

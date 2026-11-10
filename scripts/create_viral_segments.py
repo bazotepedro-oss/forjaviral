@@ -186,62 +186,73 @@ def preprocess_transcript_for_ai(segments):
 
     return full_text.strip()
 
-def call_gemini(prompt, api_key, model_name='gemini-flash-lite-latest'):
+GEMINI_FALLBACK_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-flash-latest",
+    "gemini-2.5-flash-lite",
+    "gemini-flash-lite-latest",
+    "gemini-3.8-flash",
+]
+
+
+def _gemini_retry_delay(error_str, attempt):
+    """Espera sugerida pelo Google, limitada a 70s para nao travar o app."""
+    match = re.search(r"retry in (\d+(\.\d+)?)s", error_str)
+    if match:
+        return min(float(match.group(1)) + 2.0, 70.0)
+    return min(20.0 * (attempt + 1), 70.0)
+
+
+def call_gemini(prompt, api_key, model_name='gemini-2.5-flash'):
     _set_ai_error("")
     if not HAS_GEMINI:
         _set_ai_error("Gemini: biblioteca google-generativeai nao instalada")
         raise ImportError("A biblioteca 'google-generativeai' não está instalada. Instale com: pip install google-generativeai")
-    
-    genai.configure(api_key=api_key)
-    # Usando modelo definido na config ou o padrão
-    model = genai.GenerativeModel(model_name) 
-    
-    max_retries = 5
-    base_wait = 30
 
-    for attempt in range(max_retries):
-        try:
-            response = model.generate_content(prompt)
-            return response.text
-        except Exception as e:
-            error_str = str(e)
-            _set_ai_error(f"Gemini: {error_str[:500]}")
-            if "429" in error_str or "Quota exceeded" in error_str:
-                wait_time = base_wait * (attempt + 1)
-                
-                match = re.search(r"retry in (\d+(\.\d+)?)s", error_str)
-                if match:
-                    wait_time = float(match.group(1)) + 5.0
-                
-                print(f"[429] Quota Exceeded. Waiting {wait_time:.2f}s before retry {attempt+1}/{max_retries}...", flush=True)
-                time.sleep(wait_time)
-                continue
-            else:
+    genai.configure(api_key=api_key)
+
+    models_to_try = [model_name]
+    for fallback in GEMINI_FALLBACK_MODELS:
+        if fallback not in models_to_try:
+            models_to_try.append(fallback)
+
+    # Cada modelo ganha no maximo duas tentativas. Se a cota estourar, o proximo
+    # modelo e testado na hora, em vez de esperar minutos no mesmo modelo.
+    for name in models_to_try:
+        for attempt in range(2):
+            try:
+                response = genai.GenerativeModel(name).generate_content(prompt)
+                return response.text
+            except Exception as e:
+                error_str = str(e)
                 err_lower = error_str.lower()
+                _set_ai_error(f"Gemini: {error_str[:500]}")
+
+                if "API_KEY_INVALID" in error_str or "api key not valid" in err_lower:
+                    print("\n[ERRO CRÍTICO GEMINI] Chave de API inválida ou revogada! Obtenha sua chave gratuita em https://aistudio.google.com/ e insira no campo Gemini API Key.")
+                    return "{}"
+
+                if "429" in error_str or "quota exceeded" in err_lower or "rate limit" in err_lower:
+                    if "perday" in err_lower.replace(" ", "") or "per day" in err_lower or "daily" in err_lower:
+                        print(f"[429] Cota diaria esgotada em '{name}'. Tentando outro modelo...")
+                        break
+                    if attempt == 0:
+                        wait_time = _gemini_retry_delay(error_str, attempt)
+                        print(f"[429] Limite por minuto em '{name}'. Aguardando {wait_time:.0f}s...", flush=True)
+                        time.sleep(wait_time)
+                        continue
+                    print(f"[429] '{name}' continua limitado. Tentando outro modelo...")
+                    break
+
                 if "404" in error_str or "not found" in err_lower or "no longer available" in err_lower:
-                    print(f"[Gemini 404] Modelo '{model_name}' indisponível. Tentando automaticamente 'gemini-2.0-flash'...")
-                    try:
-                        fallback_model = genai.GenerativeModel("gemini-2.0-flash")
-                        response_fb = fallback_model.generate_content(prompt)
-                        return response_fb.text
-                    except Exception as e_fb:
-                        print(f"Fallback para gemini-2.0-flash falhou ({e_fb}). Tentando 'gemini-1.5-flash'...")
-                        try:
-                            fallback_model2 = genai.GenerativeModel("gemini-1.5-flash")
-                            response_fb2 = fallback_model2.generate_content(prompt)
-                            return response_fb2.text
-                        except Exception as e_fb2:
-                            print(f"Erro em todos os fallbacks do Gemini: {e_fb2}")
-                            _set_ai_error(f"Gemini: modelo indisponivel ({e_fb2})")
-                            return "{}"
-                if "API_KEY_INVALID" in error_str or "API key not valid" in error_str:
-                    print(f"\n[ERRO CRÍTICO GEMINI] Chave de API inválida ou revogada! Obtenha sua chave gratuita em https://aistudio.google.com/ e insira no campo Gemini API Key.")
-                else:
-                    print(f"Erro na API do Gemini: {e}")
-                return "{}"
-    
-    print("Falha após max retries no Gemini.")
-    _set_ai_error("Gemini: falha apos varias tentativas (quota/limite de requisicoes)")
+                    print(f"[Gemini 404] Modelo '{name}' indisponivel. Tentando outro modelo...")
+                    break
+
+                print(f"Erro na API do Gemini ({name}): {e}")
+                break
+
+    print("Falha em todos os modelos do Gemini.")
+    _set_ai_error("Gemini: falha em todos os modelos (quota/limite de requisicoes)")
     return "{}"
 
 def call_g4f(prompt, model_name=None):
@@ -361,8 +372,63 @@ def _tokens_for_match(text):
     return [token for token in _normalize_for_match(text).split() if token]
 
 
+def _parse_time_ref(value):
+    """Converte a referência de tempo da IA em segundos.
+
+    Aceita "(90s)", "90", "1:30" e "1:02:45". Antes, um timecode com dois pontos
+    era lido como o primeiro número ("1"), jogando o corte para o início.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return 0
+    timecode = re.search(r"(\d{1,2}):(\d{2})(?::(\d{2}))?", text)
+    if timecode:
+        hours, minutes, seconds = timecode.groups()
+        if seconds is None:
+            return int(hours) * 60 + int(minutes)
+        return int(hours) * 3600 + int(minutes) * 60 + int(seconds)
+    match = re.search(r"\d+", text)
+    return int(match.group()) if match else 0
+
+
+def _safe_score(value):
+    """Aceita nota em numero ou texto e mantem sempre um inteiro entre 0 e 100."""
+    try:
+        score = int(float(str(value).strip().replace('%', '').replace(',', '.')))
+    except (TypeError, ValueError):
+        return 0
+    return max(0, min(100, score))
+
+
+def _match_score(window_text, target):
+    """Quanto a janela de fala corresponde ao trecho informado pela IA.
+
+    1.0 quando o trecho aparece literalmente (caso esperado). Caso contrario,
+    devolve a fracao de palavras do trecho encontradas na janela, para tolerar
+    pequenas diferencas de transcricao.
+    """
+    if not target:
+        return 0.0
+    if target in window_text:
+        return 1.0
+    target_tokens = set(_tokens_for_match(target))
+    if not target_tokens:
+        return 0.0
+    return len(target_tokens & set(_tokens_for_match(window_text))) / len(target_tokens)
+
+
+MAX_SENTENCE_BLOCK_SECONDS = 12.0
+MAX_SENTENCE_BLOCK_WORDS = 45
+
+
 def _build_sentence_blocks(transcript_segments):
-    """Agrupa segmentos da transcrição em blocos de frase, usando pontuação e pausas."""
+    """Agrupa segmentos da transcrição em blocos de frase.
+
+    Além da pontuação e das pausas, fecha o bloco quando ele fica longo demais.
+    Legendas automáticas do YouTube costumam não ter pontuação nenhuma; sem esse
+    limite o vídeo inteiro virava um único bloco e todos os cortes colapsavam
+    para 0 - duração total.
+    """
     blocks = []
     current = None
 
@@ -378,7 +444,9 @@ def _build_sentence_blocks(transcript_segments):
             current = {"start": start, "end": end, "text": text}
         else:
             gap = start - current["end"]
-            if gap > 1.2:
+            too_long = (current["end"] - current["start"]) >= MAX_SENTENCE_BLOCK_SECONDS
+            too_many_words = len(current["text"].split()) >= MAX_SENTENCE_BLOCK_WORDS
+            if gap > 1.2 or too_long or too_many_words:
                 blocks.append(current)
                 current = {"start": start, "end": end, "text": text}
             else:
@@ -448,7 +516,12 @@ def _block_index_for_end(blocks, timestamp):
 
 
 def _snap_segments_to_sentences(segments, transcript_segments, min_duration, max_duration):
-    """Ajusta início/fim de cada corte para começar e terminar em frases completas."""
+    """Ajusta início/fim para frases completas sem perder o ponto exato do hook.
+
+    O início só recua até o começo da frase quando a diferença é pequena; caso
+    contrário mantém o trecho exato que a IA escolheu. O fim é esticado até o
+    fim da frase para não terminar no meio de uma ideia.
+    """
     blocks = _build_sentence_blocks(transcript_segments)
     if not blocks:
         return segments
@@ -458,9 +531,9 @@ def _snap_segments_to_sentences(segments, transcript_segments, min_duration, max
         try:
             start = float(segment.get("start_time", 0) or 0)
             end = float(segment.get("end_time", start) or start)
+            if end <= start:
+                end = start + min_duration
 
-            # Os tempos já foram alinhados pelo texto da IA em process_segments.
-            # Aqui apenas esticamos para o começo/fim da frase que contém esses tempos.
             start_index = _block_index_at_time(blocks, start)
             end_index = _block_index_for_end(blocks, end)
 
@@ -471,21 +544,24 @@ def _snap_segments_to_sentences(segments, transcript_segments, min_duration, max
             if end_index < start_index:
                 end_index = start_index
 
-            # Garante duração mínima avançando até o fim de uma frase.
-            while end_index < len(blocks) - 1 and blocks[end_index]["end"] - blocks[start_index]["start"] < min_duration:
+            block_start = float(blocks[start_index]["start"])
+            new_start = block_start if (start - block_start) <= 2.5 else start
+
+            block_end = float(blocks[end_index]["end"])
+            new_end = block_end if (block_end - end) <= 2.5 else end
+
+            # Duração mínima: avança até o fim de frases completas.
+            while end_index < len(blocks) - 1 and (new_end - new_start) < min_duration:
                 end_index += 1
-
-            # Se passou do máximo, volta para o último bloco que ainda cabe.
-            while end_index > start_index and blocks[end_index]["end"] - blocks[start_index]["start"] > max_duration:
-                end_index -= 1
-
-            new_start = float(blocks[start_index]["start"])
-            new_end = float(blocks[end_index]["end"])
-
-            if new_end - new_start < min_duration:
-                while end_index < len(blocks) - 1 and blocks[end_index]["end"] - new_start < min_duration:
-                    end_index += 1
                 new_end = float(blocks[end_index]["end"])
+
+            # Duração máxima: recua até a última frase que ainda cabe.
+            while end_index > start_index and (new_end - new_start) > max_duration:
+                end_index -= 1
+                new_end = float(blocks[end_index]["end"])
+
+            if (new_end - new_start) > max_duration:
+                new_end = new_start + max_duration
 
             if new_end <= new_start:
                 snapped.append(segment)
@@ -526,17 +602,7 @@ def process_segments(raw_segments, transcript_segments, min_duration, max_durati
     for seg in all_segments:
         try:
             # 1. Parse Reference Time
-            ref_time_str = seg.get('start_time_ref', '(0s)')
-            ref_time_val = 0
-            try:
-                if isinstance(ref_time_str, str):
-                    match = re.search(r'\d+', ref_time_str)
-                    if match:
-                         ref_time_val = int(match.group())
-                else:
-                    ref_time_val = int(ref_time_str)
-            except:
-                ref_time_val = 0
+            ref_time_val = _parse_time_ref(seg.get('start_time_ref', '(0s)'))
                 
             # Find segment index closest to ref_time
             start_idx = 0
@@ -552,28 +618,34 @@ def process_segments(raw_segments, transcript_segments, min_duration, max_durati
             # Backtrack curto: o texto da IA será usado para achar a frase exata.
             start_idx = max(0, start_idx - 2)
             
-            # 2. Find Exact Start Text
+            # 2. Localiza a frase exata de inicio usando o texto informado pela IA.
+            # O casamento reverso (janela dentro do texto) foi removido: ele aceitava
+            # qualquer trecho curto parecido e fazia o corte comecar no lugar errado.
             start_text_target = _normalize_for_match(seg.get('start_text', ''))
-            
+
             final_start_time = -1
             match_start_idx = -1
-            
-            # Search window
-            search_limit = min(len(transcript_segments), start_idx + 50)
-            
-            for i in range(start_idx, search_limit):
-                window_text = " ".join(
-                    _normalize_for_match(transcript_segments[j]['text'])
-                    for j in range(i, min(i + 3, search_limit))
-                )
-                
-                # Check for partial match (including phrases spread across segments)
-                if start_text_target and (start_text_target in window_text or window_text in start_text_target):
-                    final_start_time = transcript_segments[i]['start']
-                    match_start_idx = i
-                    break
-            
-            # Fallback
+
+            if start_text_target:
+                search_begin = max(0, start_idx - 3)
+                search_limit = min(len(transcript_segments), start_idx + 60)
+                candidates = []
+                for i in range(search_begin, search_limit):
+                    window_text = " ".join(
+                        _normalize_for_match(transcript_segments[j]['text'])
+                        for j in range(i, min(i + 3, len(transcript_segments)))
+                    )
+                    if _match_score(window_text, start_text_target) >= 0.75:
+                        candidates.append(i)
+                if candidates:
+                    # Havendo mais de uma ocorrencia, usa a mais proxima do timestamp da IA.
+                    match_start_idx = min(
+                        candidates,
+                        key=lambda idx: abs(float(transcript_segments[idx]['start']) - ref_time_val),
+                    )
+                    final_start_time = transcript_segments[match_start_idx]['start']
+
+            # Fallback: usa o timestamp informado pela IA.
             if final_start_time == -1:
                 final_start_time = transcript_segments[start_idx]['start'] if start_idx < len(transcript_segments) else ref_time_val
                 match_start_idx = start_idx
@@ -583,15 +655,8 @@ def process_segments(raw_segments, transcript_segments, min_duration, max_durati
             final_end_time = -1
 
             # Optional: the AI can provide an approximate end tag.
-            end_ref_val = None
-            try:
-                end_ref_raw = seg.get('end_time_ref')
-                if end_ref_raw not in (None, ''):
-                    end_ref_match = re.search(r'\d+', str(end_ref_raw))
-                    if end_ref_match:
-                        end_ref_val = int(end_ref_match.group())
-            except Exception:
-                end_ref_val = None
+            end_ref_raw = seg.get('end_time_ref')
+            end_ref_val = _parse_time_ref(end_ref_raw) if end_ref_raw not in (None, '') else None
 
             end_matches = []
             if match_start_idx != -1 and end_text_target:
@@ -601,7 +666,7 @@ def process_segments(raw_segments, transcript_segments, min_duration, max_durati
                         _normalize_for_match(transcript_segments[j]['text'])
                         for j in range(max(match_start_idx, i - 2), i + 1)
                     )
-                    if end_text_target in window_text or window_text in end_text_target:
+                    if _match_score(window_text, end_text_target) >= 0.75:
                         end_matches.append(i)
 
             if end_matches:
@@ -630,20 +695,13 @@ def process_segments(raw_segments, transcript_segments, min_duration, max_durati
             if final_end_time == -1:
                  final_end_time = final_start_time + tempo_minimo 
             
-            # Calculate Duration
+            # A duracao final e ajustada em _snap_segments_to_sentences, sempre em
+            # frases completas. Cortar ou esticar aqui no meio da frase era o que
+            # deixava os cortes sem nexo.
+            if final_end_time <= final_start_time:
+                final_end_time = final_start_time + tempo_minimo
+
             duration = final_end_time - final_start_time
-            
-            # Validate Duration (Min)
-            if duration < tempo_minimo: 
-                print(f"[WARN] Segmento menor que duration min ({duration:.2f}s < {tempo_minimo}s). Estendendo para {tempo_minimo}s.")
-                duration = tempo_minimo
-                final_end_time = final_start_time + duration
-            
-            # Validate Duration (Max)
-            if duration > tempo_maximo:
-                print(f"[WARN] Segmento excede max duration ({duration:.2f}s > {tempo_maximo}s). Cortando para {tempo_maximo}s.")
-                final_end_time = final_start_time + tempo_maximo
-                duration = tempo_maximo
 
             # Construct Final Segment
             raw_title = str(seg.get('title') or 'Viral Segment').strip()
@@ -663,10 +721,11 @@ def process_segments(raw_segments, transcript_segments, min_duration, max_durati
                 "hashtags": hashtags,
                 "start_time": final_start_time,
                 "end_time": final_end_time,
-                "hook": clean_title,
+                "hook": "",
+                "hook_line": seg.get('hook_line', ''),
                 "reasoning": seg.get('reasoning', ''),
                 "description": seg.get('reasoning', ''),
-                "score": seg.get('score', 0),
+                "score": _safe_score(seg.get('score')),
                 "duration": duration,
                 "_start_text": seg.get('start_text', ''),
                 "_end_text": seg.get('end_text', ''),
@@ -683,6 +742,21 @@ def process_segments(raw_segments, transcript_segments, min_duration, max_durati
         tempo_minimo,
         tempo_maximo,
     )
+
+    # O hook e a primeira frase realmente falada dentro do corte, nao o titulo.
+    # Recalculado depois do snap para refletir o audio que o cliente vai ouvir.
+    hook_blocks = _build_sentence_blocks(transcript_segments)
+    for segment in processed_segments:
+        try:
+            hook_index = _block_index_at_time(hook_blocks, float(segment.get("start_time", 0) or 0))
+            if hook_index is None:
+                continue
+            hook_text = re.sub(r"\s+", " ", str(hook_blocks[hook_index].get("text") or "")).strip()
+            if hook_text:
+                segment["hook"] = hook_text
+                segment["hook_line"] = hook_text
+        except Exception:
+            continue
 
     unique_segments = []
     processed_segments.sort(key=lambda x: int(x.get('score', 0)), reverse=True)
@@ -712,6 +786,8 @@ def process_segments(raw_segments, transcript_segments, min_duration, max_durati
     if output_count and len(all_segments) > output_count:
         print(f"Filtrando os top {output_count} segmentos de {len(all_segments)} candidatos encontrados nos chunks.")
         all_segments = all_segments[:output_count]
+    elif output_count and len(all_segments) < output_count:
+        print(f"[AVISO] A IA retornou {len(all_segments)} corte(s) valido(s), menos que os {output_count} solicitados.")
 
     final_result = {"segments": all_segments}
     
@@ -745,7 +821,7 @@ def create(num_segments, viral_mode, themes, tempo_minimo, tempo_maximo, ai_mode
         "selected_api": "gemini",
         "gemini": {
             "api_key": "",
-            "model": "gemini-flash-lite-latest",
+            "model": "gemini-2.5-flash",
             "chunk_size": 15000
         },
         "g4f": {
@@ -770,7 +846,7 @@ def create(num_segments, viral_mode, themes, tempo_minimo, tempo_maximo, ai_mode
     if ai_mode == "gemini":
         cfg_chunk = config["gemini"].get("chunk_size", 250000)
         current_chunk_size = chunk_size_arg if chunk_size_arg and int(chunk_size_arg) > 0 else cfg_chunk
-        cfg_model = config["gemini"].get("model", "gemini-2.5-flash-lite-preview-09-2025")
+        cfg_model = config["gemini"].get("model", "gemini-2.5-flash")
         model_name = model_name_arg if model_name_arg else cfg_model
         if not api_key: api_key = config["gemini"].get("api_key", "")
             
@@ -819,14 +895,15 @@ OUTPUT JSON ONLY:
             { "segments" :
                 [
                     {
-                        "start_text": "Exact first 5-10 words of a complete sentence",
-                        "end_text": "Exact last 5-10 words of a complete sentence",
+                        "start_text": "First 8-15 words of the opening sentence, copied exactly",
+                        "end_text": "Last 8-15 words of the closing sentence, copied exactly",
                         "start_time_ref": "Value of closest (XXs) tag",
                         "end_time_ref": "Value of closest (XXs) tag at the END of the segment",
-                        "title": "Short viral title, max 70 chars, NO hashtags, same language as transcript",
+                        "hook_line": "The exact opening sentence of the cut, copied from the transcript",
+                        "title": "Short headline, max 70 chars, NO hashtags, same language as transcript",
                         "hashtags": "#tag1 #tag2 #tag3",
-                        "reasoning": "Why this is viral? Hook? Value? (Same Language as Transcript)",
-                        "score": 95
+                        "reasoning": "Why this cut works, in the same language as the transcript",
+                        "score": "Integer 0-100, honest and varied (90+ only for exceptional cuts)"
                     }
                 ]
             }
@@ -868,7 +945,9 @@ OUTPUT JSON ONLY:
             else:
                 start = next_start
 
-    ask_amount = max(quantidade_de_virals + 2, int(quantidade_de_virals * 1.35))
+    # Pede mais candidatos do que o cliente quer receber. Assim, sobreposicoes,
+    # duplicatas e trechos fracos podem ser descartados sem faltar corte no final.
+    ask_amount = max(quantidade_de_virals + 3, int(quantidade_de_virals * 1.6) + 1)
     if viral_mode:
         virality_instruction = f"""analyze the segment for potential virality and identify {ask_amount} candidate viral segments from the transcript (aiming for at least {quantidade_de_virals} top quality cuts)"""
     else:
@@ -888,7 +967,8 @@ OUTPUT JSON ONLY:
                 max_duration=tempo_maximo,
                 transcript_chunk=chunk,
                 json_template=json_template,
-                amount=quantidade_de_virals
+                amount=ask_amount,
+                keep=quantidade_de_virals
             )
         except KeyError as e:
             prompt = system_prompt_template
@@ -898,7 +978,8 @@ OUTPUT JSON ONLY:
             prompt = prompt.replace("{max_duration}", str(tempo_maximo))
             prompt = prompt.replace("{transcript_chunk}", chunk)
             prompt = prompt.replace("{json_template}", json_template)
-            prompt = prompt.replace("{amount}", str(quantidade_de_virals))
+            prompt = prompt.replace("{amount}", str(ask_amount))
+            prompt = prompt.replace("{keep}", str(quantidade_de_virals))
 
         output_texts.append(prompt)
 
@@ -911,7 +992,8 @@ OUTPUT JSON ONLY:
         full_prompt = full_prompt.replace("{max_duration}", str(tempo_maximo))
         full_prompt = full_prompt.replace("{transcript_chunk}", content) 
         full_prompt = full_prompt.replace("{json_template}", json_template)
-        full_prompt = full_prompt.replace("{amount}", str(quantidade_de_virals))
+        full_prompt = full_prompt.replace("{amount}", str(ask_amount))
+        full_prompt = full_prompt.replace("{keep}", str(quantidade_de_virals))
         
         with open(full_prompt_path, "w", encoding="utf-8") as f:
             f.write(full_prompt)
@@ -1043,11 +1125,14 @@ OUTPUT JSON ONLY:
         # Usa um trecho representativo (ate 180.000 caracteres)
         rescue_chunk = content[:180000] if len(content) > 180000 else content
         
-        rescue_prompt = f"""You are a World-Class Viral Video Editor.
-Analyze this transcript with timestamps (XXs) and identify {quantidade_de_virals} high-interest segments.
+        rescue_prompt = f"""You are a senior short-form editor.
+Analyze this transcript with timestamps (XXs) and identify {ask_amount} candidate moments that work as complete, standalone stories (the best {quantidade_de_virals} will be kept).
 Each segment must be between {tempo_minimo}s and {tempo_maximo}s.
-CRITICAL: Do NOT return an empty list. If there are no explosive viral moments, pick the best discussions, insights, or interesting stories.
-Output Title, Hook, and Reasoning in the same language as the transcript.
+CRITICAL: Do NOT return an empty list. If there is no explosive moment, pick the clearest story, insight or argument.
+Start on the first word of a complete sentence that names its subject, and end on the last word of a sentence that delivers the payoff. Never start or end mid-sentence.
+start_text must be the first 8-15 words of the opening sentence, copied exactly. end_text must be the last 8-15 words of the closing sentence, copied exactly.
+hook_line must be the exact opening sentence of the cut, copied from the transcript, not a headline.
+Output title, hook_line and reasoning in the same language as the transcript.
 
 TRANSCRIPT:
 {rescue_chunk}
@@ -1058,12 +1143,13 @@ OUTPUT VALID JSON ONLY:
     {{
       "start_time_ref": "(XXs)",
       "end_time_ref": "(XXs)",
-      "start_text": "Exact first 5-10 words",
-      "end_text": "Exact last 5-10 words",
-      "title": "Engaging Clip Title, max 70 chars, no hashtags",
+      "start_text": "First 8-15 words of the opening sentence, copied exactly",
+      "end_text": "Last 8-15 words of the closing sentence, copied exactly",
+      "hook_line": "Exact opening sentence, copied from the transcript",
+      "title": "Short headline, max 70 chars, no hashtags",
       "hashtags": "#tag1 #tag2 #tag3",
-      "reasoning": "Why this moment is interesting",
-      "score": 90
+      "reasoning": "Why this cut works",
+      "score": "Integer 0-100, honest and varied"
     }}
   ]
 }}"""
