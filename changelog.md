@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.1 — Cortes completos e erro claro da IA
+
+### Correções
+- **Fim do modo de segurança aleatório**: quando a IA falhava, o app gerava cortes fixos com notas 95/92/89. Agora ele não gera vídeos desconexos; mostra o motivo e preserva os créditos.
+- **Cortes em frases completas**: o início e o fim de cada corte são ajustados para limites de frase, evitando começar/terminar no meio do assunto.
+- **Título completo no card**: o título não é mais cortado em duas linhas; as hashtags ficam separadas e o texto completo aparece.
+- **Prompt mais rígido**: a IA agora precisa devolver `start_text`/`end_text` de frases completas, `end_time_ref`, título curto sem hashtags e campo `hashtags` separado.
+- **Aviso de chave**: se a chave Gemini não estiver configurada, o app avisa claramente em vez de gerar cortes falsos.
+
 ## Fixes for Manual/Raw JSON Input
 
 ### Core Functionality

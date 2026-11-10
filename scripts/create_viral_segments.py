@@ -5,6 +5,7 @@ import sys
 import time
 import ast
 import io
+import unicodedata
 
 # Configura stdout para evitar erros de encoding no Windows (substitui caracteres inválidos por ?)
 if sys.stdout and hasattr(sys.stdout, 'buffer'):
@@ -32,6 +33,14 @@ try:
     HAS_LLAMA_CPP = True
 except ImportError:
     HAS_LLAMA_CPP = False
+
+# Guarda o último motivo de falha da IA para mostrar um erro útil no lugar de cortes falsos.
+LAST_AI_ERROR = ""
+
+
+def _set_ai_error(message):
+    global LAST_AI_ERROR
+    LAST_AI_ERROR = str(message or "").strip()
 
 def clean_json_response(response_text):
     """
@@ -178,7 +187,9 @@ def preprocess_transcript_for_ai(segments):
     return full_text.strip()
 
 def call_gemini(prompt, api_key, model_name='gemini-flash-lite-latest'):
+    _set_ai_error("")
     if not HAS_GEMINI:
+        _set_ai_error("Gemini: biblioteca google-generativeai nao instalada")
         raise ImportError("A biblioteca 'google-generativeai' não está instalada. Instale com: pip install google-generativeai")
     
     genai.configure(api_key=api_key)
@@ -194,6 +205,7 @@ def call_gemini(prompt, api_key, model_name='gemini-flash-lite-latest'):
             return response.text
         except Exception as e:
             error_str = str(e)
+            _set_ai_error(f"Gemini: {error_str[:500]}")
             if "429" in error_str or "Quota exceeded" in error_str:
                 wait_time = base_wait * (attempt + 1)
                 
@@ -220,6 +232,7 @@ def call_gemini(prompt, api_key, model_name='gemini-flash-lite-latest'):
                             return response_fb2.text
                         except Exception as e_fb2:
                             print(f"Erro em todos os fallbacks do Gemini: {e_fb2}")
+                            _set_ai_error(f"Gemini: modelo indisponivel ({e_fb2})")
                             return "{}"
                 if "API_KEY_INVALID" in error_str or "API key not valid" in error_str:
                     print(f"\n[ERRO CRÍTICO GEMINI] Chave de API inválida ou revogada! Obtenha sua chave gratuita em https://aistudio.google.com/ e insira no campo Gemini API Key.")
@@ -228,10 +241,13 @@ def call_gemini(prompt, api_key, model_name='gemini-flash-lite-latest'):
                 return "{}"
     
     print("Falha após max retries no Gemini.")
+    _set_ai_error("Gemini: falha apos varias tentativas (quota/limite de requisicoes)")
     return "{}"
 
 def call_g4f(prompt, model_name=None):
+    _set_ai_error("")
     if not HAS_G4F:
+        _set_ai_error("G4F: biblioteca nao instalada")
         raise ImportError("A biblioteca 'g4f' não está instalada. Instale com: pip install g4f")
     if not model_name:
         model_name = g4f.models._all_models[0]
@@ -274,11 +290,13 @@ def call_g4f(prompt, model_name=None):
             
         except Exception as e:
             print(f"[WARN] Erro na API do G4F (Tentativa {attempt+1}/{max_retries}): {e}")
+            _set_ai_error(f"G4F: {e}")
             if attempt < max_retries - 1:
                 wait_time = base_wait * (2 ** attempt)
                 time.sleep(wait_time)
             
     print(f"Falha crítica após {max_retries} tentativas no G4F.")
+    _set_ai_error("G4F: falha apos varias tentativas")
     return "{}"
 
 def load_transcript(project_folder):
@@ -330,6 +348,160 @@ def load_transcript(project_folder):
     
     return transcript_segments
 
+def _normalize_for_match(text):
+    """Normaliza texto para comparar frases entre a IA e a transcrição."""
+    value = unicodedata.normalize("NFKD", str(text or ""))
+    value = "".join(char for char in value if not unicodedata.combining(char))
+    value = value.lower()
+    value = re.sub(r"[^\w\s]", " ", value)
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def _tokens_for_match(text):
+    return [token for token in _normalize_for_match(text).split() if token]
+
+
+def _build_sentence_blocks(transcript_segments):
+    """Agrupa segmentos da transcrição em blocos de frase, usando pontuação e pausas."""
+    blocks = []
+    current = None
+
+    for segment in transcript_segments:
+        text = str(segment.get("text") or "").strip()
+        if not text:
+            continue
+
+        start = float(segment.get("start", 0) or 0)
+        end = float(segment.get("end", start) or start)
+
+        if current is None:
+            current = {"start": start, "end": end, "text": text}
+        else:
+            gap = start - current["end"]
+            if gap > 1.2:
+                blocks.append(current)
+                current = {"start": start, "end": end, "text": text}
+            else:
+                current["end"] = end
+                current["text"] = current["text"] + " " + text
+
+        if re.search(r"[.!?…][\"')\]]?\s*$", text):
+            blocks.append(current)
+            current = None
+
+    if current is not None:
+        blocks.append(current)
+
+    return [block for block in blocks if block["end"] > block["start"]]
+
+
+def _best_block_index(blocks, phrase, around_time=None):
+    """Encontra o bloco com maior sobreposição de palavras com a frase da IA."""
+    phrase_tokens = set(_tokens_for_match(phrase))
+    if not phrase_tokens:
+        return None
+
+    best_index = None
+    best_score = 0.0
+
+    for index, block in enumerate(blocks):
+        if around_time is not None:
+            if block["end"] < around_time - 90 or block["start"] > around_time + 90:
+                continue
+
+        block_tokens = set(_tokens_for_match(block.get("text", "")))
+        if not block_tokens:
+            continue
+
+        score = len(phrase_tokens & block_tokens) / len(phrase_tokens)
+        if score > best_score:
+            best_score = score
+            best_index = index
+
+    return best_index if best_score >= 0.34 else None
+
+
+def _block_index_at_time(blocks, timestamp):
+    if not blocks:
+        return None
+    for index, block in enumerate(blocks):
+        if block["start"] <= timestamp < block["end"]:
+            return index
+    return min(range(len(blocks)), key=lambda index: abs(blocks[index]["start"] - timestamp))
+
+
+def _block_index_for_end(blocks, timestamp):
+    """Para o fim, usa o bloco que contém o tempo ou o bloco anterior (fim da frase)."""
+    if not blocks:
+        return None
+    for index, block in enumerate(blocks):
+        if block["start"] <= timestamp < block["end"]:
+            return index
+
+    previous = None
+    for index, block in enumerate(blocks):
+        if block["start"] <= timestamp:
+            previous = index
+        else:
+            break
+    return previous if previous is not None else 0
+
+
+def _snap_segments_to_sentences(segments, transcript_segments, min_duration, max_duration):
+    """Ajusta início/fim de cada corte para começar e terminar em frases completas."""
+    blocks = _build_sentence_blocks(transcript_segments)
+    if not blocks:
+        return segments
+
+    snapped = []
+    for segment in segments:
+        try:
+            start = float(segment.get("start_time", 0) or 0)
+            end = float(segment.get("end_time", start) or start)
+
+            # Os tempos já foram alinhados pelo texto da IA em process_segments.
+            # Aqui apenas esticamos para o começo/fim da frase que contém esses tempos.
+            start_index = _block_index_at_time(blocks, start)
+            end_index = _block_index_for_end(blocks, end)
+
+            if start_index is None or end_index is None:
+                snapped.append(segment)
+                continue
+
+            if end_index < start_index:
+                end_index = start_index
+
+            # Garante duração mínima avançando até o fim de uma frase.
+            while end_index < len(blocks) - 1 and blocks[end_index]["end"] - blocks[start_index]["start"] < min_duration:
+                end_index += 1
+
+            # Se passou do máximo, volta para o último bloco que ainda cabe.
+            while end_index > start_index and blocks[end_index]["end"] - blocks[start_index]["start"] > max_duration:
+                end_index -= 1
+
+            new_start = float(blocks[start_index]["start"])
+            new_end = float(blocks[end_index]["end"])
+
+            if new_end - new_start < min_duration:
+                while end_index < len(blocks) - 1 and blocks[end_index]["end"] - new_start < min_duration:
+                    end_index += 1
+                new_end = float(blocks[end_index]["end"])
+
+            if new_end <= new_start:
+                snapped.append(segment)
+                continue
+
+            updated = dict(segment)
+            updated["start_time"] = round(new_start, 3)
+            updated["end_time"] = round(new_end, 3)
+            updated["duration"] = round(new_end - new_start, 3)
+            snapped.append(updated)
+        except Exception:
+            snapped.append(segment)
+
+    return snapped
+
+
 def process_segments(raw_segments, transcript_segments, min_duration, max_duration, output_count=None):
     """
     Aligns raw AI segments (with reference tags) to actual transcript timestamps.
@@ -377,13 +549,11 @@ def process_segments(raw_segments, transcript_segments, min_duration, max_durati
                 if s['start'] > ref_time_val + 10: 
                     break
             
-            # Backtrack
-            start_idx = max(0, start_idx - 5)
+            # Backtrack curto: o texto da IA será usado para achar a frase exata.
+            start_idx = max(0, start_idx - 2)
             
             # 2. Find Exact Start Text
-            start_text_target = seg.get('start_text', '').lower().strip()
-            # Normalize
-            start_text_target = re.sub(r'[^\w\s]', '', start_text_target)
+            start_text_target = _normalize_for_match(seg.get('start_text', ''))
             
             final_start_time = -1
             match_start_idx = -1
@@ -392,11 +562,13 @@ def process_segments(raw_segments, transcript_segments, min_duration, max_durati
             search_limit = min(len(transcript_segments), start_idx + 50)
             
             for i in range(start_idx, search_limit):
-                s_text = transcript_segments[i]['text'].lower()
-                s_text = re.sub(r'[^\w\s]', '', s_text)
+                window_text = " ".join(
+                    _normalize_for_match(transcript_segments[j]['text'])
+                    for j in range(i, min(i + 3, search_limit))
+                )
                 
-                # Check for partial match
-                if start_text_target and (start_text_target in s_text or s_text in start_text_target):
+                # Check for partial match (including phrases spread across segments)
+                if start_text_target and (start_text_target in window_text or window_text in start_text_target):
                     final_start_time = transcript_segments[i]['start']
                     match_start_idx = i
                     break
@@ -407,21 +579,52 @@ def process_segments(raw_segments, transcript_segments, min_duration, max_durati
                 match_start_idx = start_idx
 
             # 3. Find End Text
-            end_text_target = seg.get('end_text', '').lower().strip()
-            end_text_target = re.sub(r'[^\w\s]', '', end_text_target)
-            
+            end_text_target = _normalize_for_match(seg.get('end_text', ''))
             final_end_time = -1
-            
-            if match_start_idx != -1:
+
+            # Optional: the AI can provide an approximate end tag.
+            end_ref_val = None
+            try:
+                end_ref_raw = seg.get('end_time_ref')
+                if end_ref_raw not in (None, ''):
+                    end_ref_match = re.search(r'\d+', str(end_ref_raw))
+                    if end_ref_match:
+                        end_ref_val = int(end_ref_match.group())
+            except Exception:
+                end_ref_val = None
+
+            end_matches = []
+            if match_start_idx != -1 and end_text_target:
                 search_end_limit = min(len(transcript_segments), match_start_idx + 200)
-                
                 for i in range(match_start_idx, search_end_limit):
-                    s_text = transcript_segments[i]['text'].lower()
-                    s_text = re.sub(r'[^\w\s]', '', s_text)
-                    
-                    if end_text_target and (end_text_target in s_text or s_text in end_text_target):
-                         final_end_time = transcript_segments[i]['end']
-                         break
+                    window_text = " ".join(
+                        _normalize_for_match(transcript_segments[j]['text'])
+                        for j in range(max(match_start_idx, i - 2), i + 1)
+                    )
+                    if end_text_target in window_text or window_text in end_text_target:
+                        end_matches.append(i)
+
+            if end_matches:
+                if end_ref_val is not None:
+                    chosen = min(
+                        end_matches,
+                        key=lambda idx: abs(float(transcript_segments[idx].get('end', 0)) - end_ref_val),
+                    )
+                else:
+                    # Prefer the last occurrence inside the max duration: the AI's end_text
+                    # may repeat earlier, and the first match can cut the story in half.
+                    valid = [
+                        idx for idx in end_matches
+                        if float(transcript_segments[idx].get('end', 0)) - final_start_time <= tempo_maximo
+                    ]
+                    chosen = valid[-1] if valid else end_matches[-1]
+                final_end_time = transcript_segments[chosen]['end']
+            elif end_ref_val is not None:
+                nearest = min(
+                    transcript_segments,
+                    key=lambda item: abs(float(item.get('end', 0)) - end_ref_val),
+                )
+                final_end_time = nearest['end']
             
             # Fallback End Time
             if final_end_time == -1:
@@ -443,14 +646,30 @@ def process_segments(raw_segments, transcript_segments, min_duration, max_durati
                 duration = tempo_maximo
 
             # Construct Final Segment
+            raw_title = str(seg.get('title') or 'Viral Segment').strip()
+            hashtags = re.findall(r"#[\wÀ-ÿ]+", raw_title)
+            for tag in re.findall(r"#[\wÀ-ÿ]+", str(seg.get('hashtags') or '')):
+                if tag not in hashtags:
+                    hashtags.append(tag)
+            clean_title = re.sub(r"\s*#[\wÀ-ÿ]+", "", raw_title)
+            clean_title = re.sub(r"\s{2,}", " ", clean_title).strip(" -–—")
+            if len(clean_title) > 110:
+                clean_title = clean_title[:107].rsplit(" ", 1)[0].rstrip(" ,.;-") + "..."
+            if not clean_title:
+                clean_title = raw_title or "Viral Segment"
+
             processed_segments.append({
-                "title": seg.get('title', 'Viral Segment'),
+                "title": clean_title,
+                "hashtags": hashtags,
                 "start_time": final_start_time,
                 "end_time": final_end_time,
-                "hook": seg.get('title', ''), 
+                "hook": clean_title,
                 "reasoning": seg.get('reasoning', ''),
+                "description": seg.get('reasoning', ''),
                 "score": seg.get('score', 0),
-                "duration": duration
+                "duration": duration,
+                "_start_text": seg.get('start_text', ''),
+                "_end_text": seg.get('end_text', ''),
             })
 
         except Exception as e:
@@ -458,6 +677,13 @@ def process_segments(raw_segments, transcript_segments, min_duration, max_durati
             continue
 
     # Deduplication
+    processed_segments = _snap_segments_to_sentences(
+        processed_segments,
+        transcript_segments,
+        tempo_minimo,
+        tempo_maximo,
+    )
+
     unique_segments = []
     processed_segments.sort(key=lambda x: int(x.get('score', 0)), reverse=True)
     
@@ -558,6 +784,20 @@ def create(num_segments, viral_mode, themes, tempo_minimo, tempo_maximo, ai_mode
         current_chunk_size = chunk_size_arg if chunk_size_arg and int(chunk_size_arg) > 0 else 15000
         model_name = model_name_arg if model_name_arg else ""
 
+    if ai_mode == "gemini":
+        if not HAS_GEMINI:
+            print("[ERRO] A biblioteca google-generativeai nao esta instalada.")
+            print("[DICA] Rode o instalador ou use o backend G4F.")
+            return {"segments": []}
+        if not (str(api_key or "").strip() or str(config["gemini"].get("api_key") or "").strip()):
+            print("\n[ERRO] Gemini API key nao configurada.")
+            print("[DICA] Cole sua chave no campo 'Gemini API Key' ou selecione o backend G4F.")
+            return {"segments": []}
+    if ai_mode == "g4f" and not HAS_G4F:
+        print("[ERRO] A biblioteca g4f nao esta instalada.")
+        print("[DICA] Rode o instalador ou selecione outro backend de IA.")
+        return {"segments": []}
+
     system_prompt_template = ""
     if os.path.exists(prompt_path):
         with open(prompt_path, 'r', encoding='utf-8') as f:
@@ -579,10 +819,12 @@ OUTPUT JSON ONLY:
             { "segments" :
                 [
                     {
-                        "start_text": "Exact first 5-10 words of the segment",
-                        "end_text": "Exact last 5-10 words of the segment",
+                        "start_text": "Exact first 5-10 words of a complete sentence",
+                        "end_text": "Exact last 5-10 words of a complete sentence",
                         "start_time_ref": "Value of closest (XXs) tag",
-                        "title": "Viral Hook Title (Same Language as Transcript)",
+                        "end_time_ref": "Value of closest (XXs) tag at the END of the segment",
+                        "title": "Short viral title, max 70 chars, NO hashtags, same language as transcript",
+                        "hashtags": "#tag1 #tag2 #tag3",
                         "reasoning": "Why this is viral? Hook? Value? (Same Language as Transcript)",
                         "score": 95
                     }
@@ -815,9 +1057,11 @@ OUTPUT VALID JSON ONLY:
   "segments": [
     {{
       "start_time_ref": "(XXs)",
+      "end_time_ref": "(XXs)",
       "start_text": "Exact first 5-10 words",
       "end_text": "Exact last 5-10 words",
-      "title": "Engaging Clip Title",
+      "title": "Engaging Clip Title, max 70 chars, no hashtags",
+      "hashtags": "#tag1 #tag2 #tag3",
       "reasoning": "Why this moment is interesting",
       "score": 90
     }}
@@ -846,39 +1090,17 @@ OUTPUT VALID JSON ONLY:
                 print(f"[MODO DE RESGATE] Sucesso! Recuperados {len(rescued_segs)} corte(s)!")
                 all_raw_segments.extend(rescued_segs)
 
-    # ULTIMATE SAFETY NET: Se mesmo apos o resgate a IA ainda nao retornou nada (ex: API offline),
-    # gera segmentos baseados no fluxo da transcricao para que o processo NUNCA crashe
-    if not all_raw_segments and transcript_segments:
-        print("\n" + "="*60)
-        print("[MODO DE SEGURANCA] Gerando cortes dinâmicos a partir do fluxo da conversa...")
-        print("="*60 + "\n")
-        total_time = transcript_segments[-1].get('end', 0)
-        if total_time > tempo_minimo:
-            step = total_time / (quantidade_de_virals + 1)
-            scores_dist = [95, 92, 89, 87, 85, 83, 81, 80]
-            for s_idx in range(1, quantidade_de_virals + 1):
-                target = s_idx * step
-                closest = min(transcript_segments, key=lambda x: abs(x['start'] - target))
-                s_t = closest['start']
-                raw_txt = closest.get('text', '').strip()
-                words = raw_txt.split()
-                if len(words) >= 4:
-                    title_candidate = " ".join(words[:7]).capitalize()
-                elif raw_txt:
-                    title_candidate = raw_txt.capitalize()
-                else:
-                    title_candidate = f"Momento Relevante #{s_idx}"
-                if len(title_candidate) > 55:
-                    title_candidate = title_candidate[:52] + "..."
-                sc = scores_dist[(s_idx - 1) % len(scores_dist)]
-                all_raw_segments.append({
-                    "start_time_ref": f"({int(s_t)}s)",
-                    "start_text": closest.get('text', '')[:40],
-                    "end_text": "",
-                    "title": title_candidate,
-                    "reasoning": "Destaque selecionado automaticamente por densidade de diálogo e retenção.",
-                    "score": sc
-                })
+    # Se a IA não retornou nada, NÃO gera cortes aleatórios.
+    # O fallback antigo cortava o vídeo em pontos fixos e entregava conteúdo desconexo.
+    if not all_raw_segments:
+        print("\n" + "=" * 60)
+        print("[ERRO] A IA nao retornou nenhum corte valido.")
+        print("[ERRO] Nenhum corte sera gerado para nao entregar videos desconexos.")
+        if LAST_AI_ERROR:
+            print(f"[ERRO IA] {LAST_AI_ERROR}")
+        print("[DICA] Verifique a chave e o modelo da IA (Gemini/G4F) e tente novamente.")
+        print("=" * 60 + "\n")
+        return {"segments": []}
 
     # Call the alignment / processing logic
     return process_segments(

@@ -602,6 +602,9 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
             logs += f"\n\n[AVISO CRÉDITOS] Erro ao sincronizar créditos com o servidor: {e_cred}\n"
     else:
         logs += f"\n\n========================================================"
+        logs += "\n[ERRO] Nenhum corte foi gerado nesta execucao."
+        logs += "\n[ERRO] Verifique a chave e o modelo da IA (Gemini/G4F)."
+        logs += "\n[ERRO] Nenhum credito foi debitado."
         logs += f"\n[CRÉDITOS] Nenhum vídeo de corte foi finalizado nesta execução."
         logs += "\n[CRÉDITOS] Reserva integral devolvida." if settlement_ok else "\n[AVISO CRÉDITOS] Não foi possível confirmar a devolução; contate o suporte com este log."
         logs += f"\n[CRÉDITOS] Saldo preservado: {_gate.state.credits} crédito(s)."

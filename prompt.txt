@@ -124,6 +124,14 @@ Bad Start: "(10s) So, I was thinking..."
 
 Good Start: "(12s) I almost lost everything in one day."
 
+SENTENCE BOUNDARIES (MANDATORY):
+
+- start_text MUST be the exact first 8-15 words of a complete sentence.
+- end_text MUST be the exact last 8-15 words of a complete sentence.
+- NEVER start or end mid-sentence.
+- If the sentence starts with a pronoun or a reference without context, expand backward to the sentence that establishes the subject.
+- The cut must contain a complete mini-story: context, tension, and payoff.
+
 2. THE "STANDALONE" TEST:
 
 Before selecting a segment, verify:
@@ -354,15 +362,18 @@ Contain complete narrative structure.
 
 Rank high in the Virality Priority Stack.
 
-Additionally, generate a highly clickable title for each segment.
+Additionally, generate a highly clickable title and a separate hashtag set for each segment.
 
 The title must:
 - Be emotionally charged.
 - Create curiosity, tension, or conflict.
 - Use strategic capitalization for emphasis.
 - Include 1–2 relevant emojis when appropriate.
-- Include 3–6 optimized hashtags related to the topic and niche.
+- Be at most 70 characters (without hashtags).
+- NOT contain hashtags. Put hashtags in the separate "hashtags" field.
 - Avoid generic summaries.
+
+The hashtags field must contain 3–6 hashtags separated by spaces, e.g. "#Politica #Brasil #Debate".
 
 TRANSCRIPT:
 {transcript_chunk}

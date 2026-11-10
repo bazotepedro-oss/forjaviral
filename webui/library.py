@@ -1,5 +1,7 @@
 import os
 import json
+import re
+import html
 import urllib.parse
 import gradio as gr
 
@@ -17,6 +19,15 @@ VIRALS_DIR = os.path.join(BASE_DIR, "VIRALS")
 
 # URL Mode: "fastapi" (default) or "gradio"
 URL_MODE = "fastapi"
+
+
+def _split_title_hashtags(raw_title):
+    value = str(raw_title or "").strip()
+    hashtags = re.findall(r"#[\wÀ-ÿ]+", value)
+    clean = re.sub(r"\s*#[\wÀ-ÿ]+", "", value)
+    clean = re.sub(r"\s{2,}", " ", clean).strip(" -–—")
+    return clean or value or "Viral Segment", hashtags
+
 
 def set_url_mode(mode):
     global URL_MODE
@@ -79,7 +90,18 @@ def generate_project_gallery(project_path_name, is_full_path=False):
         html_cards = ""
         
         for i, seg in enumerate(segments_list):
-            title = seg.get("title", f"{i18n('Segment')} {i+1}")
+            raw_title = seg.get("title", f"{i18n('Segment')} {i+1}")
+            title, hashtags = _split_title_hashtags(raw_title)
+            title_text = html.escape(title)
+            title_attr = html.escape(title, quote=True)
+            hashtags_html = ""
+            if hashtags:
+                hashtags_html = (
+                    '<div style="font-size: 11px; font-weight: 500; color: #8b8b99; '
+                    'text-align: center; line-height: 1.35; overflow-wrap: anywhere;">'
+                    + html.escape(" ".join(hashtags))
+                    + "</div>"
+                )
             score = seg.get("score", "N/A")
             description = seg.get("description", i18n("No description available."))
             
@@ -257,7 +279,8 @@ def generate_project_gallery(project_path_name, is_full_path=False):
                     </div>
                     
                     <!-- Title -->
-                    <h4 style="margin: 4px 0 0 0; color: #e5e5e5; font-size: 15px; font-weight: 600; line-height: 1.4; font-family: sans-serif; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-align: center;" title="{title}">{title}</h4>
+                    <h4 style="margin: 4px 0 0 0; color: #e5e5e5; font-size: 14px; font-weight: 600; line-height: 1.35; font-family: sans-serif; white-space: normal; overflow-wrap: anywhere; text-align: center;" title="{title_attr}">{title_text}</h4>
+                    {hashtags_html}
                 </div>
             </div>
             """
