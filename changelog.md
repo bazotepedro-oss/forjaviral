@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.7 — YouTube no Colab e cookies
+
+### Correções
+- **Bloqueio "Sign in to confirm you're not a bot"**: o download agora tenta os clientes alternativos do YouTube (`tv`, `android_vr`, `web_safari`, `mweb`) antes de desistir, em vez de procurar cookies de navegadores que não existem no Colab.
+- **Cookies.txt no Colab**: nova célula 2B no notebook envia o `cookies.txt` exportado do navegador, salva no Drive e inicia o app com `--cookies-file`.
+- **Mensagem clara**: quando o YouTube exige verificação, o log explica o que fazer em vez de terminar com erro de cookie do navegador.
+- **Windows/macOS**: continua tentando os cookies dos navegadores locais automaticamente.
+
 ## 1.3.6 — PyTorch travado e GPU validada
 
 ### Correções

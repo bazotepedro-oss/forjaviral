@@ -6,6 +6,32 @@ from i18n.i18n import I18nAuto
 i18n = I18nAuto()
 
 BROWSERS = ('chrome', 'edge', 'firefox', 'brave', 'opera', 'vivaldi', 'chromium', 'whale')
+IS_HEADLESS_LINUX = sys.platform.startswith('linux')
+PLAYER_CLIENTS = ('tv', 'android_vr', 'web_safari', 'mweb')
+
+BOT_CHECK_HINTS = (
+    "sign in to confirm",
+    "confirm you're not a bot",
+    "confirm you’re not a bot",
+    "not a bot",
+    "bot check",
+)
+
+
+def _is_bot_check(error):
+    text = str(error).lower()
+    return any(hint in text for hint in BOT_CHECK_HINTS)
+
+
+def _with_client(options, client):
+    updated = dict(options)
+    updated['extractor_args'] = {'youtube': {'player_client': [client]}}
+    return updated
+
+
+def _attempt_download(url, options):
+    with yt_dlp.YoutubeDL(options) as ydl:
+        ydl.download([url])
 
 def get_aria2c_path():
     """Retorna o caminho do executavel aria2c se disponivel."""
@@ -23,53 +49,78 @@ def get_aria2c_path():
     return None
 
 def download_with_browser_cookies(url, ydl_opts):
-    """Download video directly; fallback to browser cookies only if authentication/bot check is required."""
-    def try_download(opts):
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            ydl.download([url])
+    """Baixa o vídeo tentando clientes do YouTube e, se necessário, cookies.
 
-    if ydl_opts.get('cookiefile'):
-        try:
-            try_download(ydl_opts)
-            return
-        except Exception as error:
-            print(f"Cookies.txt recusado: {error}")
+    Em servidores/Colab o YouTube costuma responder "Sign in to confirm you're
+    not a bot". Nesse caso tentamos os clientes tv/android_vr/web_safari/mweb e,
+    por último, os cookies do navegador (só faz sentido em Windows/macOS).
+    """
+    base = {key: value for key, value in ydl_opts.items() if key != 'cookiefile'}
+    cookies = ydl_opts.get('cookiefile')
+    first_error = None
 
-    # Tenta download direto (sem cookies). Funciona para a maioria dos videos publicos sem disparar erros de navegadores locais.
-    options = {key: value for key, value in ydl_opts.items() if key != 'cookiefile'}
+    # 1) Configuração normal (com cookies.txt se o cliente enviou)
     try:
-        try_download(options)
+        _attempt_download(url, dict(ydl_opts) if cookies else base)
         return
-    except Exception as first_error:
-        error_str = str(first_error).lower()
-        # Se o erro for de legenda (ex: 429), repassa para retry de video limpo
-        if "unable to download video subtitles" in error_str or "429" in error_str:
-            raise first_error
+    except Exception as error:
+        first_error = error
+        text = str(error).lower()
+        if "unable to download video subtitles" in text or "429" in text:
+            raise
+        if not _is_bot_check(error):
+            # Falhou o aria2? Tenta o downloader nativo uma vez.
+            if base.get('external_downloader'):
+                try:
+                    print("[TURBO] Tentando fallback para downloader nativo multi-thread...")
+                    native = {k: v for k, v in base.items() if k not in ('external_downloader', 'external_downloader_args')}
+                    if cookies:
+                        native['cookiefile'] = cookies
+                    _attempt_download(url, native)
+                    return
+                except Exception as native_error:
+                    first_error = native_error
+                    if not _is_bot_check(native_error):
+                        raise native_error
+            else:
+                raise
 
-        # Se falhou com aria2c, tenta com o multi-threading nativo
-        if options.get('external_downloader'):
+    print("[YouTube] Verificação de bot detectada. Tentando clientes alternativos...")
+    base_native = {
+        key: value
+        for key, value in base.items()
+        if key not in ('external_downloader', 'external_downloader_args')
+    }
+
+    for client in PLAYER_CLIENTS:
+        candidates = []
+        if cookies:
+            candidates.append({**_with_client(base_native, client), 'cookiefile': cookies})
+        candidates.append(_with_client(base_native, client))
+        for options in candidates:
             try:
-                print("[TURBO] Tentando fallback para downloader nativo multi-thread...")
-                native_opts = {k: v for k, v in options.items() if k not in ('external_downloader', 'external_downloader_args')}
-                try_download(native_opts)
+                _attempt_download(url, options)
                 return
-            except Exception:
-                pass
+            except Exception as error:
+                first_error = error
+                if not _is_bot_check(error):
+                    continue
 
-        # Se falhou por autenticacao/bloqueio, tenta cookies dos navegadores instalados silenciosamente
-        last_error = first_error
+    if not IS_HEADLESS_LINUX:
         for browser in BROWSERS:
             try:
-                browser_opts = {key: value for key, value in ydl_opts.items() if key != 'cookiefile'}
-                browser_opts['cookiesfrombrowser'] = (browser,)
-                browser_opts['quiet'] = True
-                browser_opts['no_warnings'] = True
-                try_download(browser_opts)
+                _attempt_download(url, {
+                    **base_native,
+                    'cookiesfrombrowser': (browser,),
+                    'quiet': True,
+                    'no_warnings': True,
+                })
                 return
-            except Exception as b_err:
-                last_error = b_err
+            except Exception as error:
+                first_error = error
                 continue
-        raise last_error
+
+    raise first_error
 
 def sanitize_filename(name):
     """Remove caracteres inválidos, acentos e emojis para evitar erro de encoding no Windows/FFmpeg/Aria2."""
@@ -92,39 +143,39 @@ def progress_hook(d):
     elif d['status'] == 'finished':
         print(f"[download] Download concluído: {d['filename']}", flush=True)
 
+def _extract_title(url, cookies_file=None):
+    """Obtém o título tentando cookies e clientes alternativos do YouTube."""
+    base = {'quiet': True, 'no_warnings': True}
+    has_cookies = bool(cookies_file and os.path.exists(cookies_file))
+
+    candidates = []
+    if has_cookies:
+        candidates.append({**base, 'cookiefile': cookies_file})
+    candidates.append(dict(base))
+    for client in PLAYER_CLIENTS:
+        if has_cookies:
+            candidates.append({**base, 'cookiefile': cookies_file, 'extractor_args': {'youtube': {'player_client': [client]}}})
+        candidates.append({**base, 'extractor_args': {'youtube': {'player_client': [client]}}})
+    if not IS_HEADLESS_LINUX:
+        for browser in BROWSERS:
+            candidates.append({**base, 'cookiesfrombrowser': (browser,)})
+
+    for options in candidates:
+        try:
+            with yt_dlp.YoutubeDL(options) as ydl:
+                info = ydl.extract_info(url, download=False)
+            title = info.get('title')
+            if title:
+                return title
+        except Exception:
+            continue
+    return None
+
+
 def download(url, base_root="VIRALS", download_subs=True, quality="best", cookies_file=None):
     # 1. Extrair informacoes do video para pegar o titulo
     print(i18n("Extracting video information..."))
-    title = None
-    
-    # Tentativa 1: Sem cookies (mais rapido e sem alarmes de navegadores locais)
-    try:
-        with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True}) as ydl:
-            info = ydl.extract_info(url, download=False)
-            title = info.get('title')
-    except Exception:
-        title = None
-
-    # Tentativa 2: Se falhar (ex: video restrito), tenta cookies fornecidos
-    if not title and cookies_file and os.path.exists(cookies_file):
-        try:
-            with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True, 'cookiefile': cookies_file}) as ydl:
-                info = ydl.extract_info(url, download=False)
-                title = info.get('title')
-        except Exception:
-            pass
-
-    # Tentativa 3: Se ainda falhar, tenta cookies dos navegadores instalados
-    if not title:
-        for browser in BROWSERS:
-            try:
-                with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True, 'cookiesfrombrowser': (browser,)}) as ydl:
-                    info = ydl.extract_info(url, download=False)
-                    title = info.get('title')
-                if title:
-                    break
-            except Exception:
-                pass
+    title = _extract_title(url, cookies_file)
 
     # Fallback final
     if title:
@@ -273,6 +324,11 @@ def download(url, base_root="VIRALS", download_subs=True, quality="best", cookie
             except Exception as e2:
                 print(i18n("Fatal error on second attempt: {}").format(e2))
                 raise
+        elif "sign in to confirm" in error_str.lower() or "not a bot" in error_str.lower():
+            print("\n[ERRO YOUTUBE] O YouTube pediu verificacao (bot check) para este IP.")
+            print("No Colab, envie o arquivo cookies.txt do seu navegador na celula de cookies do notebook.")
+            print("No Windows, mantenha-se logado no YouTube; o app tenta os cookies do navegador automaticamente.")
+            raise
         elif "is not a valid URL" in error_str:
              print(i18n("Error: the entered link is not valid."))
              raise 
