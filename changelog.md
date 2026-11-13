@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.10 — Player da Biblioteca corrigido
+
+### Correções
+- **Vídeo não reproduzia (NaN:NaN)**: o componente de vídeo do Gradio falhava com os cortes verticais. O painel "Corte selecionado" agora usa um player HTML5 próprio, apontando para o mesmo arquivo da galeria.
+- **Prévia de música** também usa o player próprio, com o mesmo comportamento.
+- **Visual do player**: cantos arredondados, borda sutil, limite de altura e sombra no padrão dos cards.
+- O título "Corte selecionado" ficou em caixa alta com espaçamento, como cabeçalho de seção.
+
 ## 1.3.9 — Biblioteca repaginada e música com prévia
 
 ### Interface

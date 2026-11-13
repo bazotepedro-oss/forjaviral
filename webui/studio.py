@@ -223,6 +223,22 @@ def _media_url(path: Path) -> str:
         return "/gradio_api/file=" + urllib.parse.quote(value, safe="/:")
 
 
+def video_html(path, tag: str = "") -> str:
+    """Player HTML5 próprio, usando o mesmo mount /virals da galeria."""
+    if not path:
+        return ""
+    video = Path(str(path))
+    if not video.exists():
+        return ""
+    url = _media_url(video)
+    return (
+        '<div class="lib-player-wrap">'
+        f'<video class="lib-player" controls preload="metadata" playsinline>'
+        f'<source src="{url}?v={_cache_tag(video)}-{tag}" type="video/mp4">'
+        "</video></div>"
+    )
+
+
 def gallery_html(project: str, bump: int = 0) -> str:
     items = cuts(project)
     if not items:

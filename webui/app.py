@@ -1745,6 +1745,32 @@ footer {
     background: #000 !important;
 }
 
+#library-panel .lib-player-wrap {
+    background: #000 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 16px !important;
+    overflow: hidden !important;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35) !important;
+}
+
+#library-panel .lib-player {
+    width: 100% !important;
+    max-height: 430px !important;
+    display: block !important;
+    background: #000 !important;
+}
+
+#lib_preview .lib-player {
+    max-height: 300px !important;
+}
+
+#library-panel .lib-side-title {
+    text-transform: uppercase !important;
+    letter-spacing: 0.7px !important;
+    font-size: 11px !important;
+    color: #a99a8d !important;
+}
+
 /* Itens técnicos ocultos para o cliente (continuam no código) */
 #advanced-face,
 #subtitle-settings {
@@ -2287,7 +2313,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                         lib_gallery = gr.HTML(studio.gallery_html(_lib_first) if _lib_first else studio.gallery_html(""))
                     with gr.Column(scale=2, elem_classes="fdc-card lib-side"):
                         gr.HTML('<div class="lib-side-title">Corte selecionado</div>')
-                        lib_video = gr.Video(value=_lib_first_video, show_label=False, interactive=False, elem_id="lib_video", height=340)
+                        lib_video = gr.HTML(value=studio.video_html(_lib_first_video) if _lib_first_video else "", elem_id="lib_video")
                         lib_cut = gr.Dropdown(
                             choices=[(c["label"], c["base"]) for c in _lib_cuts],
                             value=_lib_first_base,
@@ -2331,7 +2357,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     with gr.Row(elem_classes="lib-apply-row"):
                         lib_preview_btn = gr.Button("Prévia com música (30s)", size="sm", scale=1)
                         lib_apply_music_btn = gr.Button("Aplicar música", variant="primary", scale=1)
-                    lib_preview_video = gr.Video(show_label=False, interactive=False, height=300, visible=False)
+                    lib_preview_video = gr.HTML(value="", visible=False, elem_id="lib_preview")
                     lib_music_upload = gr.File(label="Enviar música (mp3, wav, m4a)", file_types=["audio"], type="filepath")
                 with gr.Accordion("Metadados", open=False):
                     lib_meta_btn = gr.Button("Carregar metadados do corte", size="sm")
@@ -2352,7 +2378,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                 entry = studio._cut_by_base(project, base) if project and base else None
                 video = entry["video"] if entry else None
                 title, desc, tags = _lib_meta(project, base)
-                return gr.update(value=video), title, desc, tags
+                return gr.update(value=studio.video_html(video)), title, desc, tags
 
             def _lib_on_project(project):
                 items = studio.cuts(project) if project else []
@@ -2362,7 +2388,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                 return (
                     gr.update(value=studio.gallery_html(project) if project else ""),
                     gr.update(choices=[(i["label"], i["base"]) for i in items], value=first_base),
-                    gr.update(value=first_video),
+                    gr.update(value=studio.video_html(first_video)),
                     title,
                     desc,
                     tags,
@@ -2379,7 +2405,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     gr.update(choices=projects, value=project),
                     gr.update(value=studio.gallery_html(project) if project else ""),
                     gr.update(choices=[(i["label"], i["base"]) for i in items], value=first_base),
-                    gr.update(value=first_video),
+                    gr.update(value=studio.video_html(first_video)),
                     title,
                     desc,
                     tags,
@@ -2414,18 +2440,18 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     messages.append(studio.apply_style(project, target, style))
                 preview = studio.preview_video(project, base, "style")
                 label = f"{len(targets)} corte(s) atualizado(s)." if apply_all else messages[-1]
-                return label, gr.update(value=studio.gallery_html(project, bump=int(time.time()))), gr.update(value=preview)
+                return label, gr.update(value=studio.gallery_html(project, bump=int(time.time()))), gr.update(value=studio.video_html(preview, "style"))
 
             def _lib_preview_music(project, base, track, vol, duck):
                 message, preview = studio.preview_music(project, base, track, int(vol), bool(duck), 30)
-                return message, (gr.update(value=preview, visible=True) if preview else gr.update())
+                return message, (gr.update(value=studio.video_html(preview, "music"), visible=True) if preview else gr.update())
 
             def _lib_apply_music(project, base, track, vol, duck):
                 if not project or not base:
                     return "Selecione um projeto e um corte.", gr.update(), gr.update()
                 message = studio.apply_music(project, base, track, int(vol), bool(duck))
                 preview = studio.preview_video(project, base, "music")
-                return message, gr.update(value=studio.gallery_html(project, bump=int(time.time()))), gr.update(value=preview, visible=True)
+                return message, gr.update(value=studio.gallery_html(project, bump=int(time.time()))), gr.update(value=studio.video_html(preview, "music"))
 
             def _lib_track_audio(track):
                 return gr.update(value=track) if track else gr.update()
@@ -2463,7 +2489,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     message,
                     gr.update(value=studio.gallery_html(project, bump=int(time.time()))),
                     gr.update(choices=[(i["label"], i["base"]) for i in items], value=next_base),
-                    gr.update(value=next_video),
+                    gr.update(value=studio.video_html(next_video)),
                 )
 
             def _lib_delete_project(project, confirm):
@@ -2477,7 +2503,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     gr.update(choices=projects, value=first),
                     gr.update(value=studio.gallery_html(first) if first else ""),
                     gr.update(choices=[(i["label"], i["base"]) for i in items], value=first_base),
-                    gr.update(value=(items[0]["video"] if items else None)),
+                    gr.update(value=studio.video_html(items[0]["video"]) if items else ""),
                 )
 
             def _lib_zip(project):
