@@ -31,6 +31,7 @@ import uvicorn
 
 import re
 import library # Module for Library Logic
+import studio # Biblioteca de cortes (galeria, estilos, música)
 import subtitle_handler as subs # Module for Subtitles
 import subtitle_editor as editor # Module for Editor Logic
 
@@ -1534,6 +1535,87 @@ footer {
     margin-top: 6px !important;
 }
 
+/* ----- Biblioteca ----- */
+.fdc-lib-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #a99a8d;
+    margin: 4px 0 0 0;
+}
+
+.fdc-lib-project {
+    color: #FF8A4C;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 60%;
+}
+
+.fdc-lib-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
+    margin-top: 12px;
+}
+
+.fdc-lib-card {
+    position: relative;
+    background: linear-gradient(180deg, rgba(31, 21, 15, 0.95) 0%, rgba(15, 10, 7, 0.98) 100%);
+    border: 1px solid rgba(255, 107, 26, 0.16);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.32);
+}
+
+.fdc-lib-video {
+    aspect-ratio: 9 / 16;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fdc-lib-video video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.fdc-lib-body {
+    padding: 10px 12px 14px;
+}
+
+.fdc-lib-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.35;
+}
+
+.fdc-lib-tags {
+    font-size: 10px;
+    color: #a99a8d;
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+}
+
+.fdc-lib-score {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(255, 92, 0, 0.92);
+    color: #ffffff;
+    font-weight: 900;
+    font-size: 12px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    box-shadow: 0 6px 16px rgba(255, 92, 0, 0.35);
+}
+
 /* Itens técnicos ocultos para o cliente (continuam no código) */
 #advanced-face,
 #subtitle-settings {
@@ -1699,6 +1781,7 @@ def _rail_html() -> str:
     logo_html = f'<img src="{logo}" alt="Fábrica dos Cortes" />' if logo else ""
     items = [
         ("scissors", "Criar Cortes", True),
+        ("layout-grid", i18n("Library"), False),
         ("key-round", "Licença", False),
     ]
     buttons = []
@@ -1723,7 +1806,7 @@ def _dynamic_css() -> str:
     hero_bg = ui_assets.data_uri("bg_streaks.webp")
     if hero_bg:
         rules.append(f':root {{ --fdc-hero-bg: url("{hero_bg}"); }}')
-    for index, icon in enumerate(["key-round", "scissors"], 1):
+    for index, icon in enumerate(["key-round", "scissors", "layout-grid"], 1):
         rules.append(f".tab-container button:nth-child({index}) {{ --fdc-ico: {ui_icons.mask_uri(icon)}; }}")
     for index, icon in enumerate(["youtube", "folder-open", "upload"], 1):
         rules.append(f".fdc-seg label:nth-child({index}) {{ --fdc-seg-ico: {ui_icons.mask_uri(icon)}; }}")
@@ -2054,6 +2137,192 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                  underline_input, strikeout_input, border_style_input, remove_punc_input,
                  video_quality_input, use_youtube_subs_input, translate_input
              ], outputs=[logs_output, start_btn, stop_btn, results_html, topbar_html, progress_html])
+
+        with gr.Tab(i18n("Library")):
+            _lib_projects = studio.list_projects()
+            _lib_first = _lib_projects[0] if _lib_projects else None
+            with gr.Column(elem_classes="fdc-card"):
+                gr.HTML(_card_head("layout-grid", i18n("Library"), "Seus cortes prontos: legenda, música, thumbnails e download"))
+                with gr.Row():
+                    lib_project = gr.Dropdown(choices=_lib_projects, value=_lib_first, show_label=False, container=False, scale=4)
+                    lib_refresh = gr.Button("Atualizar", size="sm", scale=1)
+                lib_gallery = gr.HTML(studio.gallery_html(_lib_first) if _lib_first else studio.gallery_html(""))
+                with gr.Row():
+                    lib_cut = gr.Dropdown(
+                        choices=[(c["label"], c["base"]) for c in studio.cuts(_lib_first)] if _lib_first else [],
+                        show_label=False, container=False, scale=4,
+                    )
+                    lib_meta_btn = gr.Button("Carregar metadados", size="sm", scale=1)
+                with gr.Row():
+                    lib_approve = gr.Button("Aprovar", size="sm")
+                    lib_reject = gr.Button("Reprovar", size="sm")
+                    lib_thumbs = gr.Button("Thumbnails", size="sm")
+                    lib_zip = gr.Button("Baixar ZIP", size="sm")
+                with gr.Row():
+                    lib_new_title = gr.Textbox(placeholder="Novo título do corte", show_label=False, container=False, scale=4)
+                    lib_rename_btn = gr.Button("Renomear", size="sm", scale=1)
+                with gr.Row():
+                    lib_delete_cut_btn = gr.Button("Apagar corte", variant="stop", size="sm")
+                    lib_confirm_delete = gr.Checkbox(label="Confirmo apagar o projeto", value=False, scale=2)
+                    lib_delete_project_btn = gr.Button("Apagar projeto", variant="stop", size="sm")
+                lib_status = gr.Markdown("")
+                lib_zip_file = gr.File(label="Download do ZIP", visible=False)
+
+                with gr.Accordion("Editar legenda", open=False):
+                    with gr.Row():
+                        lib_preset = gr.Dropdown(choices=list(subs.SUBTITLE_PRESETS.keys()), value="Hormozi (Classic)", show_label=False, container=False)
+                    with gr.Row():
+                        lib_font = gr.Textbox(value="Montserrat-ExtraBold", label="Fonte")
+                        lib_size = gr.Slider(16, 60, value=30, step=1, label="Tamanho")
+                        lib_hl_size = gr.Slider(16, 70, value=35, step=1, label="Destaque")
+                    with gr.Row():
+                        lib_color = gr.ColorPicker(value="#FFFFFF", label="Cor base")
+                        lib_hl_color = gr.ColorPicker(value="#00FF00", label="Cor destaque")
+                        lib_outline = gr.ColorPicker(value="#000000", label="Contorno")
+                    with gr.Row():
+                        lib_pos = gr.Slider(0, 500, value=200, step=5, label="Posição vertical")
+                        lib_mode = gr.Dropdown(choices=[("Destacar", "highlight"), ("Palavra a palavra", "word_by_word"), ("Sem destaque", "no_highlight")], value="highlight", label="Modo")
+                        lib_upper = gr.Checkbox(value=True, label="Maiúsculas")
+                    lib_apply_btn = gr.Button("Aplicar legenda", variant="primary")
+
+                with gr.Accordion("Música", open=False):
+                    with gr.Row():
+                        lib_track = gr.Dropdown(choices=studio.music_choices(), show_label=False, container=False, scale=4)
+                        lib_vol = gr.Slider(0, 100, value=18, step=1, label="Volume (%)", scale=2)
+                        lib_duck = gr.Checkbox(value=True, label="Abaixar na voz", scale=2)
+                    with gr.Row():
+                        lib_music_upload = gr.File(label="Enviar música", file_types=["audio"], type="filepath")
+                        lib_apply_music_btn = gr.Button("Aplicar música", variant="primary")
+
+                with gr.Accordion("Metadados", open=False):
+                    lib_title = gr.Textbox(label="Título")
+                    lib_desc = gr.Textbox(label="Descrição", lines=4)
+                    lib_tags = gr.Textbox(label="Hashtags")
+
+            def _lib_on_project(project):
+                items = studio.cuts(project) if project else []
+                return (
+                    gr.update(value=studio.gallery_html(project) if project else ""),
+                    gr.update(choices=[(i["label"], i["base"]) for i in items], value=(items[0]["base"] if items else None)),
+                )
+
+            def _lib_refresh(project):
+                projects = studio.list_projects()
+                project = project if project in projects else (projects[0] if projects else None)
+                items = studio.cuts(project) if project else []
+                return (
+                    gr.update(choices=projects, value=project),
+                    gr.update(value=studio.gallery_html(project) if project else ""),
+                    gr.update(choices=[(i["label"], i["base"]) for i in items], value=(items[0]["base"] if items else None)),
+                )
+
+            def _lib_meta(project, base):
+                meta = studio.metadata(project, base) if project and base else {"title": "", "description": "", "hashtags": ""}
+                return meta["title"], meta["description"], meta["hashtags"]
+
+            def _lib_preset_values(name):
+                s = studio.style_from_preset(name)
+                return (
+                    s["font_name"], int(s["font_size"]), int(s["highlight_size"]),
+                    s["base_color"], s["highlight_color"], s["outline_color"],
+                    int(s["vertical_position"]), s["mode"], bool(s["uppercase"]),
+                )
+
+            def _lib_apply_style(project, base, preset, font, size, hlsize, color, hlcolor, outline, pos, mode, upper):
+                if not project or not base:
+                    return "Selecione um projeto e um corte.", gr.update()
+                style = studio.style_from_preset(preset)
+                style.update({
+                    "font_name": font or style["font_name"],
+                    "font_size": int(size),
+                    "highlight_size": int(hlsize),
+                    "base_color": color,
+                    "highlight_color": hlcolor,
+                    "outline_color": outline,
+                    "vertical_position": int(pos),
+                    "mode": mode,
+                    "uppercase": bool(upper),
+                })
+                message = studio.apply_style(project, base, style)
+                return message, gr.update(value=studio.gallery_html(project, bump=int(time.time())))
+
+            def _lib_apply_music(project, base, track, vol, duck, upload):
+                if not project or not base:
+                    return "Selecione um projeto e um corte.", gr.update()
+                path = track
+                if upload:
+                    saved = studio.save_music_upload(upload)
+                    if saved:
+                        path = saved
+                message = studio.apply_music(project, base, path, int(vol), bool(duck))
+                return message, gr.update(choices=studio.music_choices(), value=path)
+
+            def _lib_rename(project, base, title):
+                if not project or not base:
+                    return "Selecione um corte.", gr.update(), gr.update()
+                message = studio.rename_cut(project, base, title)
+                items = studio.cuts(project)
+                return (
+                    message,
+                    gr.update(value=studio.gallery_html(project, bump=int(time.time()))),
+                    gr.update(choices=[(i["label"], i["base"]) for i in items], value=base),
+                )
+
+            def _lib_delete_cut(project, base):
+                if not project or not base:
+                    return "Selecione um corte.", gr.update(), gr.update()
+                message = studio.delete_cut(project, base)
+                items = studio.cuts(project)
+                return (
+                    message,
+                    gr.update(value=studio.gallery_html(project, bump=int(time.time()))),
+                    gr.update(choices=[(i["label"], i["base"]) for i in items], value=(items[0]["base"] if items else None)),
+                )
+
+            def _lib_delete_project(project, confirm):
+                message = studio.delete_project(project, bool(confirm))
+                projects = studio.list_projects()
+                first = projects[0] if projects else None
+                items = studio.cuts(first) if first else []
+                return (
+                    message,
+                    gr.update(choices=projects, value=first),
+                    gr.update(value=studio.gallery_html(first) if first else ""),
+                    gr.update(choices=[(i["label"], i["base"]) for i in items], value=(items[0]["base"] if items else None)),
+                )
+
+            def _lib_zip(project):
+                path = studio.export_zip(project) if project else ""
+                if not path:
+                    return "Selecione um projeto.", gr.update(visible=False)
+                return "ZIP gerado.", gr.update(value=path, visible=True)
+
+            def _lib_thumbs(project):
+                count = studio.make_thumbnails(project) if project else 0
+                return f"{count} thumbnail(s) geradas.", gr.update(value=studio.gallery_html(project, bump=int(time.time())))
+
+            lib_project.change(_lib_on_project, lib_project, [lib_gallery, lib_cut])
+            lib_refresh.click(_lib_refresh, lib_project, [lib_project, lib_gallery, lib_cut])
+            lib_cut.change(_lib_meta, [lib_project, lib_cut], [lib_title, lib_desc, lib_tags])
+            lib_meta_btn.click(_lib_meta, [lib_project, lib_cut], [lib_title, lib_desc, lib_tags])
+            lib_preset.change(_lib_preset_values, lib_preset, [lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper])
+            lib_apply_btn.click(
+                _lib_apply_style,
+                [lib_project, lib_cut, lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper],
+                [lib_status, lib_gallery],
+            )
+            lib_apply_music_btn.click(
+                _lib_apply_music,
+                [lib_project, lib_cut, lib_track, lib_vol, lib_duck, lib_music_upload],
+                [lib_status, lib_track],
+            )
+            lib_rename_btn.click(_lib_rename, [lib_project, lib_cut, lib_new_title], [lib_status, lib_gallery, lib_cut])
+            lib_delete_cut_btn.click(_lib_delete_cut, [lib_project, lib_cut], [lib_status, lib_gallery, lib_cut])
+            lib_delete_project_btn.click(_lib_delete_project, [lib_project, lib_confirm_delete], [lib_status, lib_project, lib_gallery, lib_cut])
+            lib_zip.click(_lib_zip, lib_project, [lib_status, lib_zip_file])
+            lib_thumbs.click(_lib_thumbs, lib_project, [lib_status, lib_gallery])
+            lib_approve.click(lambda p, b: studio.set_feedback(p, b, "approve") if p and b else "Selecione um corte.", [lib_project, lib_cut], lib_status)
+            lib_reject.click(lambda p, b: studio.set_feedback(p, b, "reject") if p and b else "Selecione um corte.", [lib_project, lib_cut], lib_status)
 
 
     # Navegação lateral: liga os ícones às abas e mantém o ícone ativo sincronizado.

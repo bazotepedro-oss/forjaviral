@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.3.8 — Biblioteca de cortes
+
+### Novidades
+- **Aba Biblioteca**: galeria dos cortes prontos, com player, miniatura automática, título, nota e hashtags.
+- **Ações por corte**: aprovar, reprovar (feedback salvo), renomear, apagar corte e baixar ZIP com vídeos, legendas e metadados.
+- **Renomear/telemetria**: título atualizado no `viral_segments.txt`; feedback guardado em `feedback.json`.
+- **Editar legenda depois de pronto**: presets e controles de fonte, tamanho, cores, contorno, posição e modo; re-queima só o corte, com backup automático do vídeo anterior.
+- **Música**: catálogo em `music/`, upload do cliente, volume e ducking automático na voz (a música abaixa quando alguém fala).
+- **Metadados**: título, descrição e hashtags prontos para colar no YouTube.
+
+### Prompt
+- **Pico de emoção obrigatório**: risada, choque, aplauso, confissão, reviravolta ou discordância dentro do corte, com payoff no final.
+- **Campo `emotion`**: classifica o corte em laughter, shock, emotion, conflict, revelation ou inspiration.
+- **Estrutura de referência**: hook (0-3s), setup, escalada e payoff nos últimos segundos, sem explicação depois.
+
 ## 1.3.7 — YouTube no Colab e cookies
 
 ### Correções

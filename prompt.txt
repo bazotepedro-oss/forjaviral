@@ -43,6 +43,18 @@ WHAT MAKES A CUT WORTH IT (in priority order)
 5. Something the audience will want to agree or disagree with in the comments.
 Avoid: introductions, transitions, rambling, repeated ideas, pure information with no tension, jokes that need prior context, lists without a conclusion.
 
+EMOTION PEAK (MANDATORY)
+Every cut must contain a visible reaction peak: laughter, applause, shock, outrage, a confession, a twist, or a strong disagreement. The peak must happen inside the cut, ideally in the last third, and the cut must end shortly after it.
+Reject any moment that is only explanation, information, or a calm opinion, even if the sentences are complete.
+Signals in the transcript: "[risadas]", "haha", "gargalhada", "aplausos", "nossa", "caraca", "inacreditável", "não acredito", "chorando", "emocionado", "polêmica", "briga", "discordância", "olha isso", "presta atenção", "eu tô passando mal".
+
+REFERENCE STRUCTURE (follow this rhythm)
+1. Hook: the strongest or most unexpected sentence in the first 3 seconds.
+2. Setup: only the context needed to understand the stake.
+3. Escalation: a concrete detail, number, contradiction or confession.
+4. Payoff: the laugh, the shock, the confession or the punchline in the last 3 to 8 seconds.
+5. Stop right after the payoff. Never add a closing explanation.
+
 FIELDS
 - hook_line: the exact opening sentence of the cut, copied word for word from the transcript. This is the first sentence the viewer hears. Never write a headline here.
 - title: a short headline for the cut, at most 70 characters, emotional and curiosity-driven, with 1 or 2 emojis, in the same language as the transcript, WITHOUT hashtags.
@@ -51,7 +63,8 @@ FIELDS
 - end_text: the last 8 to 15 words of the closing sentence, copied exactly from the transcript.
 - start_time_ref / end_time_ref: the (XXs) tag closest to the first and to the last word of the cut.
 - reasoning: one or two sentences explaining why this cut works, in the same language as the transcript.
-- score: an honest integer from 0 to 100, based on how likely this cut is to stop the scroll and generate comments. Do not repeat the same score for every cut: 90 or more only for exceptional cuts, 70 to 89 for good cuts, below 70 for weak ones.
+- emotion: the dominant reaction of the cut. Use one of: laughter, shock, emotion, conflict, revelation, inspiration.
+- score: an honest integer from 0 to 100, based on how likely this cut is to stop the scroll and generate comments. Do not repeat the same score for every cut: 90 or more only for exceptional cuts, 70 to 89 for good cuts, below 70 for weak ones. A cut without a clear emotion peak must score below 75.
 
 COPY THE TEXT EXACTLY
 Every text field must be copied from the transcript with the same words and the same language. Never translate, paraphrase or correct the transcript.

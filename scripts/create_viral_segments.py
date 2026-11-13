@@ -725,6 +725,7 @@ def process_segments(raw_segments, transcript_segments, min_duration, max_durati
                 "hook_line": seg.get('hook_line', ''),
                 "reasoning": seg.get('reasoning', ''),
                 "description": seg.get('reasoning', ''),
+                "emotion": seg.get('emotion', ''),
                 "score": _safe_score(seg.get('score')),
                 "duration": duration,
                 "_start_text": seg.get('start_text', ''),
@@ -903,6 +904,7 @@ OUTPUT JSON ONLY:
                         "title": "Short headline, max 70 chars, NO hashtags, same language as transcript",
                         "hashtags": "#tag1 #tag2 #tag3",
                         "reasoning": "Why this cut works, in the same language as the transcript",
+                        "emotion": "laughter|shock|emotion|conflict|revelation|inspiration",
                         "score": "Integer 0-100, honest and varied (90+ only for exceptional cuts)"
                     }
                 ]
