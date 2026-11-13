@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 VIRALS = ROOT / "VIRALS"
 MUSIC = ROOT / "music"
 THUMBS = VIRALS / ".thumbs"
+PREVIEWS = VIRALS / ".previews"
 
 sys.path.insert(0, str(ROOT / "scripts"))
 
@@ -519,6 +520,74 @@ def save_music_upload(file_path: str) -> str:
     return str(target)
 
 
+def _music_filter(gain: float, fade_start: float, duck: bool) -> str:
+    if duck:
+        return (
+            "[0:a]volume=1.0[voice];"
+            f"[1:a]volume={gain:.2f},afade=t=out:st={fade_start:.2f}:d=1.5[bg];"
+            "[bg][voice]sidechaincompress=threshold=0.05:ratio=6:attack=15:release=350[ducked];"
+            "[voice][ducked]amix=inputs=2:duration=first:dropout_transition=2[a]"
+        )
+    return (
+        "[0:a]volume=1.0[voice];"
+        f"[1:a]volume={gain:.2f},afade=t=out:st={fade_start:.2f}:d=1.5[bg];"
+        "[voice][bg]amix=inputs=2:duration=first:dropout_transition=2[a]"
+    )
+
+
+def preview_music(project: str, base: str, track: str, volume: int = 18, duck: bool = True, seconds: int = 30) -> tuple[str, str]:
+    """Gera uma prévia curta (padrão 30s) com a música, sem alterar o corte final."""
+    entry = _cut_by_base(project, base)
+    if not entry:
+        return "Corte não encontrado.", ""
+    if not track or not os.path.exists(track):
+        return "Escolha ou envie uma música.", ""
+    burned = Path(entry["burned"]) if entry.get("burned") else Path(entry["video"])
+    gain = max(0.0, min(1.0, int(volume) / 100.0))
+    clip = max(5, int(seconds))
+    fade_start = max(0.0, clip - 1.5)
+    PREVIEWS.mkdir(parents=True, exist_ok=True)
+    output = PREVIEWS / f"{base}_music_{int(time.time())}.mp4"
+    command = [
+        "ffmpeg", "-y", "-loglevel", "error",
+        "-t", str(clip), "-i", str(burned),
+        "-t", str(clip), "-i", str(track),
+        "-filter_complex", _music_filter(gain, fade_start, bool(duck)),
+        "-map", "0:v", "-map", "[a]",
+        "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+        "-shortest", str(output),
+    ]
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0 or not output.exists():
+        return f"Falha na prévia: {result.stderr[-240:]}", ""
+    _cleanup_previews()
+    return "Prévia de 30s pronta. Veja o player na seção Música.", str(output)
+
+
+def preview_video(project: str, base: str, tag: str = "preview") -> str:
+    """Copia o corte para uma URL nova, forçando o player a recarregar."""
+    entry = _cut_by_base(project, base)
+    if not entry:
+        return ""
+    source = Path(entry["video"])
+    if not source.exists():
+        return ""
+    PREVIEWS.mkdir(parents=True, exist_ok=True)
+    target = PREVIEWS / f"{base}_{tag}_{int(time.time())}{source.suffix}"
+    shutil.copy2(source, target)
+    _cleanup_previews()
+    return str(target)
+
+
+def _cleanup_previews(keep: int = 12) -> None:
+    try:
+        files = sorted(PREVIEWS.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
+        for old in files[keep:]:
+            old.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def apply_music(project: str, base: str, track: str, volume: int = 18, duck: bool = True) -> str:
     entry = _cut_by_base(project, base)
     if not entry:
@@ -526,7 +595,6 @@ def apply_music(project: str, base: str, track: str, volume: int = 18, duck: boo
     if not track or not os.path.exists(track):
         return "Escolha ou envie uma música."
     video = Path(entry["video"])
-    folder = _project_dir(project)
     burned = Path(entry["burned"]) if entry.get("burned") else video
     backup_dir = burned.parent / "_backup"
     backup_dir.mkdir(exist_ok=True)
@@ -537,25 +605,11 @@ def apply_music(project: str, base: str, track: str, volume: int = 18, duck: boo
     fade_start = max(0.0, duration - 1.5)
     output = burned.parent / f"{burned.stem}_music.mp4"
 
-    if duck:
-        filters = (
-            f"[0:a]volume=1.0[voice];"
-            f"[1:a]volume={gain:.2f},afade=t=out:st={fade_start:.2f}:d=1.5[bg];"
-            "[bg][voice]sidechaincompress=threshold=0.05:ratio=6:attack=15:release=350[ducked];"
-            "[voice][ducked]amix=inputs=2:duration=first:dropout_transition=2[a]"
-        )
-    else:
-        filters = (
-            f"[0:a]volume=1.0[voice];"
-            f"[1:a]volume={gain:.2f},afade=t=out:st={fade_start:.2f}:d=1.5[bg];"
-            "[voice][bg]amix=inputs=2:duration=first:dropout_transition=2[a]"
-        )
-
     command = [
         "ffmpeg", "-y", "-loglevel", "error",
         "-i", str(burned),
         "-i", str(track),
-        "-filter_complex", filters,
+        "-filter_complex", _music_filter(gain, fade_start, bool(duck)),
         "-map", "0:v", "-map", "[a]",
         "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
         "-shortest", str(output),

@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.3.9 — Biblioteca repaginada e música com prévia
+
+### Interface
+- **Biblioteca em duas colunas**: galeria à esquerda (3 cards por linha) e corte selecionado fixo à direita, com player e ações.
+- **Seletor de cor corrigido**: o CSS sobrescrevia o fundo do seletor e ele ficava sempre branco. Agora mostra a cor real e aplica no vídeo.
+- **Controles no padrão do menu**: swatches grandes (46px), sliders laranja, botões e dropdowns consistentes.
+
+### Música
+- **Lista de músicas** com player para ouvir a faixa escolhida.
+- **Prévia de 30s mixada com o vídeo** antes de aplicar, com volume e ducking.
+- **Upload** de mp3/wav/m4a direto na Biblioteca.
+- **Aplicar música** re-mixa o corte com backup automático.
+
+### Legenda
+- **Aplicar em todos os cortes** de uma vez.
+- Prévia do corte atualiza depois de aplicar (URL com cache-bust).
+
 ## 1.3.8 — Biblioteca de cortes
 
 ### Novidades
