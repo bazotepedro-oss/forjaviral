@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.11 — Biblioteca: cards, clique no corte e reload do player
+
+### Correções
+- **Vídeo não trocava ao mudar de corte**: o HTML atualizava a fonte, mas o `<video>` não recarregava. Um observador em JS chama `load()` quando a fonte muda.
+- **Clique no card da galeria** seleciona o corte, atualiza o player e os metadados.
+- **Parte de baixo repaginada**: legenda, música, metadados e zona de risco agora são cards com cabeçalho, no mesmo estilo do resto do app (sem accordions gigantes).
+- **Seleção por dropdown** também recarrega o player e atualiza título/descrição/hashtags.
+
 ## 1.3.10 — Player da Biblioteca corrigido
 
 ### Correções

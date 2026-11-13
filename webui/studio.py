@@ -261,7 +261,7 @@ def gallery_html(project: str, bump: int = 0) -> str:
         tags = html.escape(" ".join(_segment_for(project, item["base"]).get("hashtags") or []))
         cards.append(
             f"""
-            <div class="fdc-lib-card">
+            <div class="fdc-lib-card" data-base="{html.escape(str(item['base']), quote=True)}">
               <div class="fdc-lib-video">
                 <video controls preload="metadata" playsinline{poster_attr}>
                   <source src="{_media_url(video)}?v={_cache_tag(video)}-{bump}" type="video/mp4">

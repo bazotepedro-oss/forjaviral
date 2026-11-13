@@ -1635,6 +1635,19 @@ footer {
     align-items: flex-start !important;
 }
 
+#library-panel .lib-bottom {
+    gap: 16px !important;
+    align-items: stretch !important;
+}
+
+#lib_pick {
+    display: none !important;
+}
+
+#library-panel .fdc-card {
+    gap: 10px !important;
+}
+
 #library-panel .lib-gallery-col {
     min-width: 0 !important;
 }
@@ -2328,46 +2341,53 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                             lib_new_title = gr.Textbox(placeholder="Novo título do corte", show_label=False, container=False, scale=3)
                             lib_rename_btn = gr.Button("Renomear", size="sm", scale=1)
                         lib_status = gr.Markdown("")
-                with gr.Accordion("Editar legenda", open=True):
-                    lib_preset = gr.Dropdown(choices=list(subs.SUBTITLE_PRESETS.keys()), value="Hormozi (Classic)", show_label=False, container=False)
-                    with gr.Row():
-                        lib_font = gr.Textbox(value="Montserrat-ExtraBold", label="Fonte")
-                        lib_size = gr.Slider(16, 60, value=30, step=1, label="Tamanho")
-                    with gr.Row():
-                        lib_hl_size = gr.Slider(16, 70, value=35, step=1, label="Destaque")
-                        lib_pos = gr.Slider(0, 500, value=200, step=5, label="Posição vertical")
-                    with gr.Row(elem_classes="lib-colors"):
-                        lib_color = gr.ColorPicker(value="#FFFFFF", label="Cor base")
-                        lib_hl_color = gr.ColorPicker(value="#00FF00", label="Cor destaque")
-                        lib_outline = gr.ColorPicker(value="#000000", label="Contorno")
-                    with gr.Row():
-                        lib_mode = gr.Dropdown(choices=[("Destacar", "highlight"), ("Palavra a palavra", "word_by_word"), ("Sem destaque", "no_highlight")], value="highlight", label="Modo")
-                        lib_upper = gr.Checkbox(value=True, label="Maiúsculas")
-                    with gr.Row(elem_classes="lib-apply-row"):
-                        lib_apply_all = gr.Checkbox(label="Aplicar em todos os cortes", value=False, scale=3)
-                        lib_apply_btn = gr.Button("Aplicar legenda", variant="primary", scale=2)
-                with gr.Accordion("Música", open=False):
-                    with gr.Row():
-                        lib_track = gr.Dropdown(choices=_lib_tracks, value=_lib_first_track, show_label=False, container=False, scale=4, info="Envie uma música ou coloque arquivos na pasta music/")
-                        lib_track_refresh = gr.Button("Atualizar lista", size="sm", scale=1)
-                    lib_track_audio = gr.Audio(label="Ouvir a música", value=_lib_first_track, interactive=False)
-                    with gr.Row():
-                        lib_vol = gr.Slider(0, 100, value=18, step=1, label="Volume (%)")
-                        lib_duck = gr.Checkbox(value=True, label="Abaixar na voz")
-                    with gr.Row(elem_classes="lib-apply-row"):
-                        lib_preview_btn = gr.Button("Prévia com música (30s)", size="sm", scale=1)
-                        lib_apply_music_btn = gr.Button("Aplicar música", variant="primary", scale=1)
-                    lib_preview_video = gr.HTML(value="", visible=False, elem_id="lib_preview")
-                    lib_music_upload = gr.File(label="Enviar música (mp3, wav, m4a)", file_types=["audio"], type="filepath")
-                with gr.Accordion("Metadados", open=False):
-                    lib_meta_btn = gr.Button("Carregar metadados do corte", size="sm")
-                    lib_title = gr.Textbox(label="Título")
-                    lib_desc = gr.Textbox(label="Descrição", lines=4)
-                    lib_tags = gr.Textbox(label="Hashtags")
-                with gr.Row(elem_classes="lib-danger-row"):
-                    lib_delete_cut_btn = gr.Button("Apagar corte", variant="stop", size="sm")
-                    lib_confirm_delete = gr.Checkbox(label="Confirmo apagar o projeto", value=False, scale=2)
-                    lib_delete_project_btn = gr.Button("Apagar projeto", variant="stop", size="sm")
+                with gr.Row(equal_height=False, elem_classes="lib-bottom"):
+                    with gr.Column(scale=3, elem_classes="fdc-card"):
+                        gr.HTML(_card_head("captions", "Editar legenda", "Fonte, cores e posição — aplica sem recortar de novo"))
+                        lib_preset = gr.Dropdown(choices=list(subs.SUBTITLE_PRESETS.keys()), value="Hormozi (Classic)", show_label=False, container=False)
+                        with gr.Row():
+                            lib_font = gr.Textbox(value="Montserrat-ExtraBold", label="Fonte")
+                            lib_size = gr.Slider(16, 60, value=30, step=1, label="Tamanho")
+                        with gr.Row():
+                            lib_hl_size = gr.Slider(16, 70, value=35, step=1, label="Destaque")
+                            lib_pos = gr.Slider(0, 500, value=200, step=5, label="Posição vertical")
+                        with gr.Row(elem_classes="lib-colors"):
+                            lib_color = gr.ColorPicker(value="#FFFFFF", label="Cor base")
+                            lib_hl_color = gr.ColorPicker(value="#00FF00", label="Cor destaque")
+                            lib_outline = gr.ColorPicker(value="#000000", label="Contorno")
+                        with gr.Row():
+                            lib_mode = gr.Dropdown(choices=[("Destacar", "highlight"), ("Palavra a palavra", "word_by_word"), ("Sem destaque", "no_highlight")], value="highlight", label="Modo")
+                            lib_upper = gr.Checkbox(value=True, label="Maiúsculas")
+                        with gr.Row(elem_classes="lib-apply-row"):
+                            lib_apply_all = gr.Checkbox(label="Aplicar em todos os cortes", value=False, scale=3)
+                            lib_apply_btn = gr.Button("Aplicar legenda", variant="primary", scale=2)
+                    with gr.Column(scale=2, elem_classes="fdc-card"):
+                        gr.HTML(_card_head("play", "Música", "Ouça a faixa, teste 30s com o vídeo e aplique com ducking"))
+                        with gr.Row():
+                            lib_track = gr.Dropdown(choices=_lib_tracks, value=_lib_first_track, show_label=False, container=False, scale=4, info="Envie uma música ou coloque arquivos na pasta music/")
+                            lib_track_refresh = gr.Button("Atualizar lista", size="sm", scale=1)
+                        lib_track_audio = gr.Audio(label="Ouvir a música", value=_lib_first_track, interactive=False)
+                        with gr.Row():
+                            lib_vol = gr.Slider(0, 100, value=18, step=1, label="Volume (%)")
+                            lib_duck = gr.Checkbox(value=True, label="Abaixar na voz")
+                        with gr.Row(elem_classes="lib-apply-row"):
+                            lib_preview_btn = gr.Button("Prévia com música (30s)", size="sm", scale=1)
+                            lib_apply_music_btn = gr.Button("Aplicar música", variant="primary", scale=1)
+                        lib_preview_video = gr.HTML(value="", visible=False, elem_id="lib_preview")
+                        lib_music_upload = gr.File(label="Enviar música (mp3, wav, m4a)", file_types=["audio"], type="filepath")
+                with gr.Row(equal_height=False, elem_classes="lib-bottom"):
+                    with gr.Column(scale=2, elem_classes="fdc-card"):
+                        gr.HTML(_card_head("info", "Metadados", "Título, descrição e hashtags prontos para o YouTube"))
+                        lib_meta_btn = gr.Button("Carregar metadados do corte", size="sm")
+                        lib_title = gr.Textbox(label="Título")
+                        lib_desc = gr.Textbox(label="Descrição", lines=4)
+                        lib_tags = gr.Textbox(label="Hashtags")
+                    with gr.Column(scale=1, elem_classes="fdc-card"):
+                        gr.HTML(_card_head("circle-alert", "Zona de risco", "Apagar corte ou projeto"))
+                        lib_delete_cut_btn = gr.Button("Apagar corte", variant="stop", size="sm")
+                        lib_confirm_delete = gr.Checkbox(label="Confirmo apagar o projeto", value=False)
+                        lib_delete_project_btn = gr.Button("Apagar projeto", variant="stop", size="sm")
+                lib_pick = gr.Textbox(value="", show_label=False, container=False, elem_id="lib_pick", visible=True)
                 lib_zip_file = gr.File(label="Download do ZIP", visible=False)
 
             def _lib_meta(project, base):
@@ -2506,6 +2526,20 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     gr.update(value=studio.video_html(items[0]["video"]) if items else ""),
                 )
 
+            def _lib_pick_select(base, project):
+                base = str(base or "").strip()
+                item = studio._cut_by_base(project, base) if project and base else None
+                if not item:
+                    return gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+                title, desc, tags = _lib_meta(project, base)
+                return (
+                    gr.update(value=base),
+                    gr.update(value=studio.video_html(item["video"])),
+                    title,
+                    desc,
+                    tags,
+                )
+
             def _lib_zip(project):
                 path = studio.export_zip(project) if project else ""
                 if not path:
@@ -2525,6 +2559,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                 [lib_project, lib_gallery, lib_cut, lib_video, lib_title, lib_desc, lib_tags],
             )
             lib_cut.change(_lib_selection, [lib_project, lib_cut], [lib_video, lib_title, lib_desc, lib_tags])
+            lib_pick.change(_lib_pick_select, [lib_pick, lib_project], [lib_cut, lib_video, lib_title, lib_desc, lib_tags])
             lib_meta_btn.click(_lib_meta, [lib_project, lib_cut], [lib_title, lib_desc, lib_tags])
             lib_preset.change(
                 _lib_preset_values, lib_preset,
@@ -2601,6 +2636,43 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
             if (create && !create.classList.contains('selected')) create.click();
             syncRail();
           }, 500);
+        }
+        """,
+    )
+
+    # Recarrega o player quando o HTML troca de corte e permite clicar no card.
+    demo.load(
+        fn=None,
+        inputs=None,
+        outputs=None,
+        js="""
+        () => {
+          if (window.__fdcPlayerFix) return;
+          window.__fdcPlayerFix = true;
+          const fixPlayers = () => {
+            document.querySelectorAll('#library-panel video.lib-player, #lib_preview video.lib-player').forEach((v) => {
+              const src = v.querySelector('source')?.getAttribute('src') || v.getAttribute('src');
+              if (!src) return;
+              if (v.dataset.fdcSrc === src) return;
+              v.dataset.fdcSrc = src;
+              try { v.load(); } catch (e) {}
+            });
+          };
+          const observer = new MutationObserver(fixPlayers);
+          observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['src'] });
+          setInterval(fixPlayers, 700);
+          document.addEventListener('click', (event) => {
+            const card = event.target && event.target.closest ? event.target.closest('.fdc-lib-card') : null;
+            if (!card) return;
+            const base = card.getAttribute('data-base');
+            const pick = document.querySelector('#lib_pick textarea, #lib_pick input');
+            if (!base || !pick) return;
+            const proto = pick.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+            const setter = Object.getOwnPropertyDescriptor(proto, 'value') ? Object.getOwnPropertyDescriptor(proto, 'value').set : null;
+            if (setter) setter.call(pick, base); else pick.value = base;
+            pick.dispatchEvent(new Event('input', { bubbles: true }));
+            pick.dispatchEvent(new Event('change', { bubbles: true }));
+          });
         }
         """,
     )
