@@ -1,4 +1,4 @@
-"""Build a 5/10 minute 16:9 podcast highlight compilation from AI-selected clips."""
+"""Build a 16:9 podcast highlight compilation from AI-selected complete moments."""
 
 from __future__ import annotations
 
@@ -53,14 +53,14 @@ def list_compilations(project_dir: str | Path) -> list[dict]:
     return items
 
 
-def _safe_segment(seg: dict, video_duration: float) -> dict | None:
+def _safe_segment(seg: dict, video_duration: float, max_clip_seconds: float = 240) -> dict | None:
     try:
         start = float(seg.get("start_time", 0))
         end = float(seg.get("end_time", 0))
         duration = end - start
         if not all(math.isfinite(v) for v in (start, end, duration)):
             return None
-        if start < 0 or end > video_duration + 1 or duration < 15 or duration > 91:
+        if start < 0 or end > video_duration + 1 or duration < 15 or duration > max_clip_seconds + 1:
             return None
         if start >= video_duration or end <= start:
             return None
@@ -108,10 +108,20 @@ def _same_topic(left: dict, right: dict) -> bool:
 
 
 def select_compilation_segments(
-    candidates: list[dict], target_seconds: int, video_duration: float, cold_open: bool = True
+    candidates: list[dict],
+    target_seconds: int,
+    video_duration: float,
+    cold_open: bool = True,
+    min_score: int = 70,
+    max_clip_seconds: float = 240,
 ) -> list[dict]:
-    """Select high-scoring, non-overlapping and topic-diverse clips near the target runtime."""
-    valid = [item for raw in candidates if (item := _safe_segment(raw, video_duration))]
+    """Select complete, non-overlapping and topic-diverse clips.
+
+    target_seconds <= 0 means automatic: keep every strong moment the AI found,
+    without an artificial 5/10 minute limit. The best scored moment always opens
+    the compilation.
+    """
+    valid = [item for raw in candidates if (item := _safe_segment(raw, video_duration, max_clip_seconds))]
     valid.sort(key=lambda x: int(x.get("score", 0)), reverse=True)
 
     # A compilação não pode repetir o mesmo assunto só porque o modelo devolveu
@@ -122,6 +132,37 @@ def select_compilation_segments(
         if not any(_same_topic(candidate, kept) for kept in unique):
             unique.append(candidate)
     pool = unique if len(unique) >= 2 else valid
+
+    if target_seconds <= 0:
+        # Modo automático: não existe alvo de 5/10 min. Entram todos os
+        # momentos completos que a IA considerou fortes, sem sobreposição.
+        chosen: list[dict] = []
+
+        def add_auto(minimum_score: int) -> None:
+            for candidate in pool:
+                if int(candidate.get("score", 0)) < minimum_score:
+                    continue
+                start = float(candidate["start_time"])
+                end = float(candidate["end_time"])
+                if any(
+                    min(end, float(existing["end_time"])) - max(start, float(existing["start_time"])) > 3
+                    for existing in chosen
+                ):
+                    continue
+                chosen.append(candidate)
+
+        add_auto(min_score)
+        if len(chosen) < 2:
+            chosen = []
+            add_auto(0)
+        if not chosen:
+            return []
+        lead = chosen[0] if cold_open else None
+        if lead is not None:
+            chosen = [lead, *sorted((item for item in chosen if item is not lead), key=lambda x: float(x["start_time"]))]
+        else:
+            chosen.sort(key=lambda x: float(x["start_time"]))
+        return chosen
 
     selected: list[dict] = []
     total = 0.0
@@ -269,7 +310,8 @@ def create_compilation(
     progress: Callable[[float, str], None] | None = None,
 ) -> dict:
     project_dir = Path(project_dir).resolve()
-    target_minutes = 10 if int(target_minutes) >= 10 else 5
+    target_minutes = max(0, int(target_minutes or 0))
+    auto_mode = target_minutes <= 0
     target_seconds = target_minutes * 60
     video = project_dir / "input.mp4"
     if not video.is_file():
@@ -279,8 +321,18 @@ def create_compilation(
 
     transcript = create_viral_segments.load_transcript(str(project_dir))
     video_duration = _probe_duration(video) or max(float(segment.get("end", 0) or 0) for segment in transcript)
-    candidate_count = 24 if target_minutes == 5 else 32
-    min_clip_seconds = 25
+    if auto_mode:
+        candidate_count = 60
+    elif target_minutes <= 5:
+        candidate_count = 24
+    elif target_minutes <= 10:
+        candidate_count = 32
+    elif target_minutes <= 20:
+        candidate_count = 48
+    else:
+        candidate_count = 60
+    min_clip_seconds = 30
+    max_clip_seconds = 240
 
     output_dir = project_dir / "best_moments"
     analysis_dir = output_dir / "analysis"
@@ -305,7 +357,7 @@ def create_compilation(
         True,
         None,
         min_clip_seconds,
-        90,
+        max_clip_seconds,
         ai_mode="gemini",
         api_key=str(api_key).strip(),
         project_folder=str(analysis_dir),
@@ -313,14 +365,20 @@ def create_compilation(
         # tokens por minuto) e evitam uma única chamada de ~275 mil caracteres.
         chunk_size_arg=120000,
         model_name_arg="gemini-2.5-flash",
+        ask_amount_override=30,
         extra_instruction=(
-            "This transcript will become a long horizontal YouTube compilation, "
-            "not a set of individual Shorts. Choose complete stories of 30 to 90 seconds "
-            "that still work when watched back-to-back. Vary the subjects, guests and "
-            "emotional tones: never choose two moments about the same story, argument or "
-            "anecdote. The first selected moment will open the compilation, so the "
-            "strongest hook and reaction peak must be among the candidates. Prefer moments "
-            "with laughter, shock, disagreement, confession or a surprising reveal."
+            "THIS IS A LONG HORIZONTAL YOUTUBE COMPILATION, not separate Shorts. "
+            "EXTRACT THE MAXIMUM NUMBER OF STRONG MOMENTS from the entire podcast. "
+            "Do not stop at a small fixed number: return every moment that deserves to be in a best-of. "
+            "EVERY CUT MUST BE COMPLETE. Start on the first word of a complete sentence and end only "
+            "after the full story, explanation, argument or payoff is finished. NEVER cut in the middle "
+            "of an explanation or stop before the conclusion. A longer complete explanation is better "
+            "than a short fragment that loses the reasoning; use up to 240 seconds when the idea needs it. "
+            "Vary the subjects, guests and emotional tones: never choose two moments about the same story, "
+            "argument or anecdote. The strongest moment will OPEN the compilation, so the best hook and "
+            "reaction peak must be among the candidates. Complete explanations, strong opinions and "
+            "surprising facts are valuable even when they are not jokes; do not force a laugh or shock "
+            "into every moment. Preserve enough context so each moment works when watched back-to-back."
         ),
         progress_callback=(
             (lambda amount, text: progress(0.08 + float(amount) * 0.8, text))
@@ -338,26 +396,54 @@ def create_compilation(
             )
         raise RuntimeError(error or "A IA não encontrou candidatos válidos.")
 
-    clips = select_compilation_segments(candidates, target_seconds, video_duration, cold_open)
+    clips = select_compilation_segments(
+        candidates,
+        target_seconds,
+        video_duration,
+        cold_open=cold_open,
+        min_score=70,
+        max_clip_seconds=max_clip_seconds,
+    )
     if not clips:
         raise RuntimeError("A IA não encontrou momentos com duração e timestamps válidos.")
     total_seconds = sum(float(item["duration"]) for item in clips)
-    if total_seconds < target_seconds * 0.85:
-        raise RuntimeError(
-            f"Só encontrei {len(clips)} momentos válidos ({total_seconds/60:.1f} min). "
-            "Não gerei um compilado curto como se tivesse a duração pedida; os 10 créditos serão devolvidos. Tente outro episódio ou rode novamente."
-        )
-    if total_seconds > target_seconds * 1.12:
-        raise RuntimeError(
-            f"A seleção ficou com {total_seconds/60:.1f} min, acima do limite seguro para {target_minutes} min. "
-            "Nada foi cobrado; tente novamente para a IA refazer a seleção."
-        )
+    if auto_mode:
+        if total_seconds < 180:
+            raise RuntimeError(
+                f"Só encontrei {len(clips)} momentos completos ({total_seconds/60:.1f} min). "
+                "Não gerei um compilado curto demais; os 10 créditos serão devolvidos. "
+                "Tente um podcast maior ou rode novamente."
+            )
+    else:
+        if total_seconds < target_seconds * 0.85:
+            raise RuntimeError(
+                f"Só encontrei {len(clips)} momentos válidos ({total_seconds/60:.1f} min). "
+                "Não gerei um compilado curto como se tivesse a duração pedida; os 10 créditos serão devolvidos. "
+                "Tente outro episódio ou rode novamente."
+            )
+        if total_seconds > target_seconds * 1.12:
+            raise RuntimeError(
+                f"A seleção ficou com {total_seconds/60:.1f} min, acima do limite seguro para {target_minutes} min. "
+                "Nada foi cobrado; tente novamente para a IA refazer a seleção."
+            )
 
     if progress:
-        progress(0.25, f"Selecionados {len(clips)} momentos ({total_seconds/60:.1f} min). Montando o vídeo 16:9...")
+        progress(0.25, f"Selecionados {len(clips)} momentos completos ({total_seconds/60:.1f} min). Montando o vídeo 16:9...")
+
+    # Evita encher o disco em compilações automáticas muito longas. O bitrate
+    # de saída fica perto de 0,5 MB/s; usamos 0,6 MB/s como margem.
+    estimated_bytes = int(total_seconds * 0.6 * 1024 * 1024) + 200 * 1024 * 1024
+    free_bytes = shutil.disk_usage(output_dir).free
+    if free_bytes < estimated_bytes:
+        raise RuntimeError(
+            f"Espaço insuficiente para renderizar {total_seconds/60:.1f} min "
+            f"(precisa de ~{estimated_bytes/1024**3:.1f} GB livres). "
+            "Libere espaço no disco e tente novamente; os 10 créditos serão devolvidos."
+        )
 
     timestamp = time.strftime("%Y%m%d_%H%M%S")
-    out_video = output_dir / f"melhores_momentos_{target_minutes}min_{timestamp}.mp4"
+    mode_tag = "auto" if auto_mode else f"{target_minutes}min"
+    out_video = output_dir / f"melhores_momentos_{mode_tag}_{timestamp}.mp4"
     out_srt = out_video.with_suffix(".srt")
     chapters = _write_compilation_srt(transcript, clips, out_srt)
 
@@ -392,16 +478,23 @@ def create_compilation(
             f"O compilado saiu em {media['fps']:.2f} FPS em vez de 30 FPS. "
             "O arquivo não foi entregue; os créditos serão devolvidos."
         )
-    if media["duration"] < target_seconds * 0.85:
-        raise RuntimeError(
-            f"O vídeo final ficou com {media['duration']/60:.1f} min, abaixo do mínimo seguro para {target_minutes} min. "
-            "Os créditos serão devolvidos."
-        )
-    if media["duration"] > target_seconds * 1.15:
-        raise RuntimeError(
-            f"O vídeo final ficou com {media['duration']/60:.1f} min, acima do limite para {target_minutes} min. "
-            "Os créditos serão devolvidos."
-        )
+    if auto_mode:
+        if media["duration"] < 180:
+            raise RuntimeError(
+                f"O vídeo final ficou com {media['duration']/60:.1f} min, curto demais para um compilado automático. "
+                "Os créditos serão devolvidos."
+            )
+    else:
+        if media["duration"] < target_seconds * 0.85:
+            raise RuntimeError(
+                f"O vídeo final ficou com {media['duration']/60:.1f} min, abaixo do mínimo seguro para {target_minutes} min. "
+                "Os créditos serão devolvidos."
+            )
+        if media["duration"] > target_seconds * 1.15:
+            raise RuntimeError(
+                f"O vídeo final ficou com {media['duration']/60:.1f} min, acima do limite para {target_minutes} min. "
+                "Os créditos serão devolvidos."
+            )
 
     chapter_lines = [
         f"{int(c['start_seconds']//60):02}:{int(c['start_seconds']%60):02} {c['title']}"
@@ -409,11 +502,12 @@ def create_compilation(
     ]
     description = "Melhores momentos do podcast.\n\nCapítulos:\n" + "\n".join(chapter_lines)
     title = f"Melhores Momentos — {project_dir.name}"
-    (output_dir / f"melhores_momentos_{target_minutes}min_{timestamp}.json").write_text(
+    (output_dir / f"melhores_momentos_{mode_tag}_{timestamp}.json").write_text(
         json.dumps(
             {
                 "title": title,
                 "description": description,
+                "mode": "auto" if auto_mode else "fixed",
                 "target_minutes": target_minutes,
                 "actual_duration_seconds": round(media["duration"], 3),
                 "media": media,
@@ -436,6 +530,8 @@ def create_compilation(
         "chapters": chapters,
         "duration_seconds": media["duration"],
         "media": media,
+        "target_minutes": target_minutes,
+        "mode": "auto" if auto_mode else "fixed",
     }
 
 

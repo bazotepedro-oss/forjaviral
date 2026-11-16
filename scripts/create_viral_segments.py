@@ -846,7 +846,7 @@ def process_segments(raw_segments, transcript_segments, min_duration, max_durati
     return final_result
 
 
-def create(num_segments, viral_mode, themes, tempo_minimo, tempo_maximo, ai_mode="manual", api_key=None, project_folder="tmp", chunk_size_arg=None, model_name_arg=None, extra_instruction="", progress_callback=None):
+def create(num_segments, viral_mode, themes, tempo_minimo, tempo_maximo, ai_mode="manual", api_key=None, project_folder="tmp", chunk_size_arg=None, model_name_arg=None, extra_instruction="", progress_callback=None, ask_amount_override=None):
     quantidade_de_virals = num_segments
 
     # 1. Load Transcript
@@ -992,7 +992,14 @@ OUTPUT JSON ONLY:
 
     # Pede mais candidatos do que o cliente quer receber. Assim, sobreposicoes,
     # duplicatas e trechos fracos podem ser descartados sem faltar corte no final.
-    ask_amount = max(quantidade_de_virals + 3, int(quantidade_de_virals * 1.6) + 1)
+    # Compilações longas usam um limite por bloco para o JSON não ser truncado.
+    if ask_amount_override:
+        try:
+            ask_amount = max(1, int(ask_amount_override))
+        except (TypeError, ValueError):
+            ask_amount = max(quantidade_de_virals + 3, int(quantidade_de_virals * 1.6) + 1)
+    else:
+        ask_amount = max(quantidade_de_virals + 3, int(quantidade_de_virals * 1.6) + 1)
     if viral_mode:
         virality_instruction = f"""analyze the segment for potential virality and identify {ask_amount} candidate viral segments from the transcript (aiming for at least {quantidade_de_virals} top quality cuts)"""
     else:

@@ -2103,6 +2103,22 @@ footer {
     margin-bottom: 8px;
 }
 
+#best-moments-panel .bm-duration {
+    max-width: 190px;
+}
+
+#best-moments-panel .bm-duration input {
+    font-size: 18px !important;
+    font-weight: 800 !important;
+}
+
+#best-moments-panel .bm-duration-note {
+    margin: -2px 0 10px;
+    color: #8f8177;
+    font-size: 10px;
+    line-height: 1.45;
+}
+
 #best-moments-panel .bm-radio label {
     background: rgba(0, 0, 0, 0.28) !important;
     border: 1px solid rgba(255, 107, 26, 0.16) !important;
@@ -3361,16 +3377,35 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
 
             _comp_projects = _compilation_projects()
 
+            def _comp_latest_mtime(project):
+                items = best_moments.list_compilations(os.path.join(VIRALS_DIR, project)) if project else []
+                return float(items[0]["created_at"]) if items else 0.0
+
+            def _comp_preferred_project(projects):
+                if not projects:
+                    return None
+                preferred = max(projects, key=_comp_latest_mtime)
+                return preferred if _comp_latest_mtime(preferred) > 0 else projects[0]
+
+            _comp_initial_project = _comp_preferred_project(_comp_projects)
+
             def _comp_latest_for(project):
                 if not project:
                     return None
                 items = best_moments.list_compilations(os.path.join(VIRALS_DIR, project))
                 if not items:
                     return None
-                return next(
-                    (item for item in items if int(item.get("target_minutes") or 0) == 10),
-                    items[0],
+                auto_item = next(
+                    (item for item in items if int(item.get("target_minutes") or 0) == 0),
+                    None,
                 )
+                if auto_item:
+                    return auto_item
+                ten_minute = next(
+                    (item for item in items if int(item.get("target_minutes") or 0) == 10),
+                    None,
+                )
+                return ten_minute or items[0]
 
             def _comp_context_updates(project):
                 latest = _comp_latest_for(project)
@@ -3382,15 +3417,19 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                         "Nenhum compilado gerado neste projeto ainda. Monte o primeiro quando quiser.",
                     )
                 minutes = latest["duration_seconds"] / 60.0
+                mode_label = (
+                    "automático" if int(latest.get("target_minutes") or 0) == 0
+                    else f"de {latest['target_minutes']} min"
+                )
                 return (
                     studio.video_html(latest["video_path"], "latest"),
                     _comp_downloads_html(latest),
                     latest["title"] + "\n\n" + latest["description"],
-                    f"Último compilado de {latest['target_minutes']} min carregado "
+                    f"Último compilado {mode_label} carregado "
                     f"({minutes:.1f} min reais). Monte outro quando quiser.",
                 )
 
-            _comp_first = _comp_latest_for(_comp_projects[0]) if _comp_projects else None
+            _comp_first = _comp_latest_for(_comp_initial_project) if _comp_initial_project else None
             _comp_initial_player = (
                 studio.video_html(_comp_first["video_path"], "latest") if _comp_first else _comp_empty
             )
@@ -3398,8 +3437,12 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
             _comp_initial_details = (
                 _comp_first["title"] + "\n\n" + _comp_first["description"] if _comp_first else ""
             )
+            _comp_initial_mode = (
+                "automático" if _comp_first and int(_comp_first.get("target_minutes") or 0) == 0
+                else (f"de {_comp_first['target_minutes']} min" if _comp_first else "")
+            )
             _comp_initial_status = (
-                f"Último compilado de {_comp_first['target_minutes']} min carregado "
+                f"Último compilado {_comp_initial_mode} carregado "
                 f"({_comp_first['duration_seconds']/60.0:.1f} min reais). Monte outro quando quiser."
                 if _comp_first
                 else (
@@ -3420,22 +3463,37 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                         with gr.Row():
                             comp_project = gr.Dropdown(
                                 choices=_comp_projects,
-                                value=_comp_projects[0] if _comp_projects else None,
+                                value=_comp_initial_project,
                                 label="Podcast baixado e transcrito",
                                 scale=5,
                             )
                             comp_refresh = gr.Button("Atualizar", size="sm", scale=1)
-                        gr.HTML('<div class="bm-label">Duração do compilado</div>')
-                        comp_length = gr.Radio(
-                            [("5 minutos", 5), ("10 minutos", 10)],
-                            value=10,
+                        gr.HTML(
+                            '<div class="bm-label">Ou baixe um podcast pelo link</div>'
+                        )
+                        with gr.Row():
+                            comp_url = gr.Textbox(
+                                show_label=False,
+                                container=False,
+                                placeholder="https://www.youtube.com/watch?v=...",
+                                scale=5,
+                            )
+                            comp_download_btn = gr.Button("Baixar e transcrever", size="sm", scale=2)
+                        comp_link_status = gr.Markdown("", elem_classes="lib-status")
+                        gr.HTML('<div class="bm-label">Duração desejada (minutos)</div>')
+                        comp_length = gr.Number(
+                            value=0,
+                            minimum=0,
+                            maximum=600,
+                            precision=0,
                             show_label=False,
                             container=False,
-                            elem_classes="bm-radio",
+                            elem_classes="bm-duration",
                         )
-                        comp_cold_open = gr.Checkbox(
-                            value=True,
-                            label="Abrir com o melhor momento (cold open)",
+                        gr.HTML(
+                            '<div class="bm-duration-note">0 = automático: usa todos os melhores momentos '
+                            "que a IA encontrar. Acima de 0, tenta chegar a essa duração.</div>",
+                            elem_classes="fdc-bare",
                         )
                         gr.HTML(
                             '<div class="bm-cost"><b>10 créditos</b> por compilação. '
@@ -3480,9 +3538,67 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
 
             def _refresh_comp_projects():
                 choices = _compilation_projects()
-                return gr.update(choices=choices, value=choices[0] if choices else None)
+                return gr.update(choices=choices, value=_comp_preferred_project(choices))
 
-            def _run_best_moments(project, target_minutes, cold_open, api_key):
+            def _download_podcast(url):
+                progress = gr.Progress(track_tqdm=True)
+                url = str(url or "").strip()
+                if not url:
+                    return "Cole o link do podcast para baixar.", gr.update()
+                _gate.check_now()
+                if not _gate.is_ok():
+                    return _gate.status_text(), gr.update()
+                scripts_dir = os.path.join(WORKING_DIR, "scripts")
+                if scripts_dir not in sys.path:
+                    sys.path.insert(0, scripts_dir)
+                try:
+                    import download_video
+                    import transcribe_video
+
+                    progress(0.03, desc="Baixando o podcast...")
+                    try:
+                        result = download_video.download(
+                            url,
+                            base_root=VIRALS_DIR,
+                            download_subs=True,
+                            quality="720p",
+                        )
+                    except SystemExit:
+                        return (
+                            "O download foi interrompido. Verifique o link, a conexão e tente novamente.",
+                            gr.update(),
+                        )
+                    if isinstance(result, tuple):
+                        input_video, project_folder = result
+                    else:
+                        input_video = result
+                        project_folder = os.path.dirname(input_video)
+
+                    progress(0.50, desc="Transcrevendo o podcast...")
+                    transcribe_video.transcribe(
+                        input_video,
+                        "large-v3-turbo",
+                        project_folder=project_folder,
+                    )
+                    if not (
+                        os.path.isfile(os.path.join(project_folder, "input.tsv"))
+                        or os.path.isfile(os.path.join(project_folder, "input.srt"))
+                    ):
+                        return (
+                            "O download terminou, mas a transcrição não foi encontrada.",
+                            gr.update(),
+                        )
+                    project_name = os.path.basename(project_folder.rstrip("\\/"))
+                    choices = _compilation_projects()
+                    progress(1.0, desc="Podcast pronto.")
+                    return (
+                        f"Podcast pronto: {project_name}. Agora escolha a duração e clique em montar.",
+                        gr.update(choices=choices, value=project_name),
+                    )
+                except Exception as exc:
+                    return f"Não consegui baixar/transcrever: {exc}", gr.update()
+
+            def _run_best_moments(project, target_minutes, api_key):
                 progress = gr.Progress(track_tqdm=True)
                 if not project:
                     _gate.settle_delivered(0)
@@ -3496,9 +3612,9 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                 try:
                     result = best_moments.create_compilation(
                         os.path.join(VIRALS_DIR, project),
-                        int(target_minutes or 10),
+                        int(target_minutes or 0),
                         str(api_key or "").strip(),
-                        cold_open=bool(cold_open),
+                        cold_open=True,
                         progress=lambda amount, description: progress(amount, desc=description),
                     )
                     settled = _gate.settle_delivered(10)
@@ -3507,8 +3623,9 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     count = len(result["clips"])
                     resolution = f"{media.get('width', 0)}×{media.get('height', 0)}"
                     fps = float(media.get("fps") or 0)
+                    mode_label = "Automático" if int(target_minutes or 0) == 0 else f"{int(target_minutes)} min"
                     status = (
-                        f"Compilado pronto: {count} momentos · {minutes:.1f} min · "
+                        f"Compilado {mode_label}: {count} momentos · {minutes:.1f} min · "
                         f"{resolution} · {fps:.0f} FPS. "
                         + ("10 créditos debitados." if settled else "Não consegui confirmar a liquidação dos 10 créditos; contate o suporte.")
                     )
@@ -3539,6 +3656,11 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     )
 
             comp_refresh.click(_refresh_comp_projects, outputs=comp_project)
+            comp_download_btn.click(
+                _download_podcast,
+                comp_url,
+                [comp_link_status, comp_project],
+            )
             comp_project.change(
                 _comp_context_updates,
                 comp_project,
@@ -3549,7 +3671,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     _run_best_moments,
                     lambda args, kwargs: 10,
                 ),
-                inputs=[comp_project, comp_length, comp_cold_open, api_key_input],
+                inputs=[comp_project, comp_length, api_key_input],
                 outputs=[comp_status, comp_player, comp_downloads, comp_details, topbar_html],
                 show_progress="hidden",
             )

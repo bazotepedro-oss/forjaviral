@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.3.13 — Compilado automático, cortes completos e link do podcast
+
+### Novidades
+- **Duração automática**: o campo de minutos começa em **0 = automático**, usando todos os melhores momentos que a IA encontrar. Acima de 0, o compilado tenta chegar à duração pedida.
+- **Sempre abre com o melhor momento**: o botão de cold open foi removido; a melhor nota sempre abre o vídeo.
+- **Baixar pelo link**: cole o link do YouTube na aba Melhores Momentos para baixar e transcrever o podcast sem passar pela aba Criar Cortes.
+- **Extração máxima**: a IA agora é instruída a devolver o máximo de momentos completos, sem parar no meio de uma explicação, argumento ou história. Cada corte pode chegar a 4 minutos quando a ideia precisa.
+- **Compilados longos**: a seleção automática usa todos os momentos com nota boa, sem o limite fixo de 5 ou 10 minutos.
+
+### Correções
+- Checagem de espaço em disco antes de renderizar compilações automáticas muito longas.
+- O último compilado automático é carregado automaticamente na aba; se não houver, o último compilado fixo é usado.
+- Links de download não passam pelo cache do Gradio, evitando cópias de centenas de MB.
+
 ## 1.3.12 — Melhores Momentos, licença discreta e correção da IA
 
 ### Novidades
