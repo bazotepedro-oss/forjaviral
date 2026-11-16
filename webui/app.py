@@ -46,6 +46,17 @@ from i18n.i18n import I18nAuto
 i18n = I18nAuto()
 
 # --- PRESETS DEFINITIONS ---
+CAPTION_FONTS = [
+    ("Montserrat ExtraBold", "Montserrat-ExtraBold"),
+    ("Montserrat Black", "Montserrat-Black"),
+    ("Montserrat Bold", "Montserrat-Bold"),
+    ("Poppins Bold", "Poppins-Bold"),
+    ("Bebas Neue", "Bebas Neue"),
+    ("Anton", "Anton"),
+    ("Arial Black", "Arial Black"),
+    ("Arial", "Arial"),
+]
+
 FACE_PRESETS = {
     "Default (Balanced)": {"thresh": 0.35, "two_face": 0.60, "conf": 0.40, "dead_zone": 150},
     "Stable (Focus Main)": {"thresh": 0.60, "two_face": 0.80, "conf": 0.60, "dead_zone": 200},
@@ -2431,6 +2442,401 @@ footer {
     }
 }
 
+/* Ícones dos acordeões da Biblioteca */
+#library-panel .lib-accordion > button.label-wrap {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+
+#library-panel .lib-accordion > button.label-wrap::before {
+    content: "" !important;
+    width: 18px !important;
+    height: 18px !important;
+    flex: 0 0 18px !important;
+    background-color: #ff8a4c !important;
+    opacity: 0.95 !important;
+    -webkit-mask: var(--fdc-acc-ico) center / contain no-repeat !important;
+    mask: var(--fdc-acc-ico) center / contain no-repeat !important;
+}
+
+#library-panel .lib-accordion > button.label-wrap > span:first-child {
+    flex: 1 1 auto !important;
+    text-align: left !important;
+}
+
+#library-panel .lib-accordion > button.label-wrap > span.icon {
+    margin-left: auto !important;
+}
+
+/* Prévia da legenda */
+#lib_caption_preview {
+    margin: 0 0 12px !important;
+}
+
+.lib-cap-preview {
+    border-radius: 16px;
+    border: 1px solid rgba(255, 107, 26, 0.16);
+    background: rgba(0, 0, 0, 0.22);
+    overflow: hidden;
+}
+
+.lib-cap-preview-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 13px;
+    color: #a99a8d;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.lib-cap-preview-mode {
+    color: #ff8a4c;
+}
+
+.lib-cap-preview-stage {
+    min-height: 128px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px 14px;
+    background:
+        radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.08), transparent 38%),
+        linear-gradient(160deg, #171a21 0%, #08090c 100%);
+}
+
+.lib-cap-preview-line {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0 8px;
+    line-height: 1.12;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    text-align: center;
+    filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.45));
+}
+
+.lib-cap-preview-line span {
+    white-space: nowrap;
+}
+
+.lib-cap-preview-hint {
+    padding: 8px 13px 10px;
+    color: #8f8177;
+    font-size: 10px;
+    line-height: 1.4;
+}
+
+/* Espaçamento da legenda */
+#lib-legend-accordion-v2 .lib-style-card {
+    padding: 16px !important;
+    gap: 12px !important;
+}
+
+#lib-legend-accordion-v2 .lib-style-label {
+    color: #d8c6b9;
+    font-size: 11px;
+    font-weight: 700;
+    margin: 2px 0 -4px;
+}
+
+#lib-legend-accordion-v2 .lib-style-row {
+    gap: 12px !important;
+    align-items: end !important;
+}
+
+#lib-legend-accordion-v2 .lib-colors {
+    gap: 12px !important;
+}
+
+#lib-legend-accordion-v2 .lib-colors > * {
+    min-width: 0 !important;
+}
+
+#lib-legend-accordion-v2 .lib-colors .block {
+    padding: 0 !important;
+}
+
+#lib-legend-accordion-v2 .lib-colors button.dialog-button {
+    height: 42px !important;
+    border-radius: 12px !important;
+}
+
+#lib-legend-accordion-v2 .lib-apply-row {
+    align-items: center !important;
+    gap: 12px !important;
+    margin-top: 4px !important;
+}
+
+#lib-legend-accordion-v2 .lib-apply-row button {
+    min-height: 44px !important;
+}
+
+/* Música */
+#lib-music-accordion-v2 .lib-music-card {
+    padding: 16px !important;
+    gap: 12px !important;
+}
+
+#lib-music-accordion-v2 .lib-music-hint {
+    color: #8f8177;
+    font-size: 10px;
+    line-height: 1.5;
+    margin: -4px 0 2px;
+}
+
+#lib-music-accordion-v2 .lib-music-track-row {
+    gap: 10px !important;
+    align-items: end !important;
+}
+
+#lib-music-accordion-v2 .lib-music-track-row .block {
+    min-width: 0 !important;
+}
+
+#lib-music-accordion-v2 .lib-music-controls {
+    gap: 16px !important;
+    align-items: center !important;
+}
+
+#lib-music-accordion-v2 .lib-music-actions {
+    gap: 10px !important;
+}
+
+#lib-music-accordion-v2 .lib-music-actions button {
+    min-height: 44px !important;
+}
+
+#lib-music-accordion-v2 .lib-audio-wrap {
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 107, 26, 0.16);
+    background: rgba(0, 0, 0, 0.26);
+}
+
+#lib-music-accordion-v2 .lib-audio-name {
+    color: #f4e7dc;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#lib-music-accordion-v2 .lib-audio-player {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#lib-music-accordion-v2 .lib-audio-player audio {
+    display: none !important;
+}
+
+#lib-music-accordion-v2 .lib-audio-toggle {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 107, 26, 0.25);
+    background: rgba(255, 92, 0, 0.12);
+    color: #ffb07a;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+#lib-music-accordion-v2 .lib-audio-toggle:hover {
+    background: rgba(255, 92, 0, 0.22);
+}
+
+#lib-music-accordion-v2 .lib-audio-track {
+    flex: 1;
+    min-width: 80px;
+    display: flex;
+    align-items: center;
+}
+
+#lib-music-accordion-v2 .lib-audio-seek {
+    width: 100%;
+    height: 4px;
+    accent-color: #ff7a1a;
+    cursor: pointer;
+}
+
+#lib-music-accordion-v2 .lib-audio-time {
+    flex: 0 0 auto;
+    color: #a99a8d;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    min-width: 78px;
+    text-align: right;
+}
+
+#lib-music-accordion-v2 .lib-audio-mute {
+    flex: 0 0 26px;
+    width: 26px;
+    height: 26px;
+    border: 0;
+    background: transparent;
+    color: #d8c6b9;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0;
+}
+
+#lib-music-accordion-v2 .lib-audio-empty {
+    padding: 14px;
+    color: #8f8177;
+    font-size: 11px;
+    text-align: center;
+}
+
+#lib_preview_btn::before,
+#lib_apply_music_btn::before {
+    content: "" !important;
+    width: 16px !important;
+    height: 16px !important;
+    flex: 0 0 16px !important;
+    background-color: currentColor !important;
+    -webkit-mask: var(--fdc-btn-ico) center / contain no-repeat !important;
+    mask: var(--fdc-btn-ico) center / contain no-repeat !important;
+}
+
+#lib_preview_btn,
+#lib_apply_music_btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+}
+
+#lib_preview {
+    max-width: 280px !important;
+    margin: 4px auto 0 !important;
+}
+
+.lib-preview-card {
+    border-radius: 16px;
+    border: 1px solid rgba(255, 107, 26, 0.16);
+    background: rgba(0, 0, 0, 0.24);
+    padding: 10px;
+}
+
+.lib-preview-head {
+    color: #a99a8d;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    margin: 0 0 8px 2px;
+}
+
+#lib_preview .lib-player-wrap {
+    max-width: 250px !important;
+    margin: 0 auto !important;
+}
+
+#lib_preview .lib-player {
+    max-height: 360px !important;
+}
+
+/* Barra de tarefas da música */
+.lib-task {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 11px;
+    border-radius: 11px;
+    border: 1px solid rgba(255, 107, 26, 0.16);
+    background: rgba(255, 92, 0, 0.06);
+    color: #d8c6b9;
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.lib-task-icon {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(255, 92, 0, 0.16);
+    color: #ff8a4c;
+    font-size: 11px;
+    font-weight: 900;
+}
+
+.lib-spinner {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 138, 76, 0.22);
+    border-top-color: #ff8a4c;
+    animation: lib-spin 0.8s linear infinite;
+}
+
+.lib-task-bar {
+    flex: 1;
+    height: 4px;
+    min-width: 70px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.lib-task-bar i {
+    display: block;
+    width: 36%;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, transparent, #ff7a1a, transparent);
+    animation: lib-task-slide 1.1s linear infinite;
+}
+
+.lib-task.done {
+    border-color: rgba(34, 197, 94, 0.2);
+    background: rgba(34, 197, 94, 0.06);
+    color: #b9e7c8;
+}
+
+.lib-task.done .lib-task-icon {
+    background: rgba(34, 197, 94, 0.16);
+    color: #6ee7a0;
+}
+
+.lib-task.error {
+    border-color: rgba(255, 70, 70, 0.22);
+    background: rgba(255, 70, 70, 0.06);
+    color: #ffb4b4;
+}
+
+.lib-task.error .lib-task-icon {
+    background: rgba(255, 70, 70, 0.16);
+    color: #ff8a8a;
+}
+
+@keyframes lib-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes lib-task-slide {
+    from { transform: translateX(-120%); }
+    to { transform: translateX(320%); }
+}
+
 /* Itens técnicos ocultos para o cliente (continuam no código) */
 #advanced-face,
 #subtitle-settings {
@@ -2606,6 +3012,61 @@ def _howto_html() -> str:
     return art + _card_head("lightbulb", "Como funciona", "Do link ao corte pronto em 3 passos") + items
 
 
+def _caption_preview_html(
+    font: str,
+    size: int,
+    highlight_size: int,
+    base_color: str,
+    highlight_color: str,
+    outline_color: str,
+    mode: str,
+    uppercase: bool,
+) -> str:
+    """Prévia HTML do estilo de legenda, sem renderizar vídeo."""
+    font = str(font or "Montserrat-ExtraBold")
+    base_color = str(base_color or "#FFFFFF")
+    highlight_color = str(highlight_color or "#FF00E7")
+    outline_color = str(outline_color or "#000000")
+    base_size = max(17, min(40, int(size or 30)))
+    hl_size = max(17, min(44, int(highlight_size or 35)))
+    words = ["A", "IA", "não", "é", "Skynet"]
+    spans = []
+    for index, word in enumerate(words):
+        if mode == "no_highlight":
+            color, word_size = base_color, base_size
+        elif index == 2:
+            color, word_size = highlight_color, hl_size
+        else:
+            color, word_size = base_color, base_size
+        spans.append(
+            f'<span style="color:{_esc(color, quote=True)};font-size:{word_size}px">{_esc(word)}</span>'
+        )
+    mode_label = {
+        "highlight": "Destaque",
+        "word_by_word": "Palavra a palavra",
+        "no_highlight": "Sem destaque",
+    }.get(str(mode), "Destaque")
+    transform = "uppercase" if uppercase else "none"
+    line = (
+        '<div class="lib-cap-preview-line" '
+        f'style="font-family:\'{_esc(font, quote=True)}\', Inter, sans-serif;'
+        f'-webkit-text-stroke:2px {_esc(outline_color, quote=True)};'
+        f'paint-order:stroke fill;text-transform:{transform};">'
+        + " ".join(spans)
+        + "</div>"
+    )
+    return (
+        '<div class="lib-cap-preview">'
+        '<div class="lib-cap-preview-head"><span>Prévia da legenda</span>'
+        f'<span class="lib-cap-preview-mode">{mode_label}</span></div>'
+        '<div class="lib-cap-preview-stage">'
+        f"{line}"
+        "</div>"
+        '<div class="lib-cap-preview-hint">Assim a legenda aparece no vídeo selecionado.</div>'
+        "</div>"
+    )
+
+
 def _rail_html() -> str:
     logo = ui_assets.data_uri("logo_rail.webp") or ui_assets.data_uri("logo.png")
     logo_html = f'<img src="{logo}" alt="Fábrica dos Cortes" />' if logo else ""
@@ -2642,6 +3103,15 @@ def _dynamic_css() -> str:
     for index, icon in enumerate(["youtube", "folder-open", "upload"], 1):
         rules.append(f".fdc-seg label:nth-child({index}) {{ --fdc-seg-ico: {ui_icons.mask_uri(icon)}; }}")
     rules.append(f"#start_btn {{ --fdc-start-ico: {ui_icons.mask_uri('zap')}; }}")
+    for elem, icon in (
+        ("lib-legend-accordion-v2", "captions"),
+        ("lib-music-accordion-v2", "play"),
+        ("lib-meta-accordion-v2", "youtube"),
+        ("lib-danger-accordion-v2", "circle-alert"),
+    ):
+        rules.append(f"#{elem} {{ --fdc-acc-ico: {ui_icons.mask_uri(icon)}; }}")
+    rules.append(f"#lib_preview_btn {{ --fdc-btn-ico: {ui_icons.mask_uri('play')}; }}")
+    rules.append(f"#lib_apply_music_btn {{ --fdc-btn-ico: {ui_icons.mask_uri('check')}; }}")
     link_icon = ui_icons.color_uri("link", "#FF8A4C")
     if link_icon:
         rules.append(
@@ -3011,19 +3481,46 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                         lib_status = gr.Markdown("Pronto para editar.", elem_classes="lib-status")
                 with gr.Accordion("Editar legenda", open=False, elem_id="lib-legend-accordion-v2", elem_classes="lib-accordion"):
                     with gr.Column(elem_classes="lib-style-card"):
-                        gr.HTML(_card_head("captions", "Estilo das legendas", "Escolha as cores e confira no player antes de aplicar"))
-                        lib_preset = gr.Dropdown(choices=["Personalizado", *list(subs.SUBTITLE_PRESETS.keys())], value=_lib_initial_style.get("preset", "Personalizado"), show_label=False, container=False)
-                        with gr.Row():
-                            lib_font = gr.Textbox(value=_lib_initial_style.get("font_name", "Montserrat-ExtraBold"), label="Fonte")
+                        gr.HTML(_card_head("captions", "Estilo das legendas", "Escolha o estilo, as cores e veja a prévia antes de aplicar"))
+                        lib_caption_preview = gr.HTML(
+                            value=_caption_preview_html(
+                                _lib_initial_style.get("font_name", "Montserrat-ExtraBold"),
+                                int(_lib_initial_style.get("font_size", 30)),
+                                int(_lib_initial_style.get("highlight_size", 35)),
+                                _lib_initial_style.get("base_color", "#FFFFFF"),
+                                _lib_initial_style.get("highlight_color", "#FF00E7"),
+                                _lib_initial_style.get("outline_color", "#000000"),
+                                _lib_initial_style.get("mode", "highlight"),
+                                bool(_lib_initial_style.get("uppercase", True)),
+                            ),
+                            elem_id="lib_caption_preview",
+                        )
+                        gr.HTML(
+                            '<div class="lib-style-label">Estilo de legenda</div>',
+                            elem_classes="fdc-bare",
+                        )
+                        lib_preset = gr.Dropdown(
+                            choices=["Personalizado", *list(subs.SUBTITLE_PRESETS.keys())],
+                            value=_lib_initial_style.get("preset", "Personalizado"),
+                            label="Estilo de legenda",
+                            container=False,
+                        )
+                        with gr.Row(elem_classes="lib-style-row"):
+                            lib_font = gr.Dropdown(
+                                choices=CAPTION_FONTS,
+                                value=_lib_initial_style.get("font_name", "Montserrat-ExtraBold"),
+                                label="Fonte",
+                                allow_custom_value=True,
+                            )
                             lib_size = gr.Slider(16, 60, value=int(_lib_initial_style.get("font_size", 30)), step=1, label="Tamanho")
-                        with gr.Row():
+                        with gr.Row(elem_classes="lib-style-row"):
                             lib_hl_size = gr.Slider(16, 70, value=int(_lib_initial_style.get("highlight_size", 35)), step=1, label="Destaque")
                             lib_pos = gr.Slider(0, 500, value=int(_lib_initial_style.get("vertical_position", 200)), step=5, label="Posição vertical")
                         with gr.Row(elem_classes="lib-colors"):
                             lib_color = gr.ColorPicker(value=_lib_initial_style.get("base_color", "#FFFFFF"), label="Cor base")
                             lib_hl_color = gr.ColorPicker(value=_lib_initial_style.get("highlight_color", "#00FF00"), label="Cor destaque")
                             lib_outline = gr.ColorPicker(value=_lib_initial_style.get("outline_color", "#000000"), label="Contorno")
-                        with gr.Row():
+                        with gr.Row(elem_classes="lib-style-row"):
                             lib_mode = gr.Dropdown(choices=[("Destacar", "highlight"), ("Palavra a palavra", "word_by_word"), ("Sem destaque", "no_highlight")], value=_lib_initial_style.get("mode", "highlight"), label="Modo")
                             lib_upper = gr.Checkbox(value=bool(_lib_initial_style.get("uppercase", True)), label="Maiúsculas")
                         with gr.Row(elem_classes="lib-apply-row"):
@@ -3032,19 +3529,48 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
 
                 with gr.Accordion("Música", open=False, elem_id="lib-music-accordion-v2", elem_classes="lib-accordion"):
                     with gr.Column(elem_classes="lib-music-card"):
-                        gr.HTML(_card_head("play", "Música de fundo", "Ouça a faixa, teste com o vídeo e aplique com ducking"))
-                        with gr.Row():
-                            lib_track = gr.Dropdown(choices=_lib_tracks, value=_lib_first_track, show_label=False, container=False, scale=4, info="Envie uma faixa ou coloque arquivos na pasta music/")
-                            lib_track_refresh = gr.Button("Atualizar lista", size="sm", scale=1)
-                        lib_track_audio = gr.HTML(value=studio.audio_html(_lib_first_track), elem_id="lib_track_audio", elem_classes="lib-track-audio")
-                        with gr.Row():
-                            lib_vol = gr.Slider(0, 100, value=18, step=1, label="Volume (%)")
-                            lib_duck = gr.Checkbox(value=True, label="Abaixar na voz")
-                        with gr.Row(elem_classes="lib-apply-row"):
-                            lib_preview_btn = gr.Button("Prévia com música (30s)", size="sm", scale=1)
-                            lib_apply_music_btn = gr.Button("Aplicar música", variant="primary", scale=1)
+                        gr.HTML(_card_head("play", "Música de fundo", "Ouça, teste 30s e aplique com ducking"))
+                        gr.HTML(
+                            '<div class="lib-music-hint">Coloque arquivos na pasta music/ ou envie uma faixa abaixo.</div>',
+                            elem_classes="fdc-bare",
+                        )
+                        with gr.Row(elem_classes="lib-music-track-row"):
+                            lib_track = gr.Dropdown(
+                                choices=_lib_tracks,
+                                value=_lib_first_track,
+                                show_label=False,
+                                container=False,
+                                scale=6,
+                                elem_id="lib_track",
+                            )
+                            lib_track_refresh = gr.Button("Atualizar", size="sm", scale=1, elem_id="lib_track_refresh")
+                        lib_track_audio = gr.HTML(
+                            value=studio.audio_html(_lib_first_track),
+                            elem_id="lib_track_audio",
+                            elem_classes="lib-track-audio",
+                        )
+                        with gr.Row(elem_classes="lib-music-controls"):
+                            lib_vol = gr.Slider(
+                                0, 100, value=18, step=1, label="Volume da música (%)", scale=3
+                            )
+                            lib_duck = gr.Checkbox(
+                                value=True, label="Abaixar a música na voz", scale=2
+                            )
+                        with gr.Row(elem_classes="lib-music-actions"):
+                            lib_preview_btn = gr.Button(
+                                "Ouvir prévia de 30s", size="sm", scale=1, elem_id="lib_preview_btn"
+                            )
+                            lib_apply_music_btn = gr.Button(
+                                "Aplicar música", variant="primary", scale=1, elem_id="lib_apply_music_btn"
+                            )
+                        lib_music_status = gr.HTML(value="", elem_id="lib_music_status")
                         lib_preview_video = gr.HTML(value="", visible=False, elem_id="lib_preview")
-                        lib_music_upload = gr.File(label="Enviar música (mp3, wav, m4a)", file_types=["audio"], type="filepath")
+                        lib_music_upload = gr.File(
+                            label="Enviar música (mp3, wav, m4a)",
+                            file_types=["audio"],
+                            type="filepath",
+                            elem_id="lib_music_upload",
+                        )
 
                 with gr.Accordion("Metadados do YouTube", open=False, elem_id="lib-meta-accordion-v2", elem_classes="lib-accordion"):
                     with gr.Column(elem_classes="lib-meta-card"):
@@ -3089,6 +3615,18 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     gr.update(value=int(s.get("vertical_position", 200))),
                     gr.update(value=s.get("mode", "highlight")),
                     gr.update(value=bool(s.get("uppercase", True))),
+                    gr.update(
+                        value=_caption_preview_html(
+                            s.get("font_name", "Montserrat-ExtraBold"),
+                            int(s.get("font_size", 30)),
+                            int(s.get("highlight_size", 35)),
+                            s.get("base_color", "#FFFFFF"),
+                            s.get("highlight_color", "#00FF00"),
+                            s.get("outline_color", "#000000"),
+                            s.get("mode", "highlight"),
+                            bool(s.get("uppercase", True)),
+                        )
+                    ),
                 )
 
             def _lib_video_html(project, base, path, tag=""):
@@ -3139,14 +3677,31 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     *style_values,
                 )
 
+            def _lib_caption_preview_ui(font, size, hlsize, color, hlcolor, outline, mode, upper):
+                return _caption_preview_html(
+                    font,
+                    int(size or 30),
+                    int(hlsize or 35),
+                    color,
+                    hlcolor,
+                    outline,
+                    mode,
+                    bool(upper),
+                )
+
             def _lib_preset_values(name):
                 if name == "Personalizado":
-                    return tuple(gr.update() for _ in range(9))
+                    return tuple(gr.update() for _ in range(10))
                 s = studio.style_from_preset(name)
                 return (
                     s["font_name"], int(s["font_size"]), int(s["highlight_size"]),
                     s["base_color"], s["highlight_color"], s["outline_color"],
                     int(s["vertical_position"]), s["mode"], bool(s["uppercase"]),
+                    _caption_preview_html(
+                        s["font_name"], int(s["font_size"]), int(s["highlight_size"]),
+                        s["base_color"], s["highlight_color"], s["outline_color"],
+                        s["mode"], bool(s["uppercase"]),
+                    ),
                 )
 
             def _lib_apply_style(project, base, preset, font, size, hlsize, color, hlcolor, outline, pos, mode, upper, apply_all):
@@ -3174,27 +3729,67 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     label = f"Legenda aplicada · base {studio.display_color(color)} · destaque {studio.display_color(hlcolor)}."
                 return label, gr.update(value=studio.gallery_html(project, bump=int(time.time()))), gr.update(value=_lib_video_html(project, base, preview, "style"))
 
+            def _lib_music_task(text, kind="running"):
+                if kind == "error":
+                    return (
+                        '<div class="lib-task error"><span class="lib-task-icon">!</span>'
+                        f"<span>{_esc(text)}</span></div>"
+                    )
+                if kind == "done":
+                    return (
+                        '<div class="lib-task done"><span class="lib-task-icon">✓</span>'
+                        f"<span>{_esc(text)}</span></div>"
+                    )
+                return (
+                    '<div class="lib-task running"><span class="lib-spinner"></span>'
+                    f"<span>{_esc(text)}</span>"
+                    '<div class="lib-task-bar"><i></i></div></div>'
+                )
+
+            def _lib_music_preview_html(project, base, preview):
+                return (
+                    '<div class="lib-preview-card">'
+                    '<div class="lib-preview-head">Prévia de 30s</div>'
+                    + _lib_video_html(project, base, preview, "music")
+                    + "</div>"
+                )
+
             def _lib_preview_music(project, base, track, vol, duck):
+                yield _lib_music_task("Preparando prévia de 30s..."), gr.update()
                 message, preview = studio.preview_music(project, base, track, int(vol), bool(duck), 30)
-                return message, (gr.update(value=_lib_video_html(project, base, preview, "music"), visible=True) if preview else gr.update())
+                if not preview:
+                    yield _lib_music_task(message or "Não consegui gerar a prévia.", "error"), gr.update()
+                    return
+                yield "", gr.update(value=_lib_music_preview_html(project, base, preview), visible=True)
 
             def _lib_apply_music(project, base, track, vol, duck):
                 if not project or not base:
-                    return "Selecione um projeto e um corte.", gr.update(), gr.update()
+                    yield _lib_music_task("Selecione um projeto e um corte.", "error"), gr.update(), gr.update()
+                    return
+                yield _lib_music_task("Aplicando música ao corte..."), gr.update(), gr.update()
                 message = studio.apply_music(project, base, track, int(vol), bool(duck))
                 preview = studio.preview_video(project, base, "music")
-                return message, gr.update(value=studio.gallery_html(project, bump=int(time.time()))), gr.update(value=_lib_video_html(project, base, preview, "music"))
+                kind = "error" if "falha" in message.lower() or "não" in message.lower() else "done"
+                yield (
+                    _lib_music_task(message, kind),
+                    gr.update(value=studio.gallery_html(project, bump=int(time.time()))),
+                    gr.update(value=_lib_video_html(project, base, preview, "music")),
+                )
 
             def _lib_track_audio(track):
                 return gr.update(value=studio.audio_html(track))
 
             def _lib_upload_track(upload):
                 if not upload:
-                    return gr.update(), gr.update(), "Nenhum arquivo enviado."
+                    return gr.update(), gr.update(), _lib_music_task("Nenhum arquivo enviado.", "error")
                 saved = studio.save_music_upload(upload)
                 if not saved:
-                    return gr.update(), gr.update(), "Falha ao salvar a música."
-                return gr.update(choices=studio.music_choices(), value=saved), gr.update(value=studio.audio_html(saved)), "Música enviada e pronta para prévia."
+                    return gr.update(), gr.update(), _lib_music_task("Falha ao salvar a música.", "error")
+                return (
+                    gr.update(choices=studio.music_choices(), value=saved),
+                    gr.update(value=studio.audio_html(saved)),
+                    _lib_music_task("Música enviada e pronta para prévia.", "done"),
+                )
 
             def _lib_refresh_tracks():
                 return gr.update(choices=studio.music_choices())
@@ -3271,17 +3866,17 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
             lib_project.change(
                 _lib_on_project, lib_project,
                 [lib_gallery, lib_cut, lib_video, lib_selected_title, lib_title, lib_desc, lib_tags,
-                 lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper],
+                 lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper, lib_caption_preview],
             )
             lib_refresh.click(
                 _lib_refresh, lib_project,
                 [lib_project, lib_gallery, lib_cut, lib_video, lib_selected_title, lib_title, lib_desc, lib_tags,
-                 lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper],
+                 lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper, lib_caption_preview],
             )
             lib_pick.change(
                 _lib_pick_select, [lib_pick, lib_project],
                 [lib_cut, lib_video, lib_selected_title, lib_title, lib_desc, lib_tags,
-                 lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper],
+                 lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper, lib_caption_preview],
             )
             lib_meta_btn.click(_lib_meta, [lib_project, lib_cut], [lib_title, lib_desc, lib_tags])
             lib_copy_meta_btn.click(
@@ -3308,8 +3903,14 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
             )
             lib_preset.change(
                 _lib_preset_values, lib_preset,
-                [lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper],
+                [lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper, lib_caption_preview],
             )
+            for _caption_control in (lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_mode, lib_upper):
+                _caption_control.change(
+                    _lib_caption_preview_ui,
+                    [lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_mode, lib_upper],
+                    lib_caption_preview,
+                )
             lib_apply_btn.click(
                 _lib_apply_style,
                 [lib_project, lib_cut, lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper, lib_apply_all],
@@ -3320,18 +3921,18 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
             lib_track_refresh.click(_lib_refresh_tracks, None, lib_track)
             lib_music_upload.change(
                 _lib_upload_track, lib_music_upload,
-                [lib_track, lib_track_audio, lib_status],
+                [lib_track, lib_track_audio, lib_music_status],
             )
             lib_preview_btn.click(
                 _lib_preview_music,
                 [lib_project, lib_cut, lib_track, lib_vol, lib_duck],
-                [lib_status, lib_preview_video],
+                [lib_music_status, lib_preview_video],
                 show_progress="hidden",
             )
             lib_apply_music_btn.click(
                 _lib_apply_music,
                 [lib_project, lib_cut, lib_track, lib_vol, lib_duck],
-                [lib_status, lib_gallery, lib_video],
+                [lib_music_status, lib_gallery, lib_video],
                 show_progress="hidden",
             )
             lib_rename_btn.click(_lib_rename, [lib_project, lib_cut, lib_new_title], [lib_status, lib_gallery, lib_cut, lib_selected_title])
@@ -3752,6 +4353,73 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
         }
         """,
     )
+
+    # Player de música próprio: liga os controles compactos ao <audio> oculto.
+    demo.load(
+        fn=None,
+        inputs=None,
+        outputs=None,
+        js="""
+        () => {
+          if (window.__fdcAudioReady) return;
+          window.__fdcAudioReady = true;
+          const fmt = (value) => {
+            if (!Number.isFinite(value)) return '0:00';
+            const minutes = Math.floor(value / 60);
+            const seconds = Math.floor(value % 60);
+            return minutes + ':' + String(seconds).padStart(2, '0');
+          };
+          const wire = () => {
+            document.querySelectorAll('.lib-audio-player').forEach((root) => {
+              if (root.dataset.fdcAudioWired) return;
+              const audio = root.querySelector('audio');
+              const toggle = root.querySelector('.lib-audio-toggle');
+              const seek = root.querySelector('.lib-audio-seek');
+              const time = root.querySelector('.lib-audio-time');
+              const mute = root.querySelector('.lib-audio-mute');
+              if (!audio || !toggle || !seek || !time || !mute) return;
+              root.dataset.fdcAudioWired = '1';
+              const update = () => {
+                time.textContent = fmt(audio.currentTime) + ' / ' + fmt(audio.duration);
+                seek.value = Number.isFinite(audio.duration) && audio.duration > 0
+                  ? (audio.currentTime / audio.duration) * 100
+                  : 0;
+              };
+              toggle.addEventListener('click', () => {
+                if (audio.paused) {
+                  audio.play().catch(() => {});
+                } else {
+                  audio.pause();
+                }
+              });
+              audio.addEventListener('play', () => { toggle.textContent = '❚❚'; });
+              audio.addEventListener('pause', () => { toggle.textContent = '▶'; });
+              audio.addEventListener('ended', () => {
+                toggle.textContent = '▶';
+                audio.currentTime = 0;
+                update();
+              });
+              audio.addEventListener('loadedmetadata', update);
+              audio.addEventListener('timeupdate', update);
+              seek.addEventListener('input', () => {
+                if (Number.isFinite(audio.duration) && audio.duration > 0) {
+                  audio.currentTime = (Number(seek.value) / 100) * audio.duration;
+                }
+              });
+              mute.addEventListener('click', () => {
+                audio.muted = !audio.muted;
+                mute.textContent = audio.muted ? '🔇' : '🔊';
+              });
+              update();
+            });
+          };
+          wire();
+          new MutationObserver(wire).observe(document.body, { subtree: true, childList: true });
+          setInterval(wire, 900);
+        }
+        """,
+    )
+
 if __name__ == "__main__":
     import webbrowser
     import threading

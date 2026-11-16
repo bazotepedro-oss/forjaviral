@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.15 — Biblioteca: ícones, prévia de legenda e música
+
+### Interface
+- **Ícones nos acordeões**: legenda, música, metadados e zona de risco agora têm ícone e título alinhado à esquerda.
+- **Seletor de fonte**: o campo de texto "Montserrat-ExtraBold" virou uma seleção de fontes.
+- **Prévia de legenda ao vivo**: mostra fonte, tamanho, cores, contorno, modo e maiúsculas antes de aplicar.
+- **Espaçamento da legenda** ajustado: linhas, cores e botão de aplicar mais equilibrados.
+- **Música repaginada**: player escuro próprio com play, barra de progresso, tempo e mute; volume e ducking alinhados.
+- **Status de carregamento**: a prévia e a aplicação de música mostram uma barra animada com o que está sendo feito; o texto solto de "prévia pronta" foi removido.
+- **Prévia de 30s** em card compacto, em vez do player preto gigante.
+
 ## 1.3.14 — Cortes longos, contexto completo e transições
 
 ### Mudanças

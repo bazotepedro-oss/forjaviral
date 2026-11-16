@@ -249,16 +249,24 @@ _AUDIO_MIME = {
 
 
 def audio_html(path: str | Path | None) -> str:
-    """Player de música nativo, sem o waveform grande do componente Gradio."""
+    """Player de música próprio, compacto e integrado ao tema escuro."""
     if not path or not Path(path).is_file():
         return '<div class="lib-audio-empty">Selecione uma faixa para ouvir.</div>'
     file_path = Path(path)
     mime = _AUDIO_MIME.get(file_path.suffix.lower(), "audio/mpeg")
+    src = f"{_media_url(file_path)}?v={_cache_tag(file_path)}"
     return (
         '<div class="lib-audio-wrap">'
         f'<div class="lib-audio-name">{html.escape(file_path.stem)}</div>'
-        f'<audio controls preload="metadata"><source src="{_media_url(file_path)}?v={_cache_tag(file_path)}" type="{mime}"></audio>'
+        '<div class="lib-audio-player">'
+        '<button type="button" class="lib-audio-toggle" aria-label="Reproduzir">▶</button>'
+        '<div class="lib-audio-track">'
+        '<input type="range" class="lib-audio-seek" min="0" max="100" value="0" step="0.1" aria-label="Progresso da música">'
         "</div>"
+        '<span class="lib-audio-time">0:00 / 0:00</span>'
+        '<button type="button" class="lib-audio-mute" aria-label="Silenciar">🔊</button>'
+        f'<audio preload="metadata"><source src="{src}" type="{mime}"></audio>'
+        "</div></div>"
     )
 
 
