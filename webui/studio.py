@@ -477,6 +477,22 @@ def export_zip(project: str) -> str:
 
 
 # ---------------------------------------------------------------- legenda
+FONT_ALIASES = {
+    "Montserrat-ExtraBold": "Montserrat",
+    "Montserrat-Black": "Montserrat",
+    "Montserrat-Bold": "Montserrat",
+    "Poppins-Bold": "Poppins",
+    "Poppins-ExtraBold": "Poppins",
+    "Arial-Black": "Arial",
+    "Arial Black": "Arial",
+}
+
+
+def normalize_font(name: str) -> str:
+    value = str(name or "Montserrat").strip()
+    return FONT_ALIASES.get(value, value)
+
+
 def style_from_preset(name: str) -> dict:
     try:
         import subtitle_handler as subs
@@ -508,6 +524,7 @@ def style_from_preset(name: str) -> dict:
         "remove_punctuation": True,
     }
     default.update(preset or {})
+    default["font_name"] = normalize_font(default.get("font_name", "Montserrat"))
     return default
 
 
@@ -535,6 +552,7 @@ def style_for_cut(project: str, base: str) -> dict:
         saved = json.loads(styles_path.read_text(encoding="utf-8")) if styles_path.exists() else {}
         if isinstance(saved.get(base), dict):
             style.update(saved[base])
+            style["font_name"] = normalize_font(style.get("font_name", "Montserrat"))
             style["preset"] = "Personalizado"
             return style
     except Exception:
@@ -574,6 +592,7 @@ def style_for_cut(project: str, base: str) -> dict:
             style["highlight_size"] = int(float(sizes[0]))
     except Exception as exc:
         print(f"[studio] Could not read subtitle style for {base}: {exc}")
+    style["font_name"] = normalize_font(style.get("font_name", "Montserrat"))
     return style
 
 
@@ -620,7 +639,7 @@ def apply_style(project: str, base: str, style: dict) -> str:
         style.get("mode", "highlight"),
         int(style.get("vertical_position", 200)),
         int(style.get("alignment", 2)),
-        style.get("font_name", "Montserrat-ExtraBold"),
+        normalize_font(style.get("font_name", "Montserrat")),
         _ass_color(style.get("outline_color", "#000000")),
         _ass_color(style.get("shadow_color", "#000000")),
         1 if style.get("bold") else 0,
@@ -652,6 +671,7 @@ def apply_style(project: str, base: str, style: dict) -> str:
         saved_styles = json.loads(styles_path.read_text(encoding="utf-8")) if styles_path.exists() else {}
     except Exception:
         saved_styles = {}
+    style["font_name"] = normalize_font(style.get("font_name", "Montserrat"))
     saved_styles[base] = dict(style)
     styles_path.write_text(json.dumps(saved_styles, ensure_ascii=False, indent=2), encoding="utf-8")
     return "Legenda salva e aplicada ao vídeo selecionado."

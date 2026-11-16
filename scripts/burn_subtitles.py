@@ -4,6 +4,10 @@ import sys
 
 # sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FONTS_DIR = os.path.join(APP_ROOT, "webui", "assets", "fonts")
+
+
 def burn_video_file(video_path, subtitle_path, output_path):
     """
     Burns subtitles into a single video file.
@@ -12,12 +16,16 @@ def burn_video_file(video_path, subtitle_path, output_path):
     # No Windows, "C:/foo" funciona se estiver entre aspas simples dentro do filtro.
     # Para garantir, usamos replace e forward slashes.
     subtitle_file_ffmpeg = subtitle_path.replace('\\', '/').replace(':', '\\:')
+    subtitle_filter = f"subtitles='{subtitle_file_ffmpeg}'"
+    if os.path.isdir(FONTS_DIR):
+        fonts_dir_ffmpeg = FONTS_DIR.replace('\\', '/').replace(':', '\\:')
+        subtitle_filter += f":fontsdir='{fonts_dir_ffmpeg}'"
 
     def run_ffmpeg(encoder, preset, additional_args=[]):
         cmd = [
             "ffmpeg", "-y", "-loglevel", "error", "-hide_banner",
             '-i', video_path,
-            '-vf', f"subtitles='{subtitle_file_ffmpeg}'",
+            '-vf', subtitle_filter,
             '-c:v', encoder,
             '-preset', preset,
             '-b:v', '5M',

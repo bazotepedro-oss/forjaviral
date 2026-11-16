@@ -47,13 +47,10 @@ i18n = I18nAuto()
 
 # --- PRESETS DEFINITIONS ---
 CAPTION_FONTS = [
-    ("Montserrat ExtraBold", "Montserrat-ExtraBold"),
-    ("Montserrat Black", "Montserrat-Black"),
-    ("Montserrat Bold", "Montserrat-Bold"),
-    ("Poppins Bold", "Poppins-Bold"),
+    ("Montserrat", "Montserrat"),
+    ("Poppins", "Poppins"),
     ("Bebas Neue", "Bebas Neue"),
     ("Anton", "Anton"),
-    ("Arial Black", "Arial Black"),
     ("Arial", "Arial"),
 ]
 
@@ -2546,6 +2543,56 @@ footer {
     margin: 2px 0 -4px;
 }
 
+#lib_style_preset {
+    border: 1px solid rgba(255, 107, 26, 0.22) !important;
+    border-radius: 14px !important;
+    background: rgba(255, 92, 0, 0.06) !important;
+    padding: 4px 10px !important;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+#lib_style_preset:hover {
+    border-color: rgba(255, 107, 26, 0.5) !important;
+    background: rgba(255, 92, 0, 0.11) !important;
+}
+
+#library-panel #lib_video .lib-player-wrap,
+#lib_preview .lib-player-wrap {
+    width: fit-content !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    background: linear-gradient(180deg, #17110d 0%, #0a0806 100%) !important;
+    border: 1px solid rgba(255, 107, 26, 0.18) !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35) !important;
+}
+
+#library-panel #lib_video .lib-player-wrap {
+    max-height: 470px !important;
+}
+
+#library-panel #lib_video .lib-player {
+    width: auto !important;
+    height: 440px !important;
+    max-height: 440px !important;
+    max-width: 100% !important;
+    background: transparent !important;
+    object-fit: contain !important;
+}
+
+#lib_preview .lib-player {
+    width: auto !important;
+    height: 360px !important;
+    max-height: 360px !important;
+    max-width: 100% !important;
+    background: transparent !important;
+    object-fit: contain !important;
+}
+
+.lib-preview-card {
+    background: linear-gradient(180deg, #17110d 0%, #0b0806 100%) !important;
+    border-color: rgba(255, 107, 26, 0.22) !important;
+}
+
 #lib-legend-accordion-v2 .lib-style-row {
     gap: 12px !important;
     align-items: end !important;
@@ -3021,9 +3068,10 @@ def _caption_preview_html(
     outline_color: str,
     mode: str,
     uppercase: bool,
+    outline_thickness: int = 3,
 ) -> str:
     """Prévia HTML do estilo de legenda, sem renderizar vídeo."""
-    font = str(font or "Montserrat-ExtraBold")
+    font = str(font or "Montserrat")
     base_color = str(base_color or "#FFFFFF")
     highlight_color = str(highlight_color or "#FF00E7")
     outline_color = str(outline_color or "#000000")
@@ -3047,10 +3095,11 @@ def _caption_preview_html(
         "no_highlight": "Sem destaque",
     }.get(str(mode), "Destaque")
     transform = "uppercase" if uppercase else "none"
+    preview_stroke = max(0, min(5, round(float(outline_thickness or 0) * 0.65)))
     line = (
         '<div class="lib-cap-preview-line" '
         f'style="font-family:\'{_esc(font, quote=True)}\', Inter, sans-serif;'
-        f'-webkit-text-stroke:2px {_esc(outline_color, quote=True)};'
+        f'-webkit-text-stroke:{preview_stroke}px {_esc(outline_color, quote=True)};'
         f'paint-order:stroke fill;text-transform:{transform};">'
         + " ".join(spans)
         + "</div>"
@@ -3095,6 +3144,18 @@ def _rail_html() -> str:
 
 def _dynamic_css() -> str:
     rules = []
+    for family, filename, weight in (
+        ("Montserrat", "fonts/Montserrat.ttf", "100 900"),
+        ("Poppins", "fonts/Poppins-Bold.ttf", "700"),
+        ("Bebas Neue", "fonts/BebasNeue-Regular.ttf", "400"),
+        ("Anton", "fonts/Anton-Regular.ttf", "400"),
+    ):
+        font_uri = ui_assets.data_uri(filename)
+        if font_uri:
+            rules.append(
+                f'@font-face {{ font-family: "{family}"; src: url("{font_uri}") format("truetype"); '
+                f'font-weight: {weight}; font-style: normal; font-display: swap; }}'
+            )
     hero_bg = ui_assets.data_uri("bg_streaks.webp")
     if hero_bg:
         rules.append(f':root {{ --fdc-hero-bg: url("{hero_bg}"); }}')
@@ -3484,7 +3545,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                         gr.HTML(_card_head("captions", "Estilo das legendas", "Escolha o estilo, as cores e veja a prévia antes de aplicar"))
                         lib_caption_preview = gr.HTML(
                             value=_caption_preview_html(
-                                _lib_initial_style.get("font_name", "Montserrat-ExtraBold"),
+                                _lib_initial_style.get("font_name", "Montserrat"),
                                 int(_lib_initial_style.get("font_size", 30)),
                                 int(_lib_initial_style.get("highlight_size", 35)),
                                 _lib_initial_style.get("base_color", "#FFFFFF"),
@@ -3492,6 +3553,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                                 _lib_initial_style.get("outline_color", "#000000"),
                                 _lib_initial_style.get("mode", "highlight"),
                                 bool(_lib_initial_style.get("uppercase", True)),
+                                int(_lib_initial_style.get("outline_thickness", 3)),
                             ),
                             elem_id="lib_caption_preview",
                         )
@@ -3504,11 +3566,12 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                             value=_lib_initial_style.get("preset", "Personalizado"),
                             label="Estilo de legenda",
                             container=False,
+                            elem_id="lib_style_preset",
                         )
                         with gr.Row(elem_classes="lib-style-row"):
                             lib_font = gr.Dropdown(
                                 choices=CAPTION_FONTS,
-                                value=_lib_initial_style.get("font_name", "Montserrat-ExtraBold"),
+                                value=_lib_initial_style.get("font_name", "Montserrat"),
                                 label="Fonte",
                                 allow_custom_value=True,
                             )
@@ -3520,6 +3583,13 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                             lib_color = gr.ColorPicker(value=_lib_initial_style.get("base_color", "#FFFFFF"), label="Cor base")
                             lib_hl_color = gr.ColorPicker(value=_lib_initial_style.get("highlight_color", "#00FF00"), label="Cor destaque")
                             lib_outline = gr.ColorPicker(value=_lib_initial_style.get("outline_color", "#000000"), label="Contorno")
+                        with gr.Row(elem_classes="lib-style-row"):
+                            lib_outline_thickness = gr.Slider(
+                                0, 10,
+                                value=int(_lib_initial_style.get("outline_thickness", 3)),
+                                step=1,
+                                label="Espessura do contorno (px)",
+                            )
                         with gr.Row(elem_classes="lib-style-row"):
                             lib_mode = gr.Dropdown(choices=[("Destacar", "highlight"), ("Palavra a palavra", "word_by_word"), ("Sem destaque", "no_highlight")], value=_lib_initial_style.get("mode", "highlight"), label="Modo")
                             lib_upper = gr.Checkbox(value=bool(_lib_initial_style.get("uppercase", True)), label="Maiúsculas")
@@ -3606,18 +3676,19 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     s = studio.style_for_cut(project, base)
                 return (
                     gr.update(value=s.get("preset", "Personalizado")),
-                    gr.update(value=s.get("font_name", "Montserrat-ExtraBold")),
+                    gr.update(value=s.get("font_name", "Montserrat")),
                     gr.update(value=int(s.get("font_size", 30))),
                     gr.update(value=int(s.get("highlight_size", 35))),
                     gr.update(value=s.get("base_color", "#FFFFFF")),
                     gr.update(value=s.get("highlight_color", "#00FF00")),
                     gr.update(value=s.get("outline_color", "#000000")),
+                    gr.update(value=int(s.get("outline_thickness", 3))),
                     gr.update(value=int(s.get("vertical_position", 200))),
                     gr.update(value=s.get("mode", "highlight")),
                     gr.update(value=bool(s.get("uppercase", True))),
                     gr.update(
                         value=_caption_preview_html(
-                            s.get("font_name", "Montserrat-ExtraBold"),
+                            s.get("font_name", "Montserrat"),
                             int(s.get("font_size", 30)),
                             int(s.get("highlight_size", 35)),
                             s.get("base_color", "#FFFFFF"),
@@ -3625,6 +3696,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                             s.get("outline_color", "#000000"),
                             s.get("mode", "highlight"),
                             bool(s.get("uppercase", True)),
+                            int(s.get("outline_thickness", 3)),
                         )
                     ),
                 )
@@ -3677,7 +3749,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     *style_values,
                 )
 
-            def _lib_caption_preview_ui(font, size, hlsize, color, hlcolor, outline, mode, upper):
+            def _lib_caption_preview_ui(font, size, hlsize, color, hlcolor, outline, outline_thickness, mode, upper):
                 return _caption_preview_html(
                     font,
                     int(size or 30),
@@ -3687,24 +3759,26 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     outline,
                     mode,
                     bool(upper),
+                    int(outline_thickness or 3),
                 )
 
             def _lib_preset_values(name):
                 if name == "Personalizado":
-                    return tuple(gr.update() for _ in range(10))
+                    return tuple(gr.update() for _ in range(11))
                 s = studio.style_from_preset(name)
                 return (
                     s["font_name"], int(s["font_size"]), int(s["highlight_size"]),
                     s["base_color"], s["highlight_color"], s["outline_color"],
-                    int(s["vertical_position"]), s["mode"], bool(s["uppercase"]),
+                    int(s["outline_thickness"]), int(s["vertical_position"]),
+                    s["mode"], bool(s["uppercase"]),
                     _caption_preview_html(
                         s["font_name"], int(s["font_size"]), int(s["highlight_size"]),
                         s["base_color"], s["highlight_color"], s["outline_color"],
-                        s["mode"], bool(s["uppercase"]),
+                        s["mode"], bool(s["uppercase"]), int(s["outline_thickness"]),
                     ),
                 )
 
-            def _lib_apply_style(project, base, preset, font, size, hlsize, color, hlcolor, outline, pos, mode, upper, apply_all):
+            def _lib_apply_style(project, base, preset, font, size, hlsize, color, hlcolor, outline, outline_thickness, pos, mode, upper, apply_all):
                 if not project or not base:
                     return "Selecione um projeto e um corte.", gr.update(), gr.update()
                 style = studio.style_from_preset(preset)
@@ -3715,6 +3789,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     "base_color": color,
                     "highlight_color": hlcolor,
                     "outline_color": outline,
+                    "outline_thickness": int(outline_thickness),
                     "vertical_position": int(pos),
                     "mode": mode,
                     "uppercase": bool(upper),
@@ -3866,17 +3941,17 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
             lib_project.change(
                 _lib_on_project, lib_project,
                 [lib_gallery, lib_cut, lib_video, lib_selected_title, lib_title, lib_desc, lib_tags,
-                 lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper, lib_caption_preview],
+                 lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_outline_thickness, lib_pos, lib_mode, lib_upper, lib_caption_preview],
             )
             lib_refresh.click(
                 _lib_refresh, lib_project,
                 [lib_project, lib_gallery, lib_cut, lib_video, lib_selected_title, lib_title, lib_desc, lib_tags,
-                 lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper, lib_caption_preview],
+                 lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_outline_thickness, lib_pos, lib_mode, lib_upper, lib_caption_preview],
             )
             lib_pick.change(
                 _lib_pick_select, [lib_pick, lib_project],
                 [lib_cut, lib_video, lib_selected_title, lib_title, lib_desc, lib_tags,
-                 lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper, lib_caption_preview],
+                 lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_outline_thickness, lib_pos, lib_mode, lib_upper, lib_caption_preview],
             )
             lib_meta_btn.click(_lib_meta, [lib_project, lib_cut], [lib_title, lib_desc, lib_tags])
             lib_copy_meta_btn.click(
@@ -3903,17 +3978,17 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
             )
             lib_preset.change(
                 _lib_preset_values, lib_preset,
-                [lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper, lib_caption_preview],
+                [lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_outline_thickness, lib_pos, lib_mode, lib_upper, lib_caption_preview],
             )
-            for _caption_control in (lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_mode, lib_upper):
+            for _caption_control in (lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_outline_thickness, lib_mode, lib_upper):
                 _caption_control.change(
                     _lib_caption_preview_ui,
-                    [lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_mode, lib_upper],
+                    [lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_outline_thickness, lib_mode, lib_upper],
                     lib_caption_preview,
                 )
             lib_apply_btn.click(
                 _lib_apply_style,
-                [lib_project, lib_cut, lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper, lib_apply_all],
+                [lib_project, lib_cut, lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_outline_thickness, lib_pos, lib_mode, lib_upper, lib_apply_all],
                 [lib_status, lib_gallery, lib_video],
                 show_progress="hidden",
             )
@@ -4537,3 +4612,4 @@ if __name__ == "__main__":
             # Disable SSR to prevent Node proxying issues on HF Spaces
             app = gr.mount_gradio_app(app, demo.queue(), path="/", allowed_paths=allowed_dirs, ssr_mode=False)
             uvicorn.run(app, host="0.0.0.0", port=7860)
+

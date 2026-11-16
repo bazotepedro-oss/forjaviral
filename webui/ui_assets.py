@@ -5,7 +5,15 @@ from functools import lru_cache
 from pathlib import Path
 
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
-_MIME = {".webp": "image/webp", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
+_MIME = {
+    ".webp": "image/webp",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".ttf": "font/ttf",
+    ".otf": "font/otf",
+    ".woff2": "font/woff2",
+}
 
 
 @lru_cache(maxsize=None)

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.16 — Fontes reais, contorno e molduras
+
+### Interface
+- **Fontes embutidas**: Montserrat, Poppins, Bebas Neue e Anton agora vão junto com o app, no preview e na renderização do vídeo. A fonte muda de verdade ao selecionar.
+- **Espessura do contorno**: novo controle de 0 a 10 px, refletido no preview e na legenda queimada.
+- **Moldura do estilo**: o seletor “Estilo de legenda” agora tem uma caixa visível, deixando claro que é clicável.
+- **Previews sem borda preta**: o corte selecionado e a prévia de música ficaram em molduras escuras próprias, com o vídeo 9:16 enquadrado sem tarjas pretas.
+- Player do corte selecionado um pouco maior, com a legenda aplicada mais visível.
+- Fundo da prévia de música no mesmo tom dos cards, sem moldura preta.
+
 ## 1.3.15 — Biblioteca: ícones, prévia de legenda e música
 
 ### Interface
