@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 import unicodedata
+from collections import deque
 from pathlib import Path
 from typing import Callable
 
@@ -304,6 +305,63 @@ def _concat_command(video: Path, clips: list[dict], output: Path, encoder: str) 
     return command
 
 
+def _render_with_progress(
+    command: list[str],
+    output_seconds: float,
+    progress: Callable[[float, str], None] | None,
+    start: float = 0.66,
+    end: float = 0.98,
+    timeout: int = 1800,
+) -> tuple[int, str]:
+    """Roda o FFmpeg mostrando o progresso real da renderização."""
+    cmd = list(command[:-1]) + ["-progress", "pipe:1", "-nostats", str(command[-1])]
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
+        )
+    except OSError as exc:
+        raise RuntimeError(f"Não foi possível iniciar o FFmpeg: {exc}") from exc
+
+    tail: deque[str] = deque(maxlen=120)
+    last_report = 0.0
+    started = time.monotonic()
+    assert proc.stdout is not None
+    while True:
+        if time.monotonic() - started > timeout:
+            proc.kill()
+            proc.wait()
+            raise RuntimeError(
+                "A renderização passou de 30 minutos e foi interrompida; os créditos serão devolvidos."
+            )
+        line = proc.stdout.readline()
+        if not line:
+            break
+        line = line.strip()
+        if not line:
+            continue
+        tail.append(line)
+        if line.startswith(("out_time_us=", "out_time_ms=")):
+            try:
+                seconds = int(line.split("=", 1)[1].strip()) / 1_000_000.0
+            except ValueError:
+                continue
+            fraction = max(0.0, min(1.0, seconds / max(0.1, output_seconds)))
+            now = time.monotonic()
+            if progress and (now - last_report >= 1.0 or fraction >= 1.0):
+                progress(
+                    start + (end - start) * fraction,
+                    f"Renderizando o vídeo 16:9... {int(round(fraction * 100))}%",
+                )
+                last_report = now
+    return proc.wait(), "\n".join(tail)
+
+
 def create_compilation(
     project_dir: str | Path,
     target_minutes: int,
@@ -358,7 +416,7 @@ def create_compilation(
         raise FileNotFoundError("Transcrição do projeto não encontrada (input.tsv/input.srt).")
 
     if progress:
-        progress(0.08, "Analisando o podcast inteiro e procurando os melhores momentos...")
+        progress(0.04, "Analisando o podcast inteiro e procurando os melhores momentos...")
 
     result = create_viral_segments.create(
         candidate_count,
@@ -388,7 +446,7 @@ def create_compilation(
             "are valuable even when they are not jokes; do not force a laugh or shock into every moment."
         ),
         progress_callback=(
-            (lambda amount, text: progress(0.08 + float(amount) * 0.8, text))
+            (lambda amount, text: progress(0.04 + float(amount) * 0.56, text))
             if progress else None
         ),
     )
@@ -435,7 +493,7 @@ def create_compilation(
             )
 
     if progress:
-        progress(0.25, f"Selecionados {len(clips)} momentos completos ({total_seconds/60:.1f} min). Montando o vídeo 16:9...")
+        progress(0.62, f"Selecionados {len(clips)} momentos completos ({total_seconds/60:.1f} min). Preparando o vídeo 16:9...")
 
     # Evita encher o disco em compilações automáticas muito longas. O bitrate
     # de saída fica perto de 0,5 MB/s; usamos 0,6 MB/s como margem.
@@ -459,20 +517,23 @@ def create_compilation(
     ).stdout
     encoder = "h264_nvenc" if "h264_nvenc" in encoder_list else "libx264"
     command = _concat_command(video, clips, out_video, encoder)
-    try:
-        rendered = subprocess.run(command, capture_output=True, text=True, timeout=1800)
-    except subprocess.TimeoutExpired:
-        raise RuntimeError("A renderização passou de 30 minutos e foi interrompida; os créditos serão devolvidos.")
-    if rendered.returncode != 0 and encoder == "h264_nvenc":
+    rendered_code, rendered_log = _render_with_progress(
+        command, total_seconds, progress
+    )
+    if rendered_code != 0 and encoder == "h264_nvenc":
         if progress:
-            progress(0.35, "GPU indisponível para o encoder. Continuando pela CPU...")
-        command = _concat_command(video, clips, out_video, "libx264")
+            progress(0.66, "GPU indisponível para o encoder. Continuando pela CPU...")
         try:
-            rendered = subprocess.run(command, capture_output=True, text=True, timeout=1800)
-        except subprocess.TimeoutExpired:
-            raise RuntimeError("A renderização passou de 30 minutos e foi interrompida; os créditos serão devolvidos.")
-    if rendered.returncode != 0 or not out_video.exists() or out_video.stat().st_size < 100_000:
-        raise RuntimeError(f"Falha ao renderizar o compilado: {rendered.stderr[-1200:]}")
+            out_video.unlink()
+        except OSError:
+            pass
+        command = _concat_command(video, clips, out_video, "libx264")
+        rendered_code, rendered_log = _render_with_progress(
+            command, total_seconds, progress
+        )
+    if rendered_code != 0 or not out_video.exists() or out_video.stat().st_size < 100_000:
+        detail = rendered_log[-1200:].strip() or f"FFmpeg retornou o código {rendered_code}."
+        raise RuntimeError(f"Falha ao renderizar o compilado: {detail}")
 
     media = _probe_media(out_video)
     if media["width"] != 1920 or media["height"] != 1080:

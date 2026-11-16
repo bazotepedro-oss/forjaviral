@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.3.17 — Pacote de fontes, instalador e feedback do compilado
+
+### Novidades
+- **Pacote com 44 fontes**: Montserrat, Poppins, Bebas Neue, Anton, Oswald, Barlow Condensed, Archivo Black, League Spartan, Teko, Kanit, Prompt, Exo 2, Orbitron, Righteous, Russo One, Black Ops One, Bungee, Bangers, Titan One, Passion One, Alfa Slab One, Inter, Roboto Condensed, Raleway, Rubik, Nunito, Lato, Open Sans, Source Sans 3, Manrope, Sora, Space Grotesk, Outfit, DM Sans, Work Sans, Plus Jakarta Sans, Urbanist, Figtree, Cabin, Caveat, Dancing Script, Great Vibes, Pacifico e Lobster.
+- O instalador registra as fontes no Windows para o usuário atual, sem precisar de administrador. O atualizador e o iniciador também garantem o pacote.
+- As fontes ficam disponíveis no seletor da Biblioteca e no preview, e o FFmpeg usa a pasta de fontes do app para queimar a legenda.
+- O site oficial ganhou uma seção dedicada aos Melhores Momentos, com detalhes do compilado, preços e novas perguntas frequentes.
+
+### Correções
+- **Botão de compilado com feedback imediato**: ao clicar, aparece na hora um cartão de progresso com etapa, porcentagem e barra animada — sem textos duplicados sobre o player ou os metadados.
+- O progresso agora acompanha de verdade a análise da IA e a renderização do FFmpeg, quadro a quadro, até 100%.
+- Em caso de falha, o status mostra o erro e devolve os 10 créditos.
+- Removida a cópia antiga `scripts/app.py`, que não era usada e continha o endereço interno do servidor.
+
 ## 1.3.16 — Fontes reais, contorno e molduras
 
 ### Interface

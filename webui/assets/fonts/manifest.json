@@ -1,0 +1,310 @@
+[
+  {
+    "family": "Montserrat",
+    "label": "Montserrat",
+    "file": "Montserrat.ttf",
+    "style": "Regular",
+    "embed": true
+  },
+  {
+    "family": "Poppins",
+    "label": "Poppins",
+    "file": "Poppins-Bold.ttf",
+    "style": "Bold",
+    "embed": true
+  },
+  {
+    "family": "Bebas Neue",
+    "label": "Bebas Neue",
+    "file": "BebasNeue-Regular.ttf",
+    "style": "Regular",
+    "embed": true
+  },
+  {
+    "family": "Anton",
+    "label": "Anton",
+    "file": "Anton-Regular.ttf",
+    "style": "Regular",
+    "embed": true
+  },
+  {
+    "family": "Oswald",
+    "label": "Oswald",
+    "file": "Oswald_Oswald_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Barlow Condensed",
+    "label": "Barlow Condensed",
+    "file": "Barlow_Condensed_BarlowCondensed-Bold.ttf",
+    "style": "Bold",
+    "embed": false
+  },
+  {
+    "family": "Archivo Black",
+    "label": "Archivo Black",
+    "file": "Archivo_Black_ArchivoBlack-Regular.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "League Spartan",
+    "label": "League Spartan",
+    "file": "League_Spartan_LeagueSpartan_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Teko",
+    "label": "Teko",
+    "file": "Teko_Teko_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Kanit",
+    "label": "Kanit",
+    "file": "Kanit_Kanit-Bold.ttf",
+    "style": "Bold",
+    "embed": false
+  },
+  {
+    "family": "Prompt",
+    "label": "Prompt",
+    "file": "Prompt_Prompt-Bold.ttf",
+    "style": "Bold",
+    "embed": false
+  },
+  {
+    "family": "Exo 2",
+    "label": "Exo 2",
+    "file": "Exo_2_Exo2_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Orbitron",
+    "label": "Orbitron",
+    "file": "Orbitron_Orbitron_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Righteous",
+    "label": "Righteous",
+    "file": "Righteous_Righteous-Regular.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Russo One",
+    "label": "Russo One",
+    "file": "Russo_One_RussoOne-Regular.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Black Ops One",
+    "label": "Black Ops One",
+    "file": "Black_Ops_One_BlackOpsOne-Regular.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Bungee",
+    "label": "Bungee",
+    "file": "Bungee_Bungee-Regular.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Bangers",
+    "label": "Bangers",
+    "file": "Bangers_Bangers-Regular.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Titan One",
+    "label": "Titan One",
+    "file": "Titan_One_TitanOne-Regular.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Passion One",
+    "label": "Passion One",
+    "file": "Passion_One_PassionOne-Bold.ttf",
+    "style": "Bold",
+    "embed": false
+  },
+  {
+    "family": "Alfa Slab One",
+    "label": "Alfa Slab One",
+    "file": "Alfa_Slab_One_AlfaSlabOne-Regular.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Inter",
+    "label": "Inter",
+    "file": "Inter_Inter_opsz_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Roboto Condensed",
+    "label": "Roboto Condensed",
+    "file": "Roboto_Condensed_RobotoCondensed_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Raleway",
+    "label": "Raleway",
+    "file": "Raleway_Raleway_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Rubik",
+    "label": "Rubik",
+    "file": "Rubik_Rubik_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Nunito",
+    "label": "Nunito",
+    "file": "Nunito_Nunito_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Lato",
+    "label": "Lato",
+    "file": "Lato_Lato-Bold.ttf",
+    "style": "Bold",
+    "embed": false
+  },
+  {
+    "family": "Open Sans",
+    "label": "Open Sans",
+    "file": "Open_Sans_OpenSans_wdth_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Source Sans 3",
+    "label": "Source Sans 3",
+    "file": "Source_Sans_3_SourceSans3_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Manrope",
+    "label": "Manrope",
+    "file": "Manrope_Manrope_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Sora",
+    "label": "Sora",
+    "file": "Sora_Sora_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Space Grotesk",
+    "label": "Space Grotesk",
+    "file": "Space_Grotesk_SpaceGrotesk_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Outfit",
+    "label": "Outfit",
+    "file": "Outfit_Outfit_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "DM Sans",
+    "label": "DM Sans",
+    "file": "DM_Sans_DMSans_opsz_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Work Sans",
+    "label": "Work Sans",
+    "file": "Work_Sans_WorkSans_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Plus Jakarta Sans",
+    "label": "Plus Jakarta Sans",
+    "file": "Plus_Jakarta_Sans_PlusJakartaSans_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Urbanist",
+    "label": "Urbanist",
+    "file": "Urbanist_Urbanist_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Figtree",
+    "label": "Figtree",
+    "file": "Figtree_Figtree_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Cabin",
+    "label": "Cabin",
+    "file": "Cabin_Cabin_wdth_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Caveat",
+    "label": "Caveat",
+    "file": "Caveat_Caveat_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Dancing Script",
+    "label": "Dancing Script",
+    "file": "Dancing_Script_DancingScript_wght_.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Great Vibes",
+    "label": "Great Vibes",
+    "file": "Great_Vibes_GreatVibes-Regular.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Pacifico",
+    "label": "Pacifico",
+    "file": "Pacifico_Pacifico-Regular.ttf",
+    "style": "Regular",
+    "embed": false
+  },
+  {
+    "family": "Lobster",
+    "label": "Lobster",
+    "file": "Lobster_Lobster-Regular.ttf",
+    "style": "Regular",
+    "embed": false
+  }
+]

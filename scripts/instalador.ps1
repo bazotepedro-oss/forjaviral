@@ -199,7 +199,18 @@ if ($choice -eq "1") {
 Write-Host " [OK] Dependencias verificadas!" -ForegroundColor Green
 Write-Host ""
 
-# Passo 7: Atalho oficial na Area de Trabalho
+# Passo 7: Fontes para legendas
+Write-Host "Instalando pacote de fontes para legendas..." -ForegroundColor Cyan
+$fontScript = Join-Path $PSScriptRoot "INSTALAR_FONTES.ps1"
+if (Test-Path $fontScript) {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $fontScript
+    Write-Host " [OK] Fontes instaladas para o usuario atual!" -ForegroundColor Green
+} else {
+    Write-Host " [AVISO] Instalador de fontes nao encontrado." -ForegroundColor Yellow
+}
+Write-Host ""
+
+# Passo 8: Atalho oficial na Area de Trabalho
 Write-Host "Criando atalho oficial na Area de Trabalho..." -ForegroundColor Cyan
 $setupShortcutScript = Join-Path $PSScriptRoot "create_shortcut.ps1"
 if (Test-Path $setupShortcutScript) {

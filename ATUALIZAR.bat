@@ -20,5 +20,8 @@ if errorlevel 1 (
 python "%~dp0scripts\auto_update.py" --force
 
 :done
+if exist "%~dp0scripts\INSTALAR_FONTES.ps1" (
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\INSTALAR_FONTES.ps1" >nul 2>&1
+)
 echo.
 pause

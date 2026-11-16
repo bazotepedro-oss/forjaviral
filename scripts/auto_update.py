@@ -117,7 +117,6 @@ FORBIDDEN_CLIENT_NAMES = {
 
 REQUIRED_PAYLOAD_FILES = (
     "webui/app.py",
-    "scripts/app.py",
     "scripts/auto_update.py",
     "INICIAR_FABRICA_DE_CORTES.bat",
 )
@@ -347,6 +346,21 @@ def apply_payload(source_root: Path, backup_root: Path, quiet: bool = False) -> 
         except OSError as exc:
             raise UpdateError(f"nao foi possivel gravar {rel}: {exc}") from exc
         copied += 1
+
+    # Copia antiga da UI que continha o endereco interno do servidor de licenca.
+    # Nao e usada pelo aplicativo e nao deve mais existir na maquina do cliente.
+    legacy_app = PROJECT_ROOT / "scripts" / "app.py"
+    if legacy_app.exists():
+        try:
+            backup = backup_root / "scripts" / "app.py"
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(legacy_app, backup)
+        except OSError:
+            pass
+        try:
+            legacy_app.unlink()
+        except OSError:
+            pass
     return copied
 
 

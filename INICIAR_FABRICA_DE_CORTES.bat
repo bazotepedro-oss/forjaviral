@@ -19,6 +19,11 @@ if exist "%~dp0scripts\auto_update.py" (
     "%~dp0.venv\Scripts\python.exe" "%~dp0scripts\auto_update.py"
 )
 
+rem Instala/atualiza o pacote de fontes para o usuario atual (sem admin).
+if exist "%~dp0scripts\INSTALAR_FONTES.ps1" (
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\INSTALAR_FONTES.ps1" >nul 2>&1
+)
+
 rem Confere se as dependencias foram instaladas de verdade. O instalador antigo
 rem podia falhar no meio e mesmo assim dizer que estava tudo pronto.
 if exist "%~dp0.venv\Scripts\python.exe" (

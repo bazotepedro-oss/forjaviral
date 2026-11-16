@@ -24,6 +24,7 @@ import datetime
 import time
 import urllib.parse
 import platform
+import queue
 import threading
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -46,13 +47,31 @@ from i18n.i18n import I18nAuto
 i18n = I18nAuto()
 
 # --- PRESETS DEFINITIONS ---
-CAPTION_FONTS = [
-    ("Montserrat", "Montserrat"),
-    ("Poppins", "Poppins"),
-    ("Bebas Neue", "Bebas Neue"),
-    ("Anton", "Anton"),
-    ("Arial", "Arial"),
-]
+def _font_manifest() -> list[dict]:
+    path = os.path.join(WORKING_DIR, "webui", "assets", "fonts", "manifest.json")
+    try:
+        with open(path, "r", encoding="utf-8-sig") as fh:
+            data = json.load(fh)
+        if isinstance(data, list):
+            return [item for item in data if isinstance(item, dict) and item.get("family")]
+    except Exception as exc:
+        print(f"[fonts] manifesto indisponível: {exc}")
+    return [
+        {"family": "Montserrat", "label": "Montserrat", "file": "Montserrat.ttf", "style": "Regular", "embed": True},
+        {"family": "Poppins", "label": "Poppins", "file": "Poppins-Bold.ttf", "style": "Bold", "embed": True},
+        {"family": "Bebas Neue", "label": "Bebas Neue", "file": "BebasNeue-Regular.ttf", "style": "Regular", "embed": True},
+        {"family": "Anton", "label": "Anton", "file": "Anton-Regular.ttf", "style": "Regular", "embed": True},
+    ]
+
+
+def _caption_fonts() -> list[tuple[str, str]]:
+    items = [(str(item.get("label") or item["family"]), str(item["family"])) for item in _font_manifest()]
+    if not any(value == "Arial" for _, value in items):
+        items.append(("Arial", "Arial"))
+    return items
+
+
+CAPTION_FONTS = _caption_fonts()
 
 FACE_PRESETS = {
     "Default (Balanced)": {"thresh": 0.35, "two_face": 0.60, "conf": 0.40, "dead_zone": 150},
@@ -70,6 +89,7 @@ EXPERIMENTAL_PRESETS = {
 # ---------------------------
 
 VIRALS_DIR = os.path.join(WORKING_DIR, "VIRALS")
+FONTS_DIR = os.path.join(WORKING_DIR, "webui", "assets", "fonts")
 MODELS_DIR = os.path.join(WORKING_DIR, "models")
 
 # Ensure directories exist
@@ -2162,7 +2182,121 @@ footer {
 }
 
 #best-moments-panel .bm-status {
-    margin-top: 10px !important;
+    margin-top: 12px !important;
+}
+
+#best-moments-panel .bm-prog {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 107, 26, 0.16);
+    background: rgba(0, 0, 0, 0.30);
+}
+
+#best-moments-panel .bm-prog-head {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+#best-moments-panel .bm-prog-ico {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 900;
+    background: rgba(255, 255, 255, 0.07);
+    color: #a99a8d;
+}
+
+#best-moments-panel .bm-prog-msg {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: #e9d9cc;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.45;
+}
+
+#best-moments-panel .bm-prog-pct {
+    flex: 0 0 auto;
+    color: #ffb07a;
+    font-size: 12px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+}
+
+#best-moments-panel .bm-prog-track {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.07);
+    overflow: hidden;
+}
+
+#best-moments-panel .bm-prog-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #ff5c00, #ffb15c);
+    box-shadow: 0 0 14px rgba(255, 92, 0, 0.35);
+    transition: width 0.45s ease;
+}
+
+#best-moments-panel .bm-prog-run {
+    border-color: rgba(255, 107, 26, 0.26);
+}
+
+#best-moments-panel .bm-prog-run .bm-prog-ico {
+    background: transparent;
+    border: 2px solid rgba(255, 138, 76, 0.22);
+    border-top-color: #ff8a4c;
+    animation: bmspin 0.85s linear infinite;
+}
+
+@keyframes bmspin {
+    to { transform: rotate(360deg); }
+}
+
+#best-moments-panel .bm-prog-ok {
+    border-color: rgba(52, 211, 153, 0.28);
+    background: rgba(6, 36, 26, 0.32);
+}
+
+#best-moments-panel .bm-prog-ok .bm-prog-ico {
+    background: rgba(52, 211, 153, 0.18);
+    color: #34d399;
+}
+
+#best-moments-panel .bm-prog-ok .bm-prog-fill {
+    background: linear-gradient(90deg, #059669, #34d399);
+    box-shadow: none;
+}
+
+#best-moments-panel .bm-prog-ok .bm-prog-pct {
+    color: #6ee7b7;
+}
+
+#best-moments-panel .bm-prog-error {
+    border-color: rgba(248, 113, 113, 0.30);
+    background: rgba(46, 10, 10, 0.34);
+}
+
+#best-moments-panel .bm-prog-error .bm-prog-ico {
+    background: rgba(248, 113, 113, 0.16);
+    color: #f87171;
+}
+
+#best-moments-panel .bm-prog-error .bm-prog-msg {
+    color: #fecaca;
+}
+
+#best-moments-panel .bm-prog-error .bm-prog-pct {
+    color: #fca5a5;
 }
 
 #best-moments-panel .bm-empty {
@@ -3144,18 +3278,25 @@ def _rail_html() -> str:
 
 def _dynamic_css() -> str:
     rules = []
-    for family, filename, weight in (
-        ("Montserrat", "fonts/Montserrat.ttf", "100 900"),
-        ("Poppins", "fonts/Poppins-Bold.ttf", "700"),
-        ("Bebas Neue", "fonts/BebasNeue-Regular.ttf", "400"),
-        ("Anton", "fonts/Anton-Regular.ttf", "400"),
-    ):
-        font_uri = ui_assets.data_uri(filename)
-        if font_uri:
-            rules.append(
-                f'@font-face {{ font-family: "{family}"; src: url("{font_uri}") format("truetype"); '
-                f'font-weight: {weight}; font-style: normal; font-display: swap; }}'
-            )
+    for item in _font_manifest():
+        family = str(item.get("family") or "")
+        filename = str(item.get("file") or "")
+        style = str(item.get("style") or "Regular")
+        if not family or not filename:
+            continue
+        if family == "Montserrat":
+            weight = "100 900"
+        elif "Black" in style:
+            weight = "900"
+        elif "Bold" in style:
+            weight = "700"
+        else:
+            weight = "400"
+        font_url = "/fonts/" + urllib.parse.quote(filename)
+        rules.append(
+            f'@font-face {{ font-family: "{family}"; src: url("{font_url}") format("truetype"); '
+            f'font-weight: {weight}; font-style: normal; font-display: swap; }}'
+        )
     hero_bg = ui_assets.data_uri("bg_streaks.webp")
     if hero_bg:
         rules.append(f':root {{ --fdc-hero-bg: url("{hero_bg}"); }}')
@@ -4041,6 +4182,28 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                 "<span>Vídeo 16:9, legendas SRT e capítulos prontos para o YouTube.</span></div>"
             )
 
+            def _comp_status_card(message, tone="idle", percent=None):
+                icons = {"run": "", "ok": "✓", "error": "!", "idle": "●"}
+                icon = icons.get(tone, "●")
+                percent_html = ""
+                track_html = ""
+                if percent is not None:
+                    pct = max(0, min(100, int(round(float(percent)))))
+                    percent_html = f'<span class="bm-prog-pct">{pct}%</span>'
+                    track_html = (
+                        '<div class="bm-prog-track">'
+                        f'<div class="bm-prog-fill" style="width:{pct}%"></div>'
+                        "</div>"
+                    )
+                message_html = _esc(str(message)).replace("\n", "<br>")
+                return (
+                    f'<div class="bm-prog bm-prog-{tone}">'
+                    '<div class="bm-prog-head">'
+                    f'<span class="bm-prog-ico">{icon}</span>'
+                    f'<span class="bm-prog-msg">{message_html}</span>'
+                    f"{percent_html}</div>{track_html}</div>"
+                )
+
             def _comp_downloads_html(latest):
                 if not latest:
                     return ""
@@ -4090,7 +4253,9 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                         _comp_empty,
                         "",
                         "",
-                        "Nenhum compilado gerado neste projeto ainda. Monte o primeiro quando quiser.",
+                        _comp_status_card(
+                            "Nenhum compilado gerado neste projeto ainda. Monte o primeiro quando quiser."
+                        ),
                     )
                 minutes = latest["duration_seconds"] / 60.0
                 mode_label = (
@@ -4101,8 +4266,11 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     studio.video_html(latest["video_path"], "latest"),
                     _comp_downloads_html(latest),
                     latest["title"] + "\n\n" + latest["description"],
-                    f"Último compilado {mode_label} carregado "
-                    f"({minutes:.1f} min reais). Monte outro quando quiser.",
+                    _comp_status_card(
+                        f"Último compilado {mode_label} carregado "
+                        f"({minutes:.1f} min reais). Monte outro quando quiser.",
+                        tone="ok",
+                    ),
                 )
 
             _comp_first = _comp_latest_for(_comp_initial_project) if _comp_initial_project else None
@@ -4117,15 +4285,18 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                 "automático" if _comp_first and int(_comp_first.get("target_minutes") or 0) == 0
                 else (f"de {_comp_first['target_minutes']} min" if _comp_first else "")
             )
-            _comp_initial_status = (
-                f"Último compilado {_comp_initial_mode} carregado "
-                f"({_comp_first['duration_seconds']/60.0:.1f} min reais). Monte outro quando quiser."
-                if _comp_first
-                else (
-                    f"{len(_comp_projects)} podcast(s) pronto(s). Escolha um e clique em montar."
-                    if _comp_projects
-                    else "Nenhum podcast baixado e transcrito. Use a aba Criar Cortes para preparar um episódio."
-                )
+            _comp_initial_status = _comp_status_card(
+                (
+                    f"Último compilado {_comp_initial_mode} carregado "
+                    f"({_comp_first['duration_seconds']/60.0:.1f} min reais). Monte outro quando quiser."
+                    if _comp_first
+                    else (
+                        f"{len(_comp_projects)} podcast(s) pronto(s). Escolha um e clique em montar."
+                        if _comp_projects
+                        else "Nenhum podcast baixado e transcrito. Use a aba Criar Cortes para preparar um episódio."
+                    )
+                ),
+                tone="ok" if _comp_first else "idle",
             )
             with gr.Column(elem_id="best-moments-panel"):
                 gr.HTML(_card_head(
@@ -4177,7 +4348,11 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                             "em caso de falha, os créditos voltam automaticamente.</div>"
                         )
                         comp_button = gr.Button("Montar Melhores Momentos · 10 créditos", variant="primary", elem_id="best_moments_btn")
-                        comp_status = gr.Markdown(_comp_initial_status, elem_classes="lib-status bm-status")
+                        comp_status = gr.HTML(
+                            _comp_initial_status,
+                            elem_classes="bm-status",
+                            elem_id="best_moments_status",
+                        )
                         gr.HTML(
                             '<div class="bm-tip">Podcasts longos dão mais opções de trechos. '
                             "Se o material for insuficiente para a duração escolhida, a ferramenta devolve os créditos "
@@ -4275,61 +4450,111 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     return f"Não consegui baixar/transcrever: {exc}", gr.update()
 
             def _run_best_moments(project, target_minutes, api_key):
-                progress = gr.Progress(track_tqdm=True)
-                if not project:
-                    _gate.settle_delivered(0)
+                def _output(message, tone="run", percent=None, player=None, downloads="", details=""):
                     return (
-                        "Selecione um podcast baixado e transcrito.",
-                        _comp_empty,
-                        "",
-                        "",
-                        _render_topbar_html(),
-                    )
-                try:
-                    result = best_moments.create_compilation(
-                        os.path.join(VIRALS_DIR, project),
-                        int(target_minutes or 0),
-                        str(api_key or "").strip(),
-                        cold_open=True,
-                        progress=lambda amount, description: progress(amount, desc=description),
-                    )
-                    settled = _gate.settle_delivered(10)
-                    media = result.get("media") or {}
-                    minutes = result["duration_seconds"] / 60.0
-                    count = len(result["clips"])
-                    resolution = f"{media.get('width', 0)}×{media.get('height', 0)}"
-                    fps = float(media.get("fps") or 0)
-                    mode_label = "Automático" if int(target_minutes or 0) == 0 else f"{int(target_minutes)} min"
-                    status = (
-                        f"Compilado {mode_label}: {count} momentos · {minutes:.1f} min · "
-                        f"{resolution} · {fps:.0f} FPS. "
-                        + ("10 créditos debitados." if settled else "Não consegui confirmar a liquidação dos 10 créditos; contate o suporte.")
-                    )
-                    details = result["title"] + "\n\n" + result["description"]
-                    downloads = _comp_downloads_html(
-                        {"video_path": result["video_path"], "srt_path": result["srt_path"]}
-                    )
-                    return (
-                        status,
-                        studio.video_html(result["video_path"], "compilation"),
+                        _comp_status_card(message, tone=tone, percent=percent),
+                        _comp_empty if player is None else player,
                         downloads,
                         details,
                         _render_topbar_html(),
                     )
-                except Exception as exc:
-                    refund_ok = _gate.settle_delivered(0)
-                    status = f"Não consegui montar o compilado: {exc}"
-                    if refund_ok:
-                        status += "\nOs 10 créditos foram devolvidos."
-                    else:
-                        status += "\nO estorno será tentado novamente; se persistir, contate o suporte com este aviso."
-                    return (
-                        status,
-                        _comp_empty,
-                        "",
-                        "",
-                        _render_topbar_html(),
+
+                if not project:
+                    _gate.settle_delivered(0)
+                    yield _output(
+                        "Selecione um podcast baixado e transcrito.",
+                        tone="error",
                     )
+                    return
+
+                # Feedback imediato: a análise do Gemini pode levar alguns minutos.
+                yield _output(
+                    f"Preparando o compilado de {project}...",
+                    percent=2,
+                )
+
+                events: queue.Queue = queue.Queue()
+                outcome: dict = {}
+
+                def _worker():
+                    try:
+                        outcome["result"] = best_moments.create_compilation(
+                            os.path.join(VIRALS_DIR, project),
+                            int(target_minutes or 0),
+                            str(api_key or "").strip(),
+                            cold_open=True,
+                            progress=lambda amount, description: events.put(
+                                ("progress", max(0.0, min(1.0, float(amount))), str(description))
+                            ),
+                        )
+                    except BaseException as exc:  # repassado para a interface
+                        outcome["error"] = exc
+                    finally:
+                        events.put(("done", None, None))
+
+                threading.Thread(
+                    target=_worker,
+                    name="best-moments",
+                    daemon=True,
+                ).start()
+
+                last_percent = -1
+                last_description = ""
+                last_emit = 0.0
+                while True:
+                    try:
+                        kind, amount, description = events.get(timeout=0.5)
+                    except queue.Empty:
+                        continue
+                    if kind == "done":
+                        break
+                    percent = int(round(float(amount) * 100))
+                    now = time.monotonic()
+                    if percent == last_percent and description == last_description:
+                        continue
+                    if now - last_emit < 0.35 and percent < 100:
+                        continue
+                    last_percent = percent
+                    last_description = description
+                    last_emit = now
+                    yield _output(description, percent=percent)
+
+                error = outcome.get("error")
+                if error is not None:
+                    refund_ok = _gate.settle_delivered(0)
+                    message = f"Não consegui montar o compilado: {error}"
+                    if refund_ok:
+                        message += "\nOs 10 créditos foram devolvidos."
+                    else:
+                        message += "\nO estorno será tentado novamente; se persistir, contate o suporte com este aviso."
+                    yield _output(message, tone="error")
+                    return
+
+                result = outcome.get("result") or {}
+                settled = _gate.settle_delivered(10)
+                media = result.get("media") or {}
+                minutes = result["duration_seconds"] / 60.0
+                count = len(result["clips"])
+                resolution = f"{media.get('width', 0)}×{media.get('height', 0)}"
+                fps = float(media.get("fps") or 0)
+                mode_label = "Automático" if int(target_minutes or 0) == 0 else f"{int(target_minutes)} min"
+                status = (
+                    f"Compilado {mode_label} pronto: {count} momentos · {minutes:.1f} min · "
+                    f"{resolution} · {fps:.0f} FPS. "
+                    + ("10 créditos debitados." if settled else "Não consegui confirmar a liquidação dos 10 créditos; contate o suporte.")
+                )
+                details = result["title"] + "\n\n" + result["description"]
+                downloads = _comp_downloads_html(
+                    {"video_path": result["video_path"], "srt_path": result["srt_path"]}
+                )
+                yield _output(
+                    status,
+                    tone="ok",
+                    percent=100,
+                    player=studio.video_html(result["video_path"], "compilation"),
+                    downloads=downloads,
+                    details=details,
+                )
 
             comp_refresh.click(_refresh_comp_projects, outputs=comp_project)
             comp_download_btn.click(
@@ -4528,8 +4753,10 @@ if __name__ == "__main__":
             prevent_thread_lock=True
         )
         
-        # Mount the VIRALS directory explicitly
+        # Mount the VIRALS and fonts directories explicitly
         app.mount("/virals", StaticFiles(directory=VIRALS_DIR), name="virals")
+        if os.path.isdir(FONTS_DIR):
+            app.mount("/fonts", StaticFiles(directory=FONTS_DIR), name="fonts")
         print(f"Mounted /virals to {VIRALS_DIR}")
         
         demo.block_thread()
@@ -4549,6 +4776,8 @@ if __name__ == "__main__":
         # Helper to attach routes to any FastAPI app (whether created by Gradio or us)
         def attach_extra_routes(fastapi_app):
             fastapi_app.mount("/virals", StaticFiles(directory=VIRALS_DIR), name="virals")
+            if os.path.isdir(FONTS_DIR):
+                fastapi_app.mount("/fonts", StaticFiles(directory=FONTS_DIR), name="fonts")
             
             @fastapi_app.get("/export_xml_api")
             def export_xml_api(project: str, segment: int, background_tasks: BackgroundTasks, format: str = "premiere"):
