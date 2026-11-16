@@ -88,7 +88,8 @@ class LicenseGate:
         p = _store_path()
         try:
             if p.exists():
-                data = json.loads(p.read_text(encoding="utf-8"))
+                # utf-8-sig aceita arquivos salvos por editores/PowerShell com BOM.
+                data = json.loads(p.read_text(encoding="utf-8-sig"))
                 if isinstance(data, dict):
                     self.base_url = str(data.get("base_url") or self.base_url).strip()
                     self.license_key = str(data.get("license_key") or "").strip()
@@ -263,9 +264,11 @@ class LicenseGate:
         if active is None:
             return False
         refund = max(0, active.requested - min(max(0, int(actual_n)), active.requested))
-        active.settled = True
         if refund and not self.refund_n(refund, active.operation_id, active.operation_id + ":settle"):
+            # Deixe a reserva em aberto: o finally do wrapper tenta o estorno
+            # novamente. Marcar como liquidada aqui perdia o crédito do cliente.
             return False
+        active.settled = True
         return True
 
     # ---- display helpers ----
@@ -284,8 +287,8 @@ class LicenseGate:
 
         m = {
             "missing_license_key": "Cole sua chave de licença para ativar.",
-            "missing_base_url": "Servidor de licença não configurado.",
-            "server_unreachable": "Sem conexão com o servidor de licença. (online obrigatório)",
+            "missing_base_url": "Serviço de licença indisponível. Tente novamente mais tarde.",
+            "server_unreachable": "Sem conexão com o serviço de licença. Verifique sua internet.",
             "expired": "Licença expirada. Renove para continuar.",
             "not_found": "Chave inválida.",
             "hwid_mismatch": "Chave já está ativada em outro PC.",
@@ -333,7 +336,7 @@ class LicenseGate:
                 if available < required:
                     self.state.ok = False
                     self.state.reason = "no_credits"
-                    msg = f"Créditos insuficientes! Você possui {available} crédito(s), mas solicitou {required} corte(s). Recarregue seus créditos para continuar."
+                    msg = f"Créditos insuficientes! Você possui {available} crédito(s), mas esta operação custa {required}. Recarregue seus créditos para continuar."
                     if gr is not None:
                         raise gr.Error(msg)
                     raise RuntimeError(msg)
@@ -371,7 +374,7 @@ class LicenseGate:
             if available < required:
                 self.state.ok = False
                 self.state.reason = "no_credits"
-                msg = f"Créditos insuficientes! Você possui {available} crédito(s), mas solicitou {required} corte(s). Recarregue seus créditos para continuar."
+                msg = f"Créditos insuficientes! Você possui {available} crédito(s), mas esta operação custa {required}. Recarregue seus créditos para continuar."
                 if gr is not None:
                     raise gr.Error(msg)
                 raise RuntimeError(msg)
@@ -396,34 +399,23 @@ class LicenseGate:
         return _wrapped
 
     # ---- UI block ----
-    def ui_block(self) -> Tuple[Any, Any, Any, Any]:
+    def ui_block(self) -> Tuple[Any, Any, Any]:
+        """Somente chave e ativação. O endereço do servidor é configuração interna."""
         if gr is None:
-            return None, None, None, None  # type: ignore
+            return None, None, None  # type: ignore
 
         status_md = gr.Markdown(self.status_text())
-
-        with gr.Row():
-            base_url_txt = gr.Textbox(
-                label="Servidor de licença",
-                value=self.base_url,
-                placeholder="https://forja-license-production.up.railway.app",
-                scale=2,
-                visible=False,
-            )
-            license_key_txt = gr.Textbox(
-                label="Chave de licença",
-                value=self.license_key,
-                placeholder="FC-XXXXX-XXXXX",
-                scale=2,
-            )
-
+        license_key_txt = gr.Textbox(
+            label="Chave de licença",
+            value=self.license_key,
+            placeholder="FC-XXXXX-XXXXX",
+        )
         check_btn = gr.Button("Verificar / Ativar", variant="primary", elem_id="license_check_btn")
 
-        def _do_check(url: str, key: str) -> str:
-            self.set_base_url(url)
+        def _do_check(key: str) -> str:
             self.set_license_key(key)
             self.check_now()
             return self.status_text()
 
-        check_btn.click(fn=_do_check, inputs=[base_url_txt, license_key_txt], outputs=[status_md])
-        return status_md, base_url_txt, license_key_txt, check_btn
+        check_btn.click(fn=_do_check, inputs=[license_key_txt], outputs=[status_md])
+        return status_md, license_key_txt, check_btn

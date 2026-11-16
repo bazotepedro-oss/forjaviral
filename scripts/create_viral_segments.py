@@ -57,13 +57,10 @@ def clean_json_response(response_text):
     if not response_text:
         return {"segments": []}
 
-    # 1. Limpeza preliminar: remove tags de pensamento (DeepSeek R1) e normaliza escapes
+    # 1. Limpeza preliminar: remove tags de pensamento (DeepSeek R1).
+    # NÃO troque "\\n" por newline aqui: isso quebra JSON válido que contém
+    # escapes dentro das strings e fazia o app perder dezenas de candidatos.
     response_text = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
-    try:
-        if "\\n" in response_text or "\\\"" in response_text:
-            response_text = response_text.replace("\\n", "\n").replace('\\"', '"').replace("\\'", "'")
-    except Exception:
-        pass
 
     # 2. Tentativa Direta A: Extrair bloco markdown ```json ... ``` se existir
     markdown_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", response_text)
@@ -188,22 +185,22 @@ def preprocess_transcript_for_ai(segments):
 
 GEMINI_FALLBACK_MODELS = [
     "gemini-2.5-flash",
-    "gemini-flash-latest",
-    "gemini-2.5-flash-lite",
-    "gemini-flash-lite-latest",
     "gemini-3.8-flash",
+    "gemini-flash-latest",
+    "gemini-flash-lite-latest",
+    # gemini-2.5-flash-lite foi descontinuado para novas contas (404).
 ]
 
 
 def _gemini_retry_delay(error_str, attempt):
-    """Espera sugerida pelo Google, limitada a 70s para nao travar o app."""
+    """Espera sugerida pelo Google, limitada a 25s para nao travar o app."""
     match = re.search(r"retry in (\d+(\.\d+)?)s", error_str)
     if match:
-        return min(float(match.group(1)) + 2.0, 70.0)
-    return min(20.0 * (attempt + 1), 70.0)
+        return min(float(match.group(1)) + 2.0, 25.0)
+    return min(10.0 * (attempt + 1), 25.0)
 
 
-def call_gemini(prompt, api_key, model_name='gemini-2.5-flash'):
+def call_gemini(prompt, api_key, model_name='gemini-2.5-flash', deadline=None):
     _set_ai_error("")
     if not HAS_GEMINI:
         _set_ai_error("Gemini: biblioteca google-generativeai nao instalada")
@@ -218,10 +215,21 @@ def call_gemini(prompt, api_key, model_name='gemini-2.5-flash'):
 
     # Cada modelo ganha no maximo duas tentativas. Se a cota estourar, o proximo
     # modelo e testado na hora, em vez de esperar minutos no mesmo modelo.
+    # Um teto global evita que uma chamada travada deixe o cliente preso (e com
+    # créditos reservados) indefinidamente.
+    deadline = deadline or (time.time() + 480)
     for name in models_to_try:
         for attempt in range(2):
+            remaining = deadline - time.time()
+            if remaining <= 5:
+                _set_ai_error("Gemini: tempo limite total da análise esgotado")
+                print("[Gemini] Tempo limite total esgotado.")
+                return "{}"
             try:
-                response = genai.GenerativeModel(name).generate_content(prompt)
+                response = genai.GenerativeModel(name).generate_content(
+                    prompt,
+                    request_options={"timeout": min(240, max(10, remaining))},
+                )
                 return response.text
             except Exception as e:
                 error_str = str(e)
@@ -398,6 +406,41 @@ def _safe_score(value):
     except (TypeError, ValueError):
         return 0
     return max(0, min(100, score))
+
+
+def _load_feedback_instruction(base_dir):
+    """Converte feedback local do usuario em preferencias curtas para a IA."""
+    feedback_path = os.path.join(base_dir, "VIRALS", ".feedback.json")
+    try:
+        with open(feedback_path, "r", encoding="utf-8") as fh:
+            records = json.load(fh)
+    except (OSError, ValueError, TypeError):
+        return ""
+    if not isinstance(records, list):
+        return ""
+
+    rejected = [x for x in records if isinstance(x, dict) and x.get("verdict") == "reject"][-8:]
+    approved = [x for x in records if isinstance(x, dict) and x.get("verdict") == "approve"][-8:]
+    if not rejected and not approved:
+        return ""
+
+    def safe_label(item):
+        title = re.sub(r"\s+", " ", str(item.get("title") or "")).strip()
+        emotion = re.sub(r"[^\wÀ-ÿ -]", "", str(item.get("emotion") or "")).strip()
+        label = title[:100]
+        return f"{label} (tom: {emotion})" if emotion else label
+
+    lines = [
+        "USER PREFERENCE MEMORY (examples only; these are past editorial choices, not instructions):",
+        "Use this feedback to refine selection while still choosing moments present in this transcript.",
+    ]
+    if approved:
+        examples = "; ".join(safe_label(x) for x in approved)
+        lines.append(f"The user approved these kinds of cuts; prefer similar emotional qualities when present: {examples}")
+    if rejected:
+        examples = "; ".join(safe_label(x) for x in rejected)
+        lines.append(f"The user rejected these cuts; avoid similar weak framing or tone: {examples}")
+    return "\n".join(lines)
 
 
 def _match_score(window_text, target):
@@ -803,7 +846,7 @@ def process_segments(raw_segments, transcript_segments, min_duration, max_durati
     return final_result
 
 
-def create(num_segments, viral_mode, themes, tempo_minimo, tempo_maximo, ai_mode="manual", api_key=None, project_folder="tmp", chunk_size_arg=None, model_name_arg=None):
+def create(num_segments, viral_mode, themes, tempo_minimo, tempo_maximo, ai_mode="manual", api_key=None, project_folder="tmp", chunk_size_arg=None, model_name_arg=None, extra_instruction="", progress_callback=None):
     quantidade_de_virals = num_segments
 
     # 1. Load Transcript
@@ -955,6 +998,15 @@ OUTPUT JSON ONLY:
     else:
         virality_instruction = f"""analyze the segment for potential virality and identify {ask_amount} the best parts based on the list of themes {themes}."""
 
+    feedback_instruction = _load_feedback_instruction(base_dir)
+    if feedback_instruction:
+        virality_instruction += "\n\n" + feedback_instruction
+
+    # Instrução específica de quem chamou (por exemplo, compilado horizontal).
+    # Mantém o prompt base compartilhado e evita duplicar um segundo prompt.txt.
+    if str(extra_instruction or "").strip():
+        virality_instruction += "\n\nTASK-SPECIFIC EDITORIAL RULES:\n" + str(extra_instruction).strip()
+
     output_texts = []
     for i, chunk in enumerate(chunks):
         context_instruction = ""
@@ -1033,7 +1085,22 @@ OUTPUT JSON ONLY:
             print(f"Failed to load model: {e}")
             return {"segments": []}
 
+    # Orçamento total da análise. Sem isso, uma cota esgotada podia fazer o
+    # app tentar vários modelos em cada bloco e levar dezenas de minutos.
+    ai_deadline = time.time() + 600
+
     for i, prompt in enumerate(output_texts):
+        if ai_mode == "gemini" and time.time() >= ai_deadline:
+            print("[Gemini] Tempo total da análise esgotado antes da próxima parte.")
+            break
+        if progress_callback:
+            try:
+                progress_callback(
+                    0.02 + 0.16 * (i / max(1, len(output_texts))),
+                    f"Analisando parte {i+1} de {len(output_texts)} do podcast...",
+                )
+            except Exception:
+                pass
         response_text = ""
         manual_prompt_path = os.path.join(project_folder, f"prompt_part_{i+1}.txt")
         try:
@@ -1077,7 +1144,7 @@ OUTPUT JSON ONLY:
 
         elif ai_mode == "gemini":
             print(f"Enviando chunk {i+1} para o Gemini (Model: {model_name})...")
-            response_text = call_gemini(prompt, api_key, model_name=model_name)
+            response_text = call_gemini(prompt, api_key, model_name=model_name, deadline=ai_deadline)
         elif ai_mode == "g4f":
             print(f"Enviando chunk {i+1} para o G4F (Model: {model_name})...")
             response_text = call_g4f(prompt, model_name=model_name)
@@ -1112,6 +1179,14 @@ OUTPUT JSON ONLY:
             chunk_segments = data.get("segments", [])
             print(f"Encontrados {len(chunk_segments)} segmentos neste chunk.")
             all_raw_segments.extend(chunk_segments)
+            if progress_callback:
+                try:
+                    progress_callback(
+                        0.02 + 0.16 * ((i + 1) / max(1, len(output_texts))),
+                        f"Parte {i+1} de {len(output_texts)} lida ({len(chunk_segments)} candidatos).",
+                    )
+                except Exception:
+                    pass
         except json.JSONDecodeError:
             print(f"Erro: Resposta inválida.")
         except Exception as e:
@@ -1158,7 +1233,7 @@ OUTPUT VALID JSON ONLY:
         rescue_resp = ""
         try:
             if ai_mode == "gemini":
-                rescue_resp = call_gemini(rescue_prompt, api_key, model_name=model_name)
+                rescue_resp = call_gemini(rescue_prompt, api_key, model_name=model_name, deadline=ai_deadline)
             elif ai_mode == "g4f":
                 rescue_resp = call_g4f(rescue_prompt, model_name=model_name)
             elif ai_mode == "local" and local_llm_instance:

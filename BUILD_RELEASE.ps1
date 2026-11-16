@@ -49,8 +49,6 @@ $Files = @(
     "run.bat",
     "run_webui.bat",
     "COMO_INSTALAR.txt",
-    "README_RELEASE.txt",
-    "README_en.md",
     "LICENSE",
     "app.ico",
     "api_config.json",
@@ -105,6 +103,13 @@ Get-ChildItem $Stage -Recurse -Force -File -ErrorAction SilentlyContinue |
     } |
     Remove-Item -Force -ErrorAction SilentlyContinue
 
+# Cópia antiga da UI que ficou em scripts/. Não é usada pelo aplicativo e
+# continha o endereço interno do servidor de licença.
+$legacyScriptApp = Join-Path $Stage "scripts\app.py"
+if (Test-Path $legacyScriptApp) {
+    Remove-Item $legacyScriptApp -Force
+}
+
 # Sanitiza a configuracao de IA: o cliente nunca recebe chave de API nossa.
 $apiConfigPath = Join-Path $Stage "api_config.json"
 if (Test-Path $apiConfigPath) {
@@ -127,8 +132,8 @@ Este pacote contem APENAS o aplicativo do cliente.
 
 Nao contem:
 - site de vendas;
-- portal de membros (HostGator);
-- servidor de licencas (Railway);
+- portal de membros;
+- servidor de licencas;
 - banco de dados;
 - chaves privadas, tokens administrativos ou senhas;
 - ambiente virtual (.venv) ou arquivos de desenvolvimento.

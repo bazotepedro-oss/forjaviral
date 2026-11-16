@@ -11,6 +11,7 @@ def get_saved_gemini_key():
     except Exception:
         pass
     return ""
+import base64
 import gradio as gr
 import subprocess
 import os
@@ -32,6 +33,7 @@ import uvicorn
 import re
 import library # Module for Library Logic
 import studio # Biblioteca de cortes (galeria, estilos, música)
+import best_moments # Compilador de destaques longos (5/10 min)
 import subtitle_handler as subs # Module for Subtitles
 import subtitle_editor as editor # Module for Editor Logic
 
@@ -1571,18 +1573,41 @@ footer {
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.32);
 }
 
-.fdc-lib-video {
+.fdc-lib-poster {
+    position: relative;
     aspect-ratio: 9 / 16;
     background: #000;
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
 }
 
-.fdc-lib-video video {
+.fdc-lib-poster img {
     width: 100%;
     height: 100%;
-    object-fit: contain;
+    object-fit: cover;
+}
+
+.fdc-lib-poster-empty {
+    color: #ff7a1a;
+    font-size: 28px;
+}
+
+.fdc-lib-play {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(255, 92, 0, 0.92);
+    color: #fff;
+    font-size: 12px;
+    box-shadow: 0 5px 16px rgba(0,0,0,.4);
 }
 
 .fdc-lib-body {
@@ -1594,6 +1619,20 @@ footer {
     font-weight: 700;
     color: #ffffff;
     line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 52px;
+}
+
+#library-panel .lib-selected-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.3;
+    margin: 2px 0 12px;
+    overflow-wrap: anywhere;
 }
 
 .fdc-lib-tags {
@@ -1625,6 +1664,11 @@ footer {
     border-color: rgba(255, 107, 26, 0.42);
 }
 
+.fdc-lib-card.selected {
+    border-color: rgba(255, 107, 26, 0.72) !important;
+    box-shadow: 0 0 0 2px rgba(255, 92, 0, 0.18), 0 14px 34px rgba(0,0,0,.42) !important;
+}
+
 #library-panel .lib-toolbar {
     gap: 10px !important;
     align-items: center !important;
@@ -1635,12 +1679,248 @@ footer {
     align-items: flex-start !important;
 }
 
+#library-panel .lib-gallery-col,
+#library-panel .lib-side {
+    align-self: auto !important;
+}
+
+#library-panel .lib-side .row {
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+}
+
+#library-panel .lib-side .row > * {
+    min-width: 0 !important;
+}
+
+.lib-status:has(p:empty) {
+    display: none !important;
+}
+
+/* Campos de estado usados pelo clique no card. Não são controles do cliente. */
+#lib_cut,
+#lib_pick {
+    display: none !important;
+}
+
+.fdc-lib-hint {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px dashed rgba(255, 107, 26, 0.18);
+    color: #8f8177;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
 #library-panel .lib-bottom {
     gap: 16px !important;
     align-items: stretch !important;
+    margin-top: 2px !important;
+}
+
+#library-panel .lib-bottom > .form {
+    min-width: 0 !important;
+}
+
+#library-panel #lib-legend-accordion,
+#library-panel #lib-music-accordion,
+#library-panel #lib-meta-accordion,
+#library-panel #lib-danger-accordion {
+    margin-top: 10px !important;
+    border: 1px solid rgba(255, 107, 26, 0.16) !important;
+    border-radius: 16px !important;
+    background: linear-gradient(180deg, rgba(25, 18, 14, 0.88), rgba(13, 10, 8, 0.94)) !important;
+    overflow: hidden !important;
+}
+
+#library-panel #lib-legend-accordion > .label-wrap,
+#library-panel #lib-music-accordion > .label-wrap,
+#library-panel #lib-meta-accordion > .label-wrap,
+#library-panel #lib-danger-accordion > .label-wrap {
+    min-height: 48px !important;
+    padding: 0 16px !important;
+    color: #f4e6dc !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+}
+
+#library-panel .lib-style-card,
+#library-panel .lib-music-card,
+#library-panel .lib-meta-card,
+#library-panel .lib-danger-card {
+    min-width: 0 !important;
+    padding: 14px 16px !important;
+    gap: 10px !important;
+}
+
+#library-panel .lib-style-card .wrap {
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+#library-panel .lib-style-card .head {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 68px !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+}
+
+#library-panel .lib-style-card .block,
+#library-panel .lib-music-card .block,
+#library-panel .lib-meta-card .block,
+#library-panel .lib-danger-card .block {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    min-width: 0 !important;
+}
+
+#library-panel .lib-style-card .tab-like-container {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: center !important;
+    width: 68px !important;
+    min-width: 68px !important;
+}
+
+#library-panel .lib-style-card button[data-testid="reset-button"] {
+    display: none !important;
+}
+
+#library-panel .lib-style-card input[data-testid="number-input"] {
+    width: 68px !important;
+    min-width: 0 !important;
+    height: 30px !important;
+    padding: 3px 6px !important;
+    text-align: center !important;
+}
+
+#library-panel .lib-style-card button[data-testid="reset-button"] {
+    display: none !important;
+}
+
+#library-panel .lib-style-card .slider_input_container {
+    display: grid !important;
+    grid-template-columns: 20px minmax(0, 1fr) 24px !important;
+    align-items: center !important;
+    gap: 7px !important;
+    width: 100% !important;
+}
+
+#library-panel .lib-style-card .min_value,
+#library-panel .lib-style-card .max_value {
+    font-size: 10px !important;
+    color: #a99a8d !important;
+}
+
+#library-panel .lib-style-card input[type="range"] {
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+#library-panel .lib-style-card .form,
+#library-panel .lib-music-card .form,
+#library-panel .lib-meta-card .form,
+#library-panel .lib-danger-card .form {
+    min-width: 0 !important;
+    background: transparent !important;
+}
+
+#library-panel .lib-status p {
+    margin: 0 !important;
+}
+
+#library-panel .lib-status {
+    padding: 8px 10px !important;
+    border-radius: 10px !important;
+    background: rgba(255, 92, 0, 0.07) !important;
+    border: 1px solid rgba(255, 107, 26, 0.12) !important;
+    color: #d8c6b9 !important;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+    overflow-wrap: anywhere !important;
+    max-height: 54px !important;
+    overflow: auto !important;
+}
+
+#library-panel .lib-status:empty {
+    display: none !important;
+}
+
+#library-panel .lib-audio-wrap {
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 107, 26, 0.16);
+    background: rgba(0, 0, 0, 0.24);
+}
+
+#library-panel .lib-audio-name {
+    color: #e9d8cc;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 7px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#library-panel .lib-audio-wrap audio {
+    display: block;
+    width: 100%;
+    height: 36px;
+    accent-color: #FF5C00;
+}
+
+#library-panel .lib-audio-empty {
+    padding: 14px;
+    border-radius: 14px;
+    border: 1px dashed rgba(255, 107, 26, 0.2);
+    color: #88796f;
+    font-size: 12px;
+    text-align: center;
+}
+
+#library-panel .lib-style-card > .form,
+#library-panel .lib-music-card > .form {
+    margin: 0 !important;
+}
+
+#library-panel .lib-style-card .head label,
+#library-panel .lib-music-card .head label {
+    min-width: 0 !important;
+}
+
+#library-panel .lib-style-card .tab-like-container input[type="number"] {
+    background: #0c0908 !important;
+    color: #fff !important;
+    border: 1px solid rgba(255,255,255,.12) !important;
+}
+
+#library-panel .lib-colors {
+    align-items: flex-start !important;
+}
+
+#library-panel .lib-colors .block {
+    min-width: 0 !important;
+}
+
+#library-panel .lib-colors [data-testid="block-info"] {
+    color: #cbb9ab !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+}
+
+#library-panel .lib-side .gradio-container,
+#library-panel .lib-side video {
+    min-width: 0 !important;
 }
 
 #lib_pick {
+    display: none !important;
+}
+
+#lib_cut {
     display: none !important;
 }
 
@@ -1777,11 +2057,362 @@ footer {
     max-height: 300px !important;
 }
 
+#best-moments-panel {
+    gap: 14px !important;
+}
+
+#best-moments-panel .best-moments-main {
+    gap: 16px !important;
+    align-items: flex-start !important;
+}
+
+#best-moments-panel .best-moments-config,
+#best-moments-panel .best-moments-output {
+    padding: 18px !important;
+    min-width: 0 !important;
+}
+
+#best-moments-panel .bm-section-title {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.9px;
+    text-transform: uppercase;
+    color: #ff8a4c;
+    margin-bottom: 10px;
+}
+
+#best-moments-panel .best-moments-config .row {
+    align-items: end !important;
+}
+
+#best-moments-panel .bm-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #d8c6b9;
+    margin: 14px 0 4px;
+}
+
+#best-moments-panel .bm-tip {
+    margin-top: 10px;
+    color: #8f8177;
+    font-size: 10px;
+    line-height: 1.5;
+}
+
+#best-moments-panel .bm-radio {
+    margin-bottom: 8px;
+}
+
+#best-moments-panel .bm-radio label {
+    background: rgba(0, 0, 0, 0.28) !important;
+    border: 1px solid rgba(255, 107, 26, 0.16) !important;
+    border-radius: 14px !important;
+    padding: 8px 14px !important;
+    color: #f4e7dc !important;
+}
+
+#best-moments-panel .bm-cost {
+    margin: 14px 0 12px;
+    padding: 11px 13px;
+    border-radius: 13px;
+    border: 1px solid rgba(255, 107, 26, 0.16);
+    background: rgba(255, 92, 0, 0.06);
+    color: #b9a99b;
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+#best-moments-panel .bm-cost b {
+    color: #ff8a4c;
+}
+
+#best_moments_btn {
+    width: 100% !important;
+    min-height: 58px !important;
+    border-radius: 16px !important;
+    background: var(--fdc-grad) !important;
+    color: #fff !important;
+    font-size: 15px !important;
+    font-weight: 900 !important;
+    box-shadow: 0 16px 38px rgba(255, 92, 0, 0.25) !important;
+}
+
+#best-moments-panel .bm-status {
+    margin-top: 10px !important;
+}
+
+#best-moments-panel .bm-empty {
+    min-height: 260px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    text-align: center;
+    border: 1px dashed rgba(255, 107, 26, 0.22);
+    border-radius: 16px;
+    background: rgba(0, 0, 0, 0.3);
+    color: #a99a8d;
+    padding: 24px;
+}
+
+#best-moments-panel .bm-empty b {
+    color: #f4e7dc;
+    font-size: 14px;
+}
+
+#best-moments-panel .bm-empty span {
+    font-size: 11px;
+    max-width: 260px;
+    line-height: 1.45;
+}
+
+#best-moments-panel .bm-empty-ico {
+    width: 46px;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(255, 92, 0, 0.16);
+    color: #ff8a4c;
+    font-size: 16px;
+    margin-bottom: 3px;
+}
+
+#best_moments_player video {
+    width: 100% !important;
+    max-height: 480px !important;
+    margin: 0 auto !important;
+    display: block !important;
+    border-radius: 16px !important;
+    background: #000 !important;
+    aspect-ratio: 16 / 9;
+    object-fit: contain;
+}
+
+#best-moments-panel .bm-download-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+#best-moments-panel .bm-dl {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 107, 26, 0.28);
+    background: rgba(255, 92, 0, 0.10);
+    color: #ffb07a !important;
+    font-size: 11px;
+    font-weight: 800;
+    text-decoration: none !important;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+#best-moments-panel .bm-dl:hover {
+    background: rgba(255, 92, 0, 0.20);
+    border-color: rgba(255, 107, 26, 0.55);
+}
+
+#best-moments-panel .bm-dl-secondary {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #d8c6b9 !important;
+}
+
+#best-moments-panel .bm-how {
+    padding: 16px 18px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 107, 26, 0.14);
+    background: linear-gradient(180deg, rgba(24, 17, 13, 0.9), rgba(12, 8, 6, 0.9));
+}
+
+#best-moments-panel .bm-how-title {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.9px;
+    text-transform: uppercase;
+    color: #ff8a4c;
+    margin-bottom: 12px;
+}
+
+#best-moments-panel .bm-how-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+#best-moments-panel .bm-how-grid > div {
+    padding: 11px 12px;
+    border-radius: 13px;
+    background: rgba(0, 0, 0, 0.26);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#best-moments-panel .bm-how-grid b {
+    color: #f4e7dc;
+    font-size: 12px;
+}
+
+#best-moments-panel .bm-how-grid span {
+    color: #a99a8d;
+    font-size: 10px;
+    line-height: 1.45;
+}
+
+#best-moments-panel .bm-fineprint {
+    color: #8f8177;
+    font-size: 10px;
+    line-height: 1.5;
+    padding: 0 4px;
+}
+
+@media (max-width: 900px) {
+    #best-moments-panel .best-moments-main {
+        flex-direction: column !important;
+    }
+
+    #best-moments-panel .bm-how-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 #library-panel .lib-side-title {
     text-transform: uppercase !important;
     letter-spacing: 0.7px !important;
     font-size: 11px !important;
     color: #a99a8d !important;
+}
+
+/* Seções da biblioteca: recolhidas e no mesmo acabamento dos cards do menu */
+#library-panel .lib-accordion {
+    margin-top: 10px !important;
+    border: 1px solid rgba(255, 107, 26, 0.16) !important;
+    border-radius: 15px !important;
+    background: linear-gradient(180deg, rgba(25, 18, 14, 0.88), rgba(13, 10, 8, 0.96)) !important;
+    overflow: hidden !important;
+}
+
+#library-panel .lib-accordion > button.label-wrap {
+    min-height: 48px !important;
+    padding: 0 16px !important;
+    color: #f4e6dc !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    background: transparent !important;
+    border: 0 !important;
+}
+
+#library-panel .lib-accordion > button.label-wrap:hover {
+    background: rgba(255, 92, 0, 0.06) !important;
+}
+
+#library-panel .lib-accordion > div {
+    padding: 0 12px 12px !important;
+}
+
+#library-panel .lib-style-card,
+#library-panel .lib-music-card,
+#library-panel .lib-meta-card,
+#library-panel .lib-danger-card {
+    padding: 12px !important;
+    gap: 10px !important;
+}
+
+#library-panel .lib-style-card .head {
+    grid-template-columns: minmax(0, 1fr) !important;
+}
+
+#library-panel .lib-style-card .tab-like-container {
+    display: none !important;
+}
+
+#library-panel .lib-style-card button[data-testid="reset-button"] {
+    display: none !important;
+}
+
+#library-panel .lib-style-card .slider_input_container {
+    grid-template-columns: 18px minmax(0, 1fr) 22px !important;
+    gap: 5px !important;
+}
+
+#library-panel .lib-status {
+    max-height: 40px !important;
+    padding: 7px 9px !important;
+    font-size: 10px !important;
+}
+
+#library-panel .lib-style-card .head,
+#library-panel .lib-music-card .head {
+    margin-bottom: 2px !important;
+}
+
+#library-panel .lib-style-card .head label,
+#library-panel .lib-music-card .head label {
+    min-width: 0 !important;
+}
+
+#library-panel #lib_video .lib-player-wrap {
+    max-height: 390px !important;
+}
+
+#library-panel #lib_video .lib-player {
+    max-height: 390px !important;
+    aspect-ratio: 9 / 16;
+    object-fit: contain !important;
+}
+
+@media (max-width: 1050px) {
+    .gradio-container {
+        padding-left: 104px !important;
+        padding-right: 16px !important;
+    }
+
+    #library-panel .lib-main {
+        flex-direction: column !important;
+    }
+
+    #library-panel .lib-gallery-col,
+    #library-panel .lib-side {
+        width: 100% !important;
+        flex: 1 1 auto !important;
+    }
+
+    .fdc-lib-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    #library-panel .lib-bottom {
+        flex-direction: column !important;
+    }
+
+    #library-panel .lib-bottom > .form {
+        width: 100% !important;
+        flex: 1 1 auto !important;
+    }
+}
+
+@media (max-width: 560px) {
+    .gradio-container {
+        padding-left: 98px !important;
+        padding-right: 12px !important;
+    }
+
+    .fdc-lib-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    #library-panel .lib-toolbar {
+        flex-wrap: wrap !important;
+    }
 }
 
 /* Itens técnicos ocultos para o cliente (continuam no código) */
@@ -1795,11 +2426,26 @@ import header
 import ui_assets
 import ui_icons
 from html import escape as _esc
+
+# studio/best_moments adicionam a pasta scripts ao inicio do sys.path. Sem esta
+# correção, "import license_gate" resolvia para scripts/license_gate.py (versão
+# antiga) em vez deste módulo, expondo o servidor na tela de licença.
+_WEBUI_DIR = os.path.dirname(os.path.abspath(__file__))
+if _WEBUI_DIR in sys.path:
+    sys.path.remove(_WEBUI_DIR)
+sys.path.insert(0, _WEBUI_DIR)
 import license_gate
 import license_client
 
-# License gate (best default)
-_LICENSE_SERVER = os.environ.get('FORJA_LICENSE_SERVER', 'https://forja-license-production.up.railway.app').rstrip('/')
+# License gate (best default). O endereço fica embutido em base64 no build do
+# cliente e nunca é renderizado na interface; a variável de ambiente permite
+# apontar para um servidor de testes sem alterar o código.
+_LICENSE_SERVER = os.environ.get('FORJA_LICENSE_SERVER', '').strip()
+if not _LICENSE_SERVER:
+    _LICENSE_SERVER = base64.b64decode(
+        "aHR0cHM6Ly9mb3JqYS1saWNlbnNlLXByb2R1Y3Rpb24udXAucmFpbHdheS5hcHA="
+    ).decode("ascii")
+_LICENSE_SERVER = _LICENSE_SERVER.rstrip('/')
 _gate = license_gate.LicenseGate(base_url=_LICENSE_SERVER, app_version='1.0.0')
 
 # ---------------------------
@@ -1950,6 +2596,7 @@ def _rail_html() -> str:
     items = [
         ("scissors", "Criar Cortes", True),
         ("layout-grid", i18n("Library"), False),
+        ("clapperboard", "Melhores Momentos", False),
         ("key-round", "Licença", False),
     ]
     buttons = []
@@ -1974,7 +2621,7 @@ def _dynamic_css() -> str:
     hero_bg = ui_assets.data_uri("bg_streaks.webp")
     if hero_bg:
         rules.append(f':root {{ --fdc-hero-bg: url("{hero_bg}"); }}')
-    for index, icon in enumerate(["key-round", "scissors", "layout-grid"], 1):
+    for index, icon in enumerate(["key-round", "scissors", "layout-grid", "clapperboard"], 1):
         rules.append(f".tab-container button:nth-child({index}) {{ --fdc-ico: {ui_icons.mask_uri(icon)}; }}")
     for index, icon in enumerate(["youtube", "folder-open", "upload"], 1):
         rules.append(f".fdc-seg label:nth-child({index}) {{ --fdc-seg-ico: {ui_icons.mask_uri(icon)}; }}")
@@ -2251,7 +2898,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
              topbar_refresh.click(fn=_sync_license_ui, inputs=[], outputs=[topbar_html, blocked_banner, start_btn])
 
              results_html = gr.HTML(label="Resultados", elem_classes="fdc-results")
-             with gr.Accordion("Detalhes técnicos", open=False, elem_classes="fdc-logs"):
+             with gr.Accordion("Detalhes técnicos", open=False, elem_classes="fdc-logs", visible=False):
                  logs_output = gr.Textbox(label="Logs", lines=8, autoscroll=True, elem_id="logs_output")
              
              # Force scroll to bottom via JS
@@ -2314,6 +2961,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
             _lib_first_video = _lib_cuts[0]["video"] if _lib_cuts else None
             _lib_tracks = studio.music_choices()
             _lib_first_track = _lib_tracks[0][1] if _lib_tracks else None
+            _lib_initial_style = studio.style_for_cut(_lib_first, _lib_first_base) if _lib_first and _lib_first_base else studio.style_from_preset("Hormozi (Classic)")
             with gr.Column(elem_id="library-panel"):
                 gr.HTML(_card_head("layout-grid", i18n("Library"), "Seus cortes prontos: legenda, música, thumbnails e download"))
                 with gr.Row(elem_classes="lib-toolbar"):
@@ -2322,51 +2970,57 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     lib_thumbs = gr.Button("Thumbnails", size="sm", scale=1)
                     lib_zip = gr.Button("Baixar ZIP", size="sm", scale=1)
                 with gr.Row(equal_height=False, elem_classes="lib-main"):
-                    with gr.Column(scale=3, elem_classes="fdc-card lib-gallery-col"):
+                    with gr.Column(scale=4, elem_classes="fdc-card lib-gallery-col"):
                         lib_gallery = gr.HTML(studio.gallery_html(_lib_first) if _lib_first else studio.gallery_html(""))
                     with gr.Column(scale=2, elem_classes="fdc-card lib-side"):
                         gr.HTML('<div class="lib-side-title">Corte selecionado</div>')
-                        lib_video = gr.HTML(value=studio.video_html(_lib_first_video) if _lib_first_video else "", elem_id="lib_video")
-                        lib_cut = gr.Dropdown(
-                            choices=[(c["label"], c["base"]) for c in _lib_cuts],
-                            value=_lib_first_base,
-                            show_label=False,
-                            container=False,
-                            elem_id="lib_cut",
+                        lib_selected_title = gr.HTML(
+                            value=f'<div class="lib-selected-title">{_esc(studio.metadata(_lib_first, _lib_first_base)["title"]) if _lib_first and _lib_first_base else "Selecione um corte"}</div>'
                         )
+                        lib_video = gr.HTML(
+                            value=studio.video_html(
+                                _lib_first_video,
+                                poster=studio.thumbnail(_lib_first, _lib_first_base) if _lib_first and _lib_first_base else None,
+                            ) if _lib_first_video else "",
+                            elem_id="lib_video",
+                        )
+                        # Estado invisível: a seleção é feita clicando no card da galeria.
+                        lib_cut = gr.Textbox(value=_lib_first_base or "", show_label=False, container=False, elem_id="lib_cut", visible=True)
                         with gr.Row():
                             lib_approve = gr.Button("Aprovar", size="sm")
                             lib_reject = gr.Button("Reprovar", size="sm")
                         with gr.Row():
                             lib_new_title = gr.Textbox(placeholder="Novo título do corte", show_label=False, container=False, scale=3)
                             lib_rename_btn = gr.Button("Renomear", size="sm", scale=1)
-                        lib_status = gr.Markdown("")
-                with gr.Row(equal_height=False, elem_classes="lib-bottom"):
-                    with gr.Column(scale=3, elem_classes="fdc-card"):
-                        gr.HTML(_card_head("captions", "Editar legenda", "Fonte, cores e posição — aplica sem recortar de novo"))
-                        lib_preset = gr.Dropdown(choices=list(subs.SUBTITLE_PRESETS.keys()), value="Hormozi (Classic)", show_label=False, container=False)
+                        lib_status = gr.Markdown("Pronto para editar.", elem_classes="lib-status")
+                with gr.Accordion("Editar legenda", open=False, elem_id="lib-legend-accordion-v2", elem_classes="lib-accordion"):
+                    with gr.Column(elem_classes="lib-style-card"):
+                        gr.HTML(_card_head("captions", "Estilo das legendas", "Escolha as cores e confira no player antes de aplicar"))
+                        lib_preset = gr.Dropdown(choices=["Personalizado", *list(subs.SUBTITLE_PRESETS.keys())], value=_lib_initial_style.get("preset", "Personalizado"), show_label=False, container=False)
                         with gr.Row():
-                            lib_font = gr.Textbox(value="Montserrat-ExtraBold", label="Fonte")
-                            lib_size = gr.Slider(16, 60, value=30, step=1, label="Tamanho")
+                            lib_font = gr.Textbox(value=_lib_initial_style.get("font_name", "Montserrat-ExtraBold"), label="Fonte")
+                            lib_size = gr.Slider(16, 60, value=int(_lib_initial_style.get("font_size", 30)), step=1, label="Tamanho")
                         with gr.Row():
-                            lib_hl_size = gr.Slider(16, 70, value=35, step=1, label="Destaque")
-                            lib_pos = gr.Slider(0, 500, value=200, step=5, label="Posição vertical")
+                            lib_hl_size = gr.Slider(16, 70, value=int(_lib_initial_style.get("highlight_size", 35)), step=1, label="Destaque")
+                            lib_pos = gr.Slider(0, 500, value=int(_lib_initial_style.get("vertical_position", 200)), step=5, label="Posição vertical")
                         with gr.Row(elem_classes="lib-colors"):
-                            lib_color = gr.ColorPicker(value="#FFFFFF", label="Cor base")
-                            lib_hl_color = gr.ColorPicker(value="#00FF00", label="Cor destaque")
-                            lib_outline = gr.ColorPicker(value="#000000", label="Contorno")
+                            lib_color = gr.ColorPicker(value=_lib_initial_style.get("base_color", "#FFFFFF"), label="Cor base")
+                            lib_hl_color = gr.ColorPicker(value=_lib_initial_style.get("highlight_color", "#00FF00"), label="Cor destaque")
+                            lib_outline = gr.ColorPicker(value=_lib_initial_style.get("outline_color", "#000000"), label="Contorno")
                         with gr.Row():
-                            lib_mode = gr.Dropdown(choices=[("Destacar", "highlight"), ("Palavra a palavra", "word_by_word"), ("Sem destaque", "no_highlight")], value="highlight", label="Modo")
-                            lib_upper = gr.Checkbox(value=True, label="Maiúsculas")
+                            lib_mode = gr.Dropdown(choices=[("Destacar", "highlight"), ("Palavra a palavra", "word_by_word"), ("Sem destaque", "no_highlight")], value=_lib_initial_style.get("mode", "highlight"), label="Modo")
+                            lib_upper = gr.Checkbox(value=bool(_lib_initial_style.get("uppercase", True)), label="Maiúsculas")
                         with gr.Row(elem_classes="lib-apply-row"):
                             lib_apply_all = gr.Checkbox(label="Aplicar em todos os cortes", value=False, scale=3)
                             lib_apply_btn = gr.Button("Aplicar legenda", variant="primary", scale=2)
-                    with gr.Column(scale=2, elem_classes="fdc-card"):
-                        gr.HTML(_card_head("play", "Música", "Ouça a faixa, teste 30s com o vídeo e aplique com ducking"))
+
+                with gr.Accordion("Música", open=False, elem_id="lib-music-accordion-v2", elem_classes="lib-accordion"):
+                    with gr.Column(elem_classes="lib-music-card"):
+                        gr.HTML(_card_head("play", "Música de fundo", "Ouça a faixa, teste com o vídeo e aplique com ducking"))
                         with gr.Row():
-                            lib_track = gr.Dropdown(choices=_lib_tracks, value=_lib_first_track, show_label=False, container=False, scale=4, info="Envie uma música ou coloque arquivos na pasta music/")
+                            lib_track = gr.Dropdown(choices=_lib_tracks, value=_lib_first_track, show_label=False, container=False, scale=4, info="Envie uma faixa ou coloque arquivos na pasta music/")
                             lib_track_refresh = gr.Button("Atualizar lista", size="sm", scale=1)
-                        lib_track_audio = gr.Audio(label="Ouvir a música", value=_lib_first_track, interactive=False)
+                        lib_track_audio = gr.HTML(value=studio.audio_html(_lib_first_track), elem_id="lib_track_audio", elem_classes="lib-track-audio")
                         with gr.Row():
                             lib_vol = gr.Slider(0, 100, value=18, step=1, label="Volume (%)")
                             lib_duck = gr.Checkbox(value=True, label="Abaixar na voz")
@@ -2375,18 +3029,22 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                             lib_apply_music_btn = gr.Button("Aplicar música", variant="primary", scale=1)
                         lib_preview_video = gr.HTML(value="", visible=False, elem_id="lib_preview")
                         lib_music_upload = gr.File(label="Enviar música (mp3, wav, m4a)", file_types=["audio"], type="filepath")
-                with gr.Row(equal_height=False, elem_classes="lib-bottom"):
-                    with gr.Column(scale=2, elem_classes="fdc-card"):
-                        gr.HTML(_card_head("info", "Metadados", "Título, descrição e hashtags prontos para o YouTube"))
+
+                with gr.Accordion("Metadados do YouTube", open=False, elem_id="lib-meta-accordion-v2", elem_classes="lib-accordion"):
+                    with gr.Column(elem_classes="lib-meta-card"):
+                        gr.HTML(_card_head("info", "Copiar para o YouTube", "Título, descrição e hashtags do corte selecionado"))
                         lib_meta_btn = gr.Button("Carregar metadados do corte", size="sm")
                         lib_title = gr.Textbox(label="Título")
                         lib_desc = gr.Textbox(label="Descrição", lines=4)
                         lib_tags = gr.Textbox(label="Hashtags")
-                    with gr.Column(scale=1, elem_classes="fdc-card"):
-                        gr.HTML(_card_head("circle-alert", "Zona de risco", "Apagar corte ou projeto"))
+                        lib_copy_meta_btn = gr.Button("Copiar título + descrição + hashtags", variant="secondary", size="sm")
+
+                with gr.Accordion("Zona de risco", open=False, elem_id="lib-danger-accordion-v2", elem_classes="lib-accordion"):
+                    with gr.Row(elem_classes="lib-danger-card"):
                         lib_delete_cut_btn = gr.Button("Apagar corte", variant="stop", size="sm")
-                        lib_confirm_delete = gr.Checkbox(label="Confirmo apagar o projeto", value=False)
+                        lib_confirm_delete = gr.Checkbox(label="Confirmo apagar o projeto", value=False, scale=2)
                         lib_delete_project_btn = gr.Button("Apagar projeto", variant="stop", size="sm")
+
                 lib_pick = gr.Textbox(value="", show_label=False, container=False, elem_id="lib_pick", visible=True)
                 lib_zip_file = gr.File(label="Download do ZIP", visible=False)
 
@@ -2394,24 +3052,55 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                 meta = studio.metadata(project, base) if project and base else {"title": "", "description": "", "hashtags": ""}
                 return meta["title"], meta["description"], meta["hashtags"]
 
+            def _lib_heading(project, base):
+                title = studio.metadata(project, base)["title"] if project and base else "Selecione um corte"
+                return f'<div class="lib-selected-title">{_esc(title)}</div>'
+
+            def _lib_style_values(project, base):
+                if not project or not base:
+                    s = studio.style_from_preset("Hormozi (Classic)")
+                    s["preset"] = "Personalizado"
+                else:
+                    s = studio.style_for_cut(project, base)
+                return (
+                    gr.update(value=s.get("preset", "Personalizado")),
+                    gr.update(value=s.get("font_name", "Montserrat-ExtraBold")),
+                    gr.update(value=int(s.get("font_size", 30))),
+                    gr.update(value=int(s.get("highlight_size", 35))),
+                    gr.update(value=s.get("base_color", "#FFFFFF")),
+                    gr.update(value=s.get("highlight_color", "#00FF00")),
+                    gr.update(value=s.get("outline_color", "#000000")),
+                    gr.update(value=int(s.get("vertical_position", 200))),
+                    gr.update(value=s.get("mode", "highlight")),
+                    gr.update(value=bool(s.get("uppercase", True))),
+                )
+
+            def _lib_video_html(project, base, path, tag=""):
+                poster = studio.thumbnail(project, base) if project and base else None
+                return studio.video_html(path, tag, poster=poster)
+
             def _lib_selection(project, base):
                 entry = studio._cut_by_base(project, base) if project and base else None
                 video = entry["video"] if entry else None
                 title, desc, tags = _lib_meta(project, base)
-                return gr.update(value=studio.video_html(video)), title, desc, tags
+                style_values = _lib_style_values(project, base)
+                return (gr.update(value=_lib_video_html(project, base, video)), gr.update(value=_lib_heading(project, base)), title, desc, tags, *style_values)
 
             def _lib_on_project(project):
                 items = studio.cuts(project) if project else []
                 first_base = items[0]["base"] if items else None
                 first_video = items[0]["video"] if items else None
                 title, desc, tags = _lib_meta(project, first_base)
+                style_values = _lib_style_values(project, first_base)
                 return (
                     gr.update(value=studio.gallery_html(project) if project else ""),
-                    gr.update(choices=[(i["label"], i["base"]) for i in items], value=first_base),
-                    gr.update(value=studio.video_html(first_video)),
+                    gr.update(value=first_base or ""),
+                    gr.update(value=_lib_video_html(project, first_base, first_video)),
+                    gr.update(value=_lib_heading(project, first_base)),
                     title,
                     desc,
                     tags,
+                    *style_values,
                 )
 
             def _lib_refresh(project):
@@ -2421,17 +3110,22 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                 first_base = items[0]["base"] if items else None
                 first_video = items[0]["video"] if items else None
                 title, desc, tags = _lib_meta(project, first_base)
+                style_values = _lib_style_values(project, first_base)
                 return (
                     gr.update(choices=projects, value=project),
                     gr.update(value=studio.gallery_html(project) if project else ""),
-                    gr.update(choices=[(i["label"], i["base"]) for i in items], value=first_base),
-                    gr.update(value=studio.video_html(first_video)),
+                    gr.update(value=first_base or ""),
+                    gr.update(value=_lib_video_html(project, first_base, first_video)),
+                    gr.update(value=_lib_heading(project, first_base)),
                     title,
                     desc,
                     tags,
+                    *style_values,
                 )
 
             def _lib_preset_values(name):
+                if name == "Personalizado":
+                    return tuple(gr.update() for _ in range(9))
                 s = studio.style_from_preset(name)
                 return (
                     s["font_name"], int(s["font_size"]), int(s["highlight_size"]),
@@ -2460,21 +3154,23 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     messages.append(studio.apply_style(project, target, style))
                 preview = studio.preview_video(project, base, "style")
                 label = f"{len(targets)} corte(s) atualizado(s)." if apply_all else messages[-1]
-                return label, gr.update(value=studio.gallery_html(project, bump=int(time.time()))), gr.update(value=studio.video_html(preview, "style"))
+                if "falha" not in label.lower() and "não encontrado" not in label.lower():
+                    label = f"Legenda aplicada · base {studio.display_color(color)} · destaque {studio.display_color(hlcolor)}."
+                return label, gr.update(value=studio.gallery_html(project, bump=int(time.time()))), gr.update(value=_lib_video_html(project, base, preview, "style"))
 
             def _lib_preview_music(project, base, track, vol, duck):
                 message, preview = studio.preview_music(project, base, track, int(vol), bool(duck), 30)
-                return message, (gr.update(value=studio.video_html(preview, "music"), visible=True) if preview else gr.update())
+                return message, (gr.update(value=_lib_video_html(project, base, preview, "music"), visible=True) if preview else gr.update())
 
             def _lib_apply_music(project, base, track, vol, duck):
                 if not project or not base:
                     return "Selecione um projeto e um corte.", gr.update(), gr.update()
                 message = studio.apply_music(project, base, track, int(vol), bool(duck))
                 preview = studio.preview_video(project, base, "music")
-                return message, gr.update(value=studio.gallery_html(project, bump=int(time.time()))), gr.update(value=studio.video_html(preview, "music"))
+                return message, gr.update(value=studio.gallery_html(project, bump=int(time.time()))), gr.update(value=_lib_video_html(project, base, preview, "music"))
 
             def _lib_track_audio(track):
-                return gr.update(value=track) if track else gr.update()
+                return gr.update(value=studio.audio_html(track))
 
             def _lib_upload_track(upload):
                 if not upload:
@@ -2482,25 +3178,26 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                 saved = studio.save_music_upload(upload)
                 if not saved:
                     return gr.update(), gr.update(), "Falha ao salvar a música."
-                return gr.update(choices=studio.music_choices(), value=saved), gr.update(value=saved), "Música enviada."
+                return gr.update(choices=studio.music_choices(), value=saved), gr.update(value=studio.audio_html(saved)), "Música enviada e pronta para prévia."
 
             def _lib_refresh_tracks():
                 return gr.update(choices=studio.music_choices())
 
             def _lib_rename(project, base, title):
                 if not project or not base:
-                    return "Selecione um corte.", gr.update(), gr.update()
+                    return "Selecione um corte.", gr.update(), gr.update(), gr.update()
                 message = studio.rename_cut(project, base, title)
                 items = studio.cuts(project)
                 return (
                     message,
                     gr.update(value=studio.gallery_html(project, bump=int(time.time()))),
-                    gr.update(choices=[(i["label"], i["base"]) for i in items], value=base),
+                    gr.update(value=base),
+                    gr.update(value=_lib_heading(project, base)),
                 )
 
             def _lib_delete_cut(project, base):
                 if not project or not base:
-                    return "Selecione um corte.", gr.update(), gr.update(), gr.update()
+                    return "Selecione um corte.", gr.update(), gr.update(), gr.update(), gr.update()
                 message = studio.delete_cut(project, base)
                 items = studio.cuts(project)
                 next_base = items[0]["base"] if items else None
@@ -2508,8 +3205,9 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                 return (
                     message,
                     gr.update(value=studio.gallery_html(project, bump=int(time.time()))),
-                    gr.update(choices=[(i["label"], i["base"]) for i in items], value=next_base),
-                    gr.update(value=studio.video_html(next_video)),
+                    gr.update(value=next_base or ""),
+                    gr.update(value=_lib_video_html(project, next_base, next_video)),
+                    gr.update(value=_lib_heading(project, next_base)),
                 )
 
             def _lib_delete_project(project, confirm):
@@ -2522,22 +3220,26 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     message,
                     gr.update(choices=projects, value=first),
                     gr.update(value=studio.gallery_html(first) if first else ""),
-                    gr.update(choices=[(i["label"], i["base"]) for i in items], value=first_base),
-                    gr.update(value=studio.video_html(items[0]["video"]) if items else ""),
+                    gr.update(value=first_base or ""),
+                    gr.update(value=_lib_video_html(first, first_base, items[0]["video"]) if items else ""),
+                    gr.update(value=_lib_heading(first, first_base)),
                 )
 
             def _lib_pick_select(base, project):
                 base = str(base or "").strip()
                 item = studio._cut_by_base(project, base) if project and base else None
                 if not item:
-                    return gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+                    return tuple(gr.update() for _ in range(16))
                 title, desc, tags = _lib_meta(project, base)
+                style_values = _lib_style_values(project, base)
                 return (
                     gr.update(value=base),
-                    gr.update(value=studio.video_html(item["video"])),
+                    gr.update(value=_lib_video_html(project, base, item["video"])),
+                    gr.update(value=_lib_heading(project, base)),
                     title,
                     desc,
                     tags,
+                    *style_values,
                 )
 
             def _lib_zip(project):
@@ -2552,15 +3254,42 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
 
             lib_project.change(
                 _lib_on_project, lib_project,
-                [lib_gallery, lib_cut, lib_video, lib_title, lib_desc, lib_tags],
+                [lib_gallery, lib_cut, lib_video, lib_selected_title, lib_title, lib_desc, lib_tags,
+                 lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper],
             )
             lib_refresh.click(
                 _lib_refresh, lib_project,
-                [lib_project, lib_gallery, lib_cut, lib_video, lib_title, lib_desc, lib_tags],
+                [lib_project, lib_gallery, lib_cut, lib_video, lib_selected_title, lib_title, lib_desc, lib_tags,
+                 lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper],
             )
-            lib_cut.change(_lib_selection, [lib_project, lib_cut], [lib_video, lib_title, lib_desc, lib_tags])
-            lib_pick.change(_lib_pick_select, [lib_pick, lib_project], [lib_cut, lib_video, lib_title, lib_desc, lib_tags])
+            lib_pick.change(
+                _lib_pick_select, [lib_pick, lib_project],
+                [lib_cut, lib_video, lib_selected_title, lib_title, lib_desc, lib_tags,
+                 lib_preset, lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper],
+            )
             lib_meta_btn.click(_lib_meta, [lib_project, lib_cut], [lib_title, lib_desc, lib_tags])
+            lib_copy_meta_btn.click(
+                fn=None,
+                inputs=[lib_title, lib_desc, lib_tags],
+                outputs=[],
+                js="""
+                async (title, description, hashtags) => {
+                  const value = [title, description, hashtags].filter(Boolean).join('\\n\\n');
+                  try {
+                    await navigator.clipboard.writeText(value);
+                    const button = document.querySelector('#lib_copy_meta_btn');
+                    if (button) {
+                      const old = button.textContent;
+                      button.textContent = 'Copiado!';
+                      setTimeout(() => { button.textContent = old; }, 1400);
+                    }
+                  } catch (error) {
+                    console.warn('Não foi possível copiar metadados:', error);
+                  }
+                  return [];
+                }
+                """,
+            )
             lib_preset.change(
                 _lib_preset_values, lib_preset,
                 [lib_font, lib_size, lib_hl_size, lib_color, lib_hl_color, lib_outline, lib_pos, lib_mode, lib_upper],
@@ -2589,19 +3318,241 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                 [lib_status, lib_gallery, lib_video],
                 show_progress="hidden",
             )
-            lib_rename_btn.click(_lib_rename, [lib_project, lib_cut, lib_new_title], [lib_status, lib_gallery, lib_cut])
+            lib_rename_btn.click(_lib_rename, [lib_project, lib_cut, lib_new_title], [lib_status, lib_gallery, lib_cut, lib_selected_title])
             lib_delete_cut_btn.click(
                 _lib_delete_cut, [lib_project, lib_cut],
-                [lib_status, lib_gallery, lib_cut, lib_video],
+                [lib_status, lib_gallery, lib_cut, lib_video, lib_selected_title],
             )
             lib_delete_project_btn.click(
                 _lib_delete_project, [lib_project, lib_confirm_delete],
-                [lib_status, lib_project, lib_gallery, lib_cut, lib_video],
+                [lib_status, lib_project, lib_gallery, lib_cut, lib_video, lib_selected_title],
             )
             lib_zip.click(_lib_zip, lib_project, [lib_status, lib_zip_file], show_progress="hidden")
             lib_thumbs.click(_lib_thumbs, lib_project, [lib_status, lib_gallery])
             lib_approve.click(lambda p, b: studio.set_feedback(p, b, "approve") if p and b else "Selecione um corte.", [lib_project, lib_cut], lib_status)
             lib_reject.click(lambda p, b: studio.set_feedback(p, b, "reject") if p and b else "Selecione um corte.", [lib_project, lib_cut], lib_status)
+
+        with gr.Tab("Melhores Momentos"):
+            def _compilation_projects():
+                return [
+                    project for project in studio.list_projects()
+                    if os.path.isfile(os.path.join(VIRALS_DIR, project, "input.mp4"))
+                    and (
+                        os.path.isfile(os.path.join(VIRALS_DIR, project, "input.tsv"))
+                        or os.path.isfile(os.path.join(VIRALS_DIR, project, "input.srt"))
+                    )
+                ]
+
+            _comp_empty = (
+                '<div class="bm-empty"><div class="bm-empty-ico">▶</div>'
+                "<b>Seu compilado aparece aqui</b>"
+                "<span>Vídeo 16:9, legendas SRT e capítulos prontos para o YouTube.</span></div>"
+            )
+
+            def _comp_downloads_html(latest):
+                if not latest:
+                    return ""
+                video_url = studio._media_url(latest["video_path"])
+                links = [f'<a class="bm-dl" href="{video_url}" download>Baixar vídeo MP4</a>']
+                if latest.get("srt_path"):
+                    srt_url = studio._media_url(latest["srt_path"])
+                    links.append(f'<a class="bm-dl bm-dl-secondary" href="{srt_url}" download>Baixar legendas SRT</a>')
+                return '<div class="bm-download-links">' + "".join(links) + "</div>"
+
+            _comp_projects = _compilation_projects()
+
+            def _comp_latest_for(project):
+                if not project:
+                    return None
+                items = best_moments.list_compilations(os.path.join(VIRALS_DIR, project))
+                if not items:
+                    return None
+                return next(
+                    (item for item in items if int(item.get("target_minutes") or 0) == 10),
+                    items[0],
+                )
+
+            def _comp_context_updates(project):
+                latest = _comp_latest_for(project)
+                if not latest:
+                    return (
+                        _comp_empty,
+                        "",
+                        "",
+                        "Nenhum compilado gerado neste projeto ainda. Monte o primeiro quando quiser.",
+                    )
+                minutes = latest["duration_seconds"] / 60.0
+                return (
+                    studio.video_html(latest["video_path"], "latest"),
+                    _comp_downloads_html(latest),
+                    latest["title"] + "\n\n" + latest["description"],
+                    f"Último compilado de {latest['target_minutes']} min carregado "
+                    f"({minutes:.1f} min reais). Monte outro quando quiser.",
+                )
+
+            _comp_first = _comp_latest_for(_comp_projects[0]) if _comp_projects else None
+            _comp_initial_player = (
+                studio.video_html(_comp_first["video_path"], "latest") if _comp_first else _comp_empty
+            )
+            _comp_initial_downloads = _comp_downloads_html(_comp_first)
+            _comp_initial_details = (
+                _comp_first["title"] + "\n\n" + _comp_first["description"] if _comp_first else ""
+            )
+            _comp_initial_status = (
+                f"Último compilado de {_comp_first['target_minutes']} min carregado "
+                f"({_comp_first['duration_seconds']/60.0:.1f} min reais). Monte outro quando quiser."
+                if _comp_first
+                else (
+                    f"{len(_comp_projects)} podcast(s) pronto(s). Escolha um e clique em montar."
+                    if _comp_projects
+                    else "Nenhum podcast baixado e transcrito. Use a aba Criar Cortes para preparar um episódio."
+                )
+            )
+            with gr.Column(elem_id="best-moments-panel"):
+                gr.HTML(_card_head(
+                    "clapperboard",
+                    "Melhores Momentos",
+                    "Compilado 16:9 com os melhores trechos do podcast, pronto para o YouTube",
+                ))
+                with gr.Row(equal_height=False, elem_classes="best-moments-main"):
+                    with gr.Column(scale=3, elem_classes="fdc-card best-moments-config"):
+                        gr.HTML('<div class="bm-section-title">Configurar compilado</div>')
+                        with gr.Row():
+                            comp_project = gr.Dropdown(
+                                choices=_comp_projects,
+                                value=_comp_projects[0] if _comp_projects else None,
+                                label="Podcast baixado e transcrito",
+                                scale=5,
+                            )
+                            comp_refresh = gr.Button("Atualizar", size="sm", scale=1)
+                        gr.HTML('<div class="bm-label">Duração do compilado</div>')
+                        comp_length = gr.Radio(
+                            [("5 minutos", 5), ("10 minutos", 10)],
+                            value=10,
+                            show_label=False,
+                            container=False,
+                            elem_classes="bm-radio",
+                        )
+                        comp_cold_open = gr.Checkbox(
+                            value=True,
+                            label="Abrir com o melhor momento (cold open)",
+                        )
+                        gr.HTML(
+                            '<div class="bm-cost"><b>10 créditos</b> por compilação. '
+                            "A cobrança só é confirmada quando o vídeo fica pronto; "
+                            "em caso de falha, os créditos voltam automaticamente.</div>"
+                        )
+                        comp_button = gr.Button("Montar Melhores Momentos · 10 créditos", variant="primary", elem_id="best_moments_btn")
+                        comp_status = gr.Markdown(_comp_initial_status, elem_classes="lib-status bm-status")
+                        gr.HTML(
+                            '<div class="bm-tip">Podcasts longos dão mais opções de trechos. '
+                            "Se o material for insuficiente para a duração escolhida, a ferramenta devolve os créditos "
+                            "em vez de entregar um vídeo incompleto.</div>",
+                            elem_classes="fdc-bare",
+                        )
+                    with gr.Column(scale=2, elem_classes="fdc-card best-moments-output"):
+                        gr.HTML('<div class="bm-section-title">Prévia e entrega</div>')
+                        comp_player = gr.HTML(value=_comp_initial_player, elem_id="best_moments_player")
+                        comp_downloads = gr.HTML(value=_comp_initial_downloads, elem_classes="fdc-bare")
+                        comp_details = gr.Textbox(
+                            label="Título, descrição e capítulos para o YouTube",
+                            value=_comp_initial_details,
+                            lines=8,
+                            interactive=False,
+                        )
+                gr.HTML(
+                    '<div class="bm-how">'
+                    '<div class="bm-how-title">O que a IA prioriza</div>'
+                    '<div class="bm-how-grid">'
+                    '<div><b>Emoção real</b><span>risadas, surpresa, shock e reações espontâneas</span></div>'
+                    '<div><b>Histórias completas</b><span>começo, tensão e desfecho sem cortar frases</span></div>'
+                    '<div><b>Opiniões fortes</b><span>polêmica, revelação e pontos de vista marcantes</span></div>'
+                    '<div><b>Retenção</b><span>ganchos que funcionam mesmo fora do contexto</span></div>'
+                    "</div></div>",
+                    elem_classes="fdc-bare",
+                )
+                gr.HTML(
+                    '<div class="bm-fineprint">O compilado analisa o podcast inteiro, evita repetir o mesmo assunto '
+                    "e monta o vídeo em 1920×1080, 30 FPS, com áudio AAC 192 kbps. "
+                    "Se não houver material suficiente para a duração escolhida, nada é entregue e os 10 créditos são devolvidos.</div>",
+                    elem_classes="fdc-bare",
+                )
+
+            def _refresh_comp_projects():
+                choices = _compilation_projects()
+                return gr.update(choices=choices, value=choices[0] if choices else None)
+
+            def _run_best_moments(project, target_minutes, cold_open, api_key):
+                progress = gr.Progress(track_tqdm=True)
+                if not project:
+                    _gate.settle_delivered(0)
+                    return (
+                        "Selecione um podcast baixado e transcrito.",
+                        _comp_empty,
+                        "",
+                        "",
+                        _render_topbar_html(),
+                    )
+                try:
+                    result = best_moments.create_compilation(
+                        os.path.join(VIRALS_DIR, project),
+                        int(target_minutes or 10),
+                        str(api_key or "").strip(),
+                        cold_open=bool(cold_open),
+                        progress=lambda amount, description: progress(amount, desc=description),
+                    )
+                    settled = _gate.settle_delivered(10)
+                    media = result.get("media") or {}
+                    minutes = result["duration_seconds"] / 60.0
+                    count = len(result["clips"])
+                    resolution = f"{media.get('width', 0)}×{media.get('height', 0)}"
+                    fps = float(media.get("fps") or 0)
+                    status = (
+                        f"Compilado pronto: {count} momentos · {minutes:.1f} min · "
+                        f"{resolution} · {fps:.0f} FPS. "
+                        + ("10 créditos debitados." if settled else "Não consegui confirmar a liquidação dos 10 créditos; contate o suporte.")
+                    )
+                    details = result["title"] + "\n\n" + result["description"]
+                    downloads = _comp_downloads_html(
+                        {"video_path": result["video_path"], "srt_path": result["srt_path"]}
+                    )
+                    return (
+                        status,
+                        studio.video_html(result["video_path"], "compilation"),
+                        downloads,
+                        details,
+                        _render_topbar_html(),
+                    )
+                except Exception as exc:
+                    refund_ok = _gate.settle_delivered(0)
+                    status = f"Não consegui montar o compilado: {exc}"
+                    if refund_ok:
+                        status += "\nOs 10 créditos foram devolvidos."
+                    else:
+                        status += "\nO estorno será tentado novamente; se persistir, contate o suporte com este aviso."
+                    return (
+                        status,
+                        _comp_empty,
+                        "",
+                        "",
+                        _render_topbar_html(),
+                    )
+
+            comp_refresh.click(_refresh_comp_projects, outputs=comp_project)
+            comp_project.change(
+                _comp_context_updates,
+                comp_project,
+                [comp_player, comp_downloads, comp_details, comp_status],
+            )
+            comp_button.click(
+                _gate.require_precheck_and_prepay(
+                    _run_best_moments,
+                    lambda args, kwargs: 10,
+                ),
+                inputs=[comp_project, comp_length, comp_cold_open, api_key_input],
+                outputs=[comp_status, comp_player, comp_downloads, comp_details, topbar_html],
+                show_progress="hidden",
+            )
 
     # Navegação lateral: liga os ícones às abas e mantém o ícone ativo sincronizado.
     demo.load(
@@ -2667,6 +3618,9 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
             const base = card.getAttribute('data-base');
             const pick = document.querySelector('#lib_pick textarea, #lib_pick input');
             if (!base || !pick) return;
+            document.querySelectorAll('.fdc-lib-card').forEach((item) => {
+              item.classList.toggle('selected', item === card);
+            });
             const proto = pick.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
             const setter = Object.getOwnPropertyDescriptor(proto, 'value') ? Object.getOwnPropertyDescriptor(proto, 'value').set : null;
             if (setter) setter.call(pick, base); else pick.value = base;

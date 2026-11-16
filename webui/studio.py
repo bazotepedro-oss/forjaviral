@@ -74,7 +74,19 @@ def _segment_for(project: str, base: str) -> dict:
 
 
 def _ass_color(hex_color: str, alpha: str = "00") -> str:
-    value = str(hex_color or "").strip().lstrip("#")
+    raw = str(hex_color or "").strip()
+    # Gradio ColorPicker can return #RRGGBB or CSS rgb()/rgba(). Previously
+    # rgb() was treated as invalid and silently converted to white.
+    rgb = re.fullmatch(
+        r"rgba?\(\s*(\d{1,3}(?:\.\d+)?)\s*,\s*(\d{1,3}(?:\.\d+)?)\s*,\s*(\d{1,3}(?:\.\d+)?)(?:\s*,\s*[\d.]+)?\s*\)",
+        raw,
+        re.IGNORECASE,
+    )
+    if rgb:
+        r, g, b = (max(0, min(255, round(float(component)))) for component in rgb.groups())
+        return f"&H{alpha}{b:02X}{g:02X}{r:02X}&".upper()
+
+    value = raw.lstrip("#")
     if len(value) == 3:
         value = "".join(ch * 2 for ch in value)
     if len(value) != 6:
@@ -182,10 +194,13 @@ def thumbnail(project: str, base: str) -> Path | None:
     if not entry:
         return None
     THUMBS.mkdir(parents=True, exist_ok=True)
-    target = THUMBS / f"{_safe_name(project)}__{_safe_name(base)}.jpg"
     video = Path(entry["video"])
     try:
-        if target.exists() and target.stat().st_mtime >= video.stat().st_mtime:
+        # Put the source mtime in the cache key. Comparing rounded mtime values
+        # kept showing the old white-caption poster after a style re-render.
+        video_stamp = video.stat().st_mtime_ns
+        target = THUMBS / f"{_safe_name(project)}__{_safe_name(base)}__{video_stamp:x}.jpg"
+        if target.exists():
             return target
         duration = _ffprobe_duration(video)
         stamp = max(0.4, min(3.0, duration * 0.15)) if duration else 1.0
@@ -223,7 +238,31 @@ def _media_url(path: Path) -> str:
         return "/gradio_api/file=" + urllib.parse.quote(value, safe="/:")
 
 
-def video_html(path, tag: str = "") -> str:
+_AUDIO_MIME = {
+    ".mp3": "audio/mpeg",
+    ".m4a": "audio/mp4",
+    ".aac": "audio/aac",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+    ".flac": "audio/flac",
+}
+
+
+def audio_html(path: str | Path | None) -> str:
+    """Player de música nativo, sem o waveform grande do componente Gradio."""
+    if not path or not Path(path).is_file():
+        return '<div class="lib-audio-empty">Selecione uma faixa para ouvir.</div>'
+    file_path = Path(path)
+    mime = _AUDIO_MIME.get(file_path.suffix.lower(), "audio/mpeg")
+    return (
+        '<div class="lib-audio-wrap">'
+        f'<div class="lib-audio-name">{html.escape(file_path.stem)}</div>'
+        f'<audio controls preload="metadata"><source src="{_media_url(file_path)}?v={_cache_tag(file_path)}" type="{mime}"></audio>'
+        "</div>"
+    )
+
+
+def video_html(path, tag: str = "", poster: str | Path | None = None) -> str:
     """Player HTML5 próprio, usando o mesmo mount /virals da galeria."""
     if not path:
         return ""
@@ -231,9 +270,14 @@ def video_html(path, tag: str = "") -> str:
     if not video.exists():
         return ""
     url = _media_url(video)
+    poster_url = ""
+    if poster:
+        poster_path = Path(str(poster))
+        if poster_path.exists():
+            poster_url = f' poster="{_media_url(poster_path)}?v={_cache_tag(poster_path)}"'
     return (
         '<div class="lib-player-wrap">'
-        f'<video class="lib-player" controls preload="metadata" playsinline>'
+        f'<video class="lib-player" controls preload="metadata" playsinline{poster_url}>'
         f'<source src="{url}?v={_cache_tag(video)}-{tag}" type="video/mp4">'
         "</video></div>"
     )
@@ -249,10 +293,9 @@ def gallery_html(project: str, bump: int = 0) -> str:
         )
 
     cards = []
-    for item in items:
-        video = Path(item["video"])
+    for index, item in enumerate(items):
         poster = thumbnail(project, item["base"])
-        poster_attr = f' poster="{_media_url(poster)}"' if poster else ""
+        poster_url = f'{_media_url(poster)}?v={_cache_tag(poster)}-{bump}' if poster else ""
         title = html.escape(item["title"])
         score = item["score"]
         score_html = (
@@ -261,11 +304,10 @@ def gallery_html(project: str, bump: int = 0) -> str:
         tags = html.escape(" ".join(_segment_for(project, item["base"]).get("hashtags") or []))
         cards.append(
             f"""
-            <div class="fdc-lib-card" data-base="{html.escape(str(item['base']), quote=True)}">
-              <div class="fdc-lib-video">
-                <video controls preload="metadata" playsinline{poster_attr}>
-                  <source src="{_media_url(video)}?v={_cache_tag(video)}-{bump}" type="video/mp4">
-                </video>
+            <div class="fdc-lib-card{' selected' if index == 0 else ''}" data-base="{html.escape(str(item['base']), quote=True)}" role="button" tabindex="0" aria-label="Abrir {title}">
+              <div class="fdc-lib-poster">
+                {'<img src="' + poster_url + '" alt="' + title + '" loading="lazy">' if poster_url else '<div class="fdc-lib-poster-empty">▶</div>'}
+                <span class="fdc-lib-play" aria-hidden="true">▶</span>
               </div>
               <div class="fdc-lib-body">
                 <div class="fdc-lib-title">{title}</div>
@@ -280,6 +322,7 @@ def gallery_html(project: str, bump: int = 0) -> str:
         f'<div class="fdc-lib-head"><span>{len(items)} corte(s)</span>'
         f'<span class="fdc-lib-project">{html.escape(project)}</span></div>'
         '<div class="fdc-lib-grid">' + "".join(cards) + "</div>"
+        '<div class="fdc-lib-hint">Clique em um corte para abrir o player e editar legenda, música e metadados.</div>'
     )
 
 
@@ -318,19 +361,37 @@ def rename_cut(project: str, base: str, new_title: str) -> str:
 
 
 def set_feedback(project: str, base: str, verdict: str) -> str:
-    path = _project_dir(project) / "feedback.json"
-    try:
-        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-    except Exception:
-        data = {}
     segment = _segment_for(project, base)
-    data[base] = {
+    item = {
+        "project": project,
+        "base": base,
         "verdict": verdict,
         "title": segment.get("title") or base,
+        "emotion": segment.get("emotion") or "",
+        "reasoning": segment.get("reasoning") or "",
+        "hook": segment.get("hook") or "",
         "score": segment.get("score"),
         "at": int(time.time()),
     }
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    project_path = _project_dir(project) / "feedback.json"
+    try:
+        local = json.loads(project_path.read_text(encoding="utf-8")) if project_path.exists() else {}
+    except Exception:
+        local = {}
+    local[base] = item
+    project_path.write_text(json.dumps(local, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # Preferências atravessam projetos: uma reprovação num episódio deve ajudar
+    # a escolher os melhores momentos dos próximos episódios também.
+    global_path = VIRALS / ".feedback.json"
+    try:
+        global_data = json.loads(global_path.read_text(encoding="utf-8")) if global_path.exists() else []
+    except Exception:
+        global_data = []
+    global_data = [x for x in global_data if not (x.get("project") == project and x.get("base") == base)]
+    global_data.append(item)
+    global_data = sorted(global_data, key=lambda x: int(x.get("at") or 0))[-100:]
+    global_path.write_text(json.dumps(global_data, ensure_ascii=False, indent=2), encoding="utf-8")
     return "Corte aprovado." if verdict == "approve" else "Corte reprovado (feedback salvo)."
 
 
@@ -356,8 +417,7 @@ def delete_cut(project: str, base: str) -> str:
                 removed += 1
             except OSError:
                 pass
-    thumb = THUMBS / f"{_safe_name(project)}__{_safe_name(base)}.jpg"
-    if thumb.exists():
+    for thumb in THUMBS.glob(f"{_safe_name(project)}__{_safe_name(base)}*.jpg"):
         try:
             thumb.unlink()
         except OSError:
@@ -388,10 +448,15 @@ def export_zip(project: str) -> str:
                 for file in current.glob("*"):
                     if file.is_file() and (sub != "burned_sub" or file.suffix.lower() == ".mp4"):
                         zf.write(file, arcname=f"{sub}/{file.name}")
+        for name in ("caption_styles.json", "feedback.json"):
+            file = folder / name
+            if file.is_file():
+                zf.write(file, arcname=name)
         for item in cuts(project):
-            thumb = THUMBS / f"{_safe_name(project)}__{_safe_name(item['base'])}.jpg"
-            if thumb.exists():
-                zf.write(thumb, arcname=f"thumbnails/{thumb.name}")
+            pattern = f"{_safe_name(project)}__{_safe_name(item['base'])}*.jpg"
+            thumbs = sorted(THUMBS.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)
+            if thumbs:
+                zf.write(thumbs[0], arcname=f"thumbnails/{thumbs[0].name}")
         zf.writestr(
             "metadados.json",
             json.dumps(
@@ -436,6 +501,72 @@ def style_from_preset(name: str) -> dict:
     }
     default.update(preset or {})
     return default
+
+
+def _ass_to_hex(value: str, fallback: str = "#FFFFFF") -> str:
+    match = re.search(r"&H([0-9A-Fa-f]{8})&?", str(value or ""))
+    if not match:
+        return fallback
+    raw = match.group(1)
+    # ASS stores colors as alpha, blue, green, red.
+    return f"#{raw[6:8]}{raw[4:6]}{raw[2:4]}".upper()
+
+
+def display_color(value: str) -> str:
+    """Normalizes a Gradio hex/rgb/rgba value to a short #RRGGBB label."""
+    return _ass_to_hex(_ass_color(value), "#FFFFFF")
+
+
+def style_for_cut(project: str, base: str) -> dict:
+    """Load the last applied style, or infer the visible style from its ASS file."""
+    style = style_from_preset("Hormozi (Classic)")
+    style["preset"] = "Personalizado"
+    folder = _project_dir(project)
+    styles_path = folder / "caption_styles.json"
+    try:
+        saved = json.loads(styles_path.read_text(encoding="utf-8")) if styles_path.exists() else {}
+        if isinstance(saved.get(base), dict):
+            style.update(saved[base])
+            style["preset"] = "Personalizado"
+            return style
+    except Exception:
+        pass
+
+    ass_path = folder / "subs_ass" / f"{base}_processed.ass"
+    if not ass_path.exists():
+        return style
+    try:
+        text = ass_path.read_text(encoding="utf-8", errors="replace")
+        format_match = re.search(r"^Format:\s*(.+)$", text, re.MULTILINE)
+        style_match = re.search(r"^Style:\s*Default,(.+)$", text, re.MULTILINE)
+        if format_match and style_match:
+            keys = [key.strip().lower() for key in format_match.group(1).split(",")]
+            vals = [value.strip() for value in style_match.group(1).split(",")]
+            fields = dict(zip(keys[1:], vals))
+            style["font_name"] = fields.get("fontname", style["font_name"])
+            style["font_size"] = int(float(fields.get("fontsize", style["font_size"])))
+            style["base_color"] = _ass_to_hex(fields.get("primarycolour", ""), style["base_color"])
+            style["outline_color"] = _ass_to_hex(fields.get("outlinecolour", ""), style["outline_color"])
+            style["shadow_color"] = _ass_to_hex(fields.get("backcolour", ""), style["shadow_color"])
+            style["bold"] = int(fields.get("bold", "0")) != 0
+            style["italic"] = int(fields.get("italic", "0")) != 0
+            style["underline"] = int(fields.get("underline", "0")) != 0
+            style["strikeout"] = int(fields.get("strikeout", "0")) != 0
+            style["border_style"] = int(float(fields.get("borderstyle", "1")))
+            style["outline_thickness"] = float(fields.get("outline", "3"))
+            style["shadow_size"] = float(fields.get("shadow", "0"))
+            style["alignment"] = int(float(fields.get("alignment", "2")))
+            style["vertical_position"] = int(float(fields.get("marginv", "200")))
+        first_dialogue = next((line for line in text.splitlines() if line.startswith("Dialogue:")), "")
+        highlight = re.search(r"\\c&H([0-9A-Fa-f]{8})&", first_dialogue)
+        if highlight:
+            style["highlight_color"] = _ass_to_hex("&H" + highlight.group(1) + "&", style["highlight_color"])
+        sizes = re.findall(r"\\fs(\d+(?:\.\d+)?)", first_dialogue)
+        if sizes:
+            style["highlight_size"] = int(float(sizes[0]))
+    except Exception as exc:
+        print(f"[studio] Could not read subtitle style for {base}: {exc}")
+    return style
 
 
 def apply_style(project: str, base: str, style: dict) -> str:
@@ -508,7 +639,14 @@ def apply_style(project: str, base: str, style: dict) -> str:
     if not ok:
         return f"Falha ao queimar a legenda: {message}"
     os.replace(temp_out, burned)
-    return f"Legenda aplicada em {burned.name}."
+    styles_path = folder / "caption_styles.json"
+    try:
+        saved_styles = json.loads(styles_path.read_text(encoding="utf-8")) if styles_path.exists() else {}
+    except Exception:
+        saved_styles = {}
+    saved_styles[base] = dict(style)
+    styles_path.write_text(json.dumps(saved_styles, ensure_ascii=False, indent=2), encoding="utf-8")
+    return "Legenda salva e aplicada ao vídeo selecionado."
 
 
 # ---------------------------------------------------------------- música

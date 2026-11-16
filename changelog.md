@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.3.12 — Melhores Momentos, licença discreta e correção da IA
+
+### Novidades
+- **Aba Melhores Momentos**: analisa o podcast inteiro, escolhe os melhores trechos e monta um compilado horizontal de **5 ou 10 minutos** para o YouTube.
+- **Entrega completa**: MP4 em 1920×1080, 16:9, 30 FPS, H.264 e áudio AAC 192 kbps, com aceleração `h264_nvenc` e fallback automático para `libx264`.
+- **Legendas e capítulos**: SRT sincronizado e descrição com capítulos prontos para colar no YouTube.
+- **Custo fixo de 10 créditos**: o saldo é reservado antes, debitado só depois da entrega e devolvido integralmente em caso de falha.
+- **Prévia e downloads** do MP4 e do SRT direto na aba.
+- **Último compilado**: ao abrir a aba, o compilado de 10 min mais recente é carregado com player, capítulos e links de download.
+
+### Correções
+- **IA perdia dezenas de candidatos**: um tratamento de escapes corrompia JSON válido e reduzia 39 momentos a 3. O compilado agora aproveita todos os candidatos retornados.
+- **Seleção sem repetição**: o compilador evita sobreposição de tempo e assuntos repetidos, prioriza picos de emoção e abre com o melhor momento.
+- **Duração confiável**: a seleção é ajustada para perto de 5/10 minutos e o vídeo é validado em resolução, FPS e duração antes de confirmar a cobrança.
+- **Licença sem servidor exposto**: a aba mostra apenas a chave e o botão de ativação; o endereço do serviço ficou interno.
+- **Opções técnicas ocultas** para o cliente: backends, modelos, chunk size, configurações de rosto e logs não aparecem mais na interface.
+- **Biblioteca mais equilibrada**: cards maiores, miniatura como poster do player, destaque do card selecionado e botões alinhados em duas colunas.
+- **Música**: prévia de 30 s, volume, ducking e aplicação ao corte com backup automático; suporte a M4A.
+
 ## 1.3.11 — Biblioteca: cards, clique no corte e reload do player
 
 ### Correções
