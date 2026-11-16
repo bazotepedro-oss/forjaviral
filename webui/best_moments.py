@@ -282,14 +282,16 @@ def _concat_command(video: Path, clips: list[dict], output: Path, encoder: str) 
     concat_inputs = []
     for index, clip in enumerate(clips):
         duration = float(clip["duration"])
-        fade_out = max(0.0, duration - 0.08)
+        video_fade_out = max(0.0, duration - 0.25)
+        audio_fade_out = max(0.0, duration - 0.20)
         filters.append(
             f"[{index}:v]setpts=PTS-STARTPTS,scale=1920:1080:force_original_aspect_ratio=decrease,"
-            f"pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=30,format=yuv420p[v{index}]"
+            f"pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=30,format=yuv420p,"
+            f"fade=t=in:st=0:d=0.25,fade=t=out:st={video_fade_out:.3f}:d=0.25[v{index}]"
         )
         filters.append(
             f"[{index}:a]asetpts=PTS-STARTPTS,aresample=48000,"
-            f"afade=t=in:st=0:d=0.04,afade=t=out:st={fade_out:.3f}:d=0.08[a{index}]"
+            f"afade=t=in:st=0:d=0.15,afade=t=out:st={audio_fade_out:.3f}:d=0.20[a{index}]"
         )
         concat_inputs.extend([f"[v{index}]", f"[a{index}]"])
     filters.append(f"{''.join(concat_inputs)}concat=n={len(clips)}:v=1:a=1[vout][aout]")
@@ -322,17 +324,23 @@ def create_compilation(
     transcript = create_viral_segments.load_transcript(str(project_dir))
     video_duration = _probe_duration(video) or max(float(segment.get("end", 0) or 0) for segment in transcript)
     if auto_mode:
-        candidate_count = 60
+        candidate_count = 18
+        ask_amount = 12
     elif target_minutes <= 5:
-        candidate_count = 24
+        candidate_count = 12
+        ask_amount = 10
     elif target_minutes <= 10:
-        candidate_count = 32
+        candidate_count = 18
+        ask_amount = 12
     elif target_minutes <= 20:
-        candidate_count = 48
+        candidate_count = 24
+        ask_amount = 15
     else:
-        candidate_count = 60
-    min_clip_seconds = 30
-    max_clip_seconds = 240
+        candidate_count = 30
+        ask_amount = 18
+    # Cortes longos para preservar o contexto: 60 s a 5 min por momento.
+    min_clip_seconds = 60
+    max_clip_seconds = 300
 
     output_dir = project_dir / "best_moments"
     analysis_dir = output_dir / "analysis"
@@ -365,20 +373,19 @@ def create_compilation(
         # tokens por minuto) e evitam uma única chamada de ~275 mil caracteres.
         chunk_size_arg=120000,
         model_name_arg="gemini-2.5-flash",
-        ask_amount_override=30,
+        ask_amount_override=ask_amount,
         extra_instruction=(
-            "THIS IS A LONG HORIZONTAL YOUTUBE COMPILATION, not separate Shorts. "
-            "EXTRACT THE MAXIMUM NUMBER OF STRONG MOMENTS from the entire podcast. "
-            "Do not stop at a small fixed number: return every moment that deserves to be in a best-of. "
-            "EVERY CUT MUST BE COMPLETE. Start on the first word of a complete sentence and end only "
-            "after the full story, explanation, argument or payoff is finished. NEVER cut in the middle "
-            "of an explanation or stop before the conclusion. A longer complete explanation is better "
-            "than a short fragment that loses the reasoning; use up to 240 seconds when the idea needs it. "
-            "Vary the subjects, guests and emotional tones: never choose two moments about the same story, "
-            "argument or anecdote. The strongest moment will OPEN the compilation, so the best hook and "
-            "reaction peak must be among the candidates. Complete explanations, strong opinions and "
-            "surprising facts are valuable even when they are not jokes; do not force a laugh or shock "
-            "into every moment. Preserve enough context so each moment works when watched back-to-back."
+            "THIS IS A LONG BEST-OF COMPILATION, not a set of Shorts. "
+            "PRIORITIZE FEWER, LONGER AND COMPLETE MOMENTS. Each selected moment should last "
+            "60 to 300 seconds and contain the FULL setup, explanation, examples, tension and conclusion. "
+            "Do NOT return 20-40 second fragments. If the same story, explanation or argument continues "
+            "into the next paragraph, INCLUDE THE CONTINUATION in the same moment instead of creating two "
+            "small cuts. NEVER start or end in the middle of an explanation; only stop after the idea is "
+            "fully delivered. Merge adjacent parts about the same subject into ONE long moment. "
+            "Return every strong complete moment the transcript supports, but quality and context are more "
+            "important than quantity. Vary the subjects, guests and emotional tones. The strongest complete "
+            "moment will OPEN the compilation. Complete explanations, strong opinions and surprising facts "
+            "are valuable even when they are not jokes; do not force a laugh or shock into every moment."
         ),
         progress_callback=(
             (lambda amount, text: progress(0.08 + float(amount) * 0.8, text))

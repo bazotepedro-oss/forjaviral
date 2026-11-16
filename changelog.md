@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.14 — Cortes longos, contexto completo e transições
+
+### Mudanças
+- **Cortes de 60 s a 5 min**: a IA agora é instruída a devolver poucos momentos longos e completos, com começo, explicação, exemplos e conclusão. Nada de fragmentos de 20–40 s.
+- **Mesmo assunto = um corte**: partes próximas da mesma explicação são unidas em um único momento, em vez de vários cortes pequenos.
+- **Transição em cada corte**: fade suave de 0,25 s para preto na saída e entrada do próximo corte, com áudio acompanhando.
+- **Compilado de referência**: 17 cortes, de 1,9 a 5 min cada, total de **52,2 minutos**.
+- O compilado anterior de cortes pequenos foi apagado e refeito.
+
 ## 1.3.13 — Compilado automático, cortes completos e link do podcast
 
 ### Novidades
