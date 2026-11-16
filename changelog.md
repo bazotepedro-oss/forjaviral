@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.18 — Instalador corrigido em pastas do usuário
+
+### Correções
+- O instalador agora usa `requirements.txt` e `constraints.txt` **relativos à pasta do aplicativo**, com o Python do `.venv` informado explicitamente. Isso evita o erro `File not found: C:\Users\...` durante a instalação.
+- Antes de instalar as dependências, o instalador confere se os dois arquivos existem e mostra o caminho completo se faltar algum.
+- Se o `.venv` tiver sido copiado de outro PC ou estiver inválido, ele é recriado automaticamente em vez de reaproveitar um ambiente quebrado.
+- O log do passo 6 mostra a pasta do app e os caminhos usados, facilitando o suporte.
+
 ## 1.3.17 — Pacote de fontes, instalador e feedback do compilado
 
 ### Novidades

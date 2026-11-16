@@ -112,11 +112,20 @@ Write-Host ""
 # Passo 3: Criar ambiente virtual isolado (.venv)
 Write-Host "[Passo 3/6] Criando ambiente virtual isolado (.venv)..." -ForegroundColor Cyan
 $venvPython = Join-Path $projectRoot ".venv\Scripts\python.exe"
-if (-not (Test-Path $venvPython)) {
+$venvOk = $false
+if (Test-Path $venvPython) {
+    & $venvPython -c "import sys" 2>$null
+    if ($LASTEXITCODE -eq 0) { $venvOk = $true }
+}
+if (-not $venvOk) {
+    if (Test-Path (Join-Path $projectRoot ".venv")) {
+        Write-Host " - Ambiente virtual invalido/copiado de outro PC; recriando..." -ForegroundColor Yellow
+        Remove-Item -LiteralPath (Join-Path $projectRoot ".venv") -Recurse -Force -ErrorAction SilentlyContinue
+    }
     & uv venv .venv --python 3.10
     if ($LASTEXITCODE -ne 0) { Stop-InstallError "criar o ambiente virtual (.venv)" }
 } else {
-    Write-Host " - Ambiente virtual ja existente, mantendo..." -ForegroundColor Gray
+    Write-Host " - Ambiente virtual ja existente e funcional, mantendo..." -ForegroundColor Gray
 }
 Write-Host " [OK] Ambiente virtual pronto!" -ForegroundColor Green
 Write-Host ""
@@ -135,15 +144,15 @@ Write-Host ""
 Write-Host "[Passo 5/6] Instalando PyTorch e aceleradores de IA..." -ForegroundColor Cyan
 if ($choice -eq "1") {
     Write-Host " - Modo GPU: Instalando PyTorch com aceleracao CUDA 12.1..." -ForegroundColor Yellow
-    & uv pip install --link-mode=copy torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+    & uv pip install --python $venvPython --link-mode=copy torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
     if ($LASTEXITCODE -ne 0) { Stop-InstallError "instalar o PyTorch (GPU/CUDA)" }
-    & uv pip install --link-mode=copy onnxruntime-gpu
+    & uv pip install --python $venvPython --link-mode=copy onnxruntime-gpu
     if ($LASTEXITCODE -ne 0) { Stop-InstallError "instalar o onnxruntime-gpu" }
 } else {
     Write-Host " - Modo CPU: Instalando PyTorch para processador..." -ForegroundColor Yellow
-    & uv pip install --link-mode=copy torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+    & uv pip install --python $venvPython --link-mode=copy torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
     if ($LASTEXITCODE -ne 0) { Stop-InstallError "instalar o PyTorch (CPU)" }
-    & uv pip install --link-mode=copy onnxruntime
+    & uv pip install --python $venvPython --link-mode=copy onnxruntime
     if ($LASTEXITCODE -ne 0) { Stop-InstallError "instalar o onnxruntime" }
 }
 Write-Host " [OK] PyTorch instalado com sucesso!" -ForegroundColor Green
@@ -151,21 +160,40 @@ Write-Host ""
 
 # Passo 6: Dependencias do App
 Write-Host "[Passo 6/6] Instalando dependencias (WhisperX, MediaPipe, Gradio, etc)..." -ForegroundColor Cyan
+Set-Location $projectRoot
 $reqFile = Join-Path $projectRoot "requirements.txt"
 $constraintsFile = Join-Path $projectRoot "constraints.txt"
-if ($choice -eq "1") {
-    & uv pip install --link-mode=copy -r $reqFile -c $constraintsFile --extra-index-url https://download.pytorch.org/whl/cu121
-} else {
-    & uv pip install --link-mode=copy -r $reqFile -c $constraintsFile --extra-index-url https://download.pytorch.org/whl/cpu
+Write-Host " - Pasta do aplicativo: $projectRoot" -ForegroundColor Gray
+Write-Host " - Requirements: $reqFile" -ForegroundColor Gray
+Write-Host " - Constraints: $constraintsFile" -ForegroundColor Gray
+if (-not (Test-Path -LiteralPath $reqFile)) {
+    Write-Host "[ERRO] requirements.txt nao encontrado em: $projectRoot" -ForegroundColor Red
+    Write-Host "Baixe o ZIP oficial novamente e extraia por completo antes de instalar." -ForegroundColor Yellow
+    Stop-InstallError "localizar o requirements.txt"
 }
-if ($LASTEXITCODE -ne 0) { Stop-InstallError "instalar as dependencias do aplicativo (Gradio, WhisperX, etc.)" }
+if (-not (Test-Path -LiteralPath $constraintsFile)) {
+    Write-Host "[ERRO] constraints.txt nao encontrado em: $projectRoot" -ForegroundColor Red
+    Write-Host "Baixe o ZIP oficial novamente e extraia por completo antes de instalar." -ForegroundColor Yellow
+    Stop-InstallError "localizar o constraints.txt"
+}
+# Caminhos relativos e Python explicito: funcionam mesmo quando a pasta do
+# aplicativo tem espacos ou fica dentro da pasta do usuario.
+if ($choice -eq "1") {
+    & uv pip install --python $venvPython --link-mode=copy -r "requirements.txt" -c "constraints.txt" --extra-index-url https://download.pytorch.org/whl/cu121
+} else {
+    & uv pip install --python $venvPython --link-mode=copy -r "requirements.txt" -c "constraints.txt" --extra-index-url https://download.pytorch.org/whl/cpu
+}
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[DICA] Se o erro citar um caminho que nao existe, confira se o ZIP foi extraido por completo em uma pasta local (evite OneDrive/Downloads temporarios)." -ForegroundColor Yellow
+    Stop-InstallError "instalar as dependencias do aplicativo (Gradio, WhisperX, etc.)"
+}
 Write-Host " [OK] Todas as dependencias foram instaladas!" -ForegroundColor Green
 Write-Host ""
 
 # Passo 6.1: CTranslate2 novo (cuDNN 9 do PyTorch). O WhisperX pede uma versao
 # antiga, mas o runtime funciona com a nova; instalamos sem deps para nao conflitar.
 Write-Host "[Passo 6.1] Ajustando o CTranslate2 para usar o cuDNN do PyTorch..." -ForegroundColor Cyan
-& uv pip install --link-mode=copy --no-deps ctranslate2==4.8.4
+& uv pip install --python $venvPython --link-mode=copy --no-deps ctranslate2==4.8.4
 if ($LASTEXITCODE -ne 0) { Stop-InstallError "ajustar o CTranslate2" }
 Write-Host " [OK] CTranslate2 ajustado!" -ForegroundColor Green
 Write-Host ""
@@ -186,7 +214,7 @@ if ($choice -eq "1") {
     & $venvPython -c "import torch, sys; sys.exit(0 if torch.cuda.is_available() else 1)"
     if ($LASTEXITCODE -ne 0) {
         Write-Host " [AVISO] O PyTorch nao esta vendo a GPU. Reinstalando a versao CUDA..." -ForegroundColor Yellow
-        & uv pip install --link-mode=copy --reinstall torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121
+        & uv pip install --python $venvPython --link-mode=copy --reinstall torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121
         if ($LASTEXITCODE -ne 0) { Stop-InstallError "reinstalar o PyTorch com CUDA" }
         & $venvPython -c "import torch, sys; sys.exit(0 if torch.cuda.is_available() else 1)"
         if ($LASTEXITCODE -ne 0) {
