@@ -67,5 +67,10 @@ if exist "%~dp0scripts\create_shortcut.ps1" (
 )
 
 echo Iniciando em segundo plano na bandeja do Windows...
-start "" powershell.exe -NoProfile -Sta -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0scripts\TRAY_FABRICA.ps1"
+rem wscript + VBS abrem o PowerShell com janela oculta: nada aparece na barra.
+if exist "%~dp0scripts\LAUNCH_TRAY.vbs" (
+    wscript.exe //nologo "%~dp0scripts\LAUNCH_TRAY.vbs"
+) else (
+    start "" powershell.exe -NoProfile -Sta -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0scripts\TRAY_FABRICA.ps1"
+)
 exit /b 0

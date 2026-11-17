@@ -7,6 +7,7 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $desktopPath = [Environment]::GetFolderPath("Desktop")
 $shortcutPath = Join-Path $desktopPath "Fabrica dos Cortes.lnk"
 $targetBat = Join-Path $projectRoot "INICIAR_FABRICA_DE_CORTES.bat"
+$hiddenLauncher = Join-Path $projectRoot "scripts\LAUNCH_HIDDEN.vbs"
 
 $iconPath = Join-Path $projectRoot "app.ico"
 if (-not (Test-Path $iconPath)) {
@@ -16,7 +17,13 @@ if (-not (Test-Path $iconPath)) {
 try {
     $WshShell = New-Object -ComObject WScript.Shell
     $Shortcut = $WshShell.CreateShortcut($shortcutPath)
-    $Shortcut.TargetPath = $targetBat
+    if (Test-Path $hiddenLauncher) {
+        # wscript abre o .bat com janela oculta: nao aparece console nem item na barra.
+        $Shortcut.TargetPath = Join-Path $env:WINDIR "System32\wscript.exe"
+        $Shortcut.Arguments = "//nologo `"$hiddenLauncher`""
+    } else {
+        $Shortcut.TargetPath = $targetBat
+    }
     $Shortcut.WorkingDirectory = $projectRoot
     $Shortcut.Description = "Fabrica dos Cortes - IA para Cortes Virais Automaticos"
     if (Test-Path $iconPath) {

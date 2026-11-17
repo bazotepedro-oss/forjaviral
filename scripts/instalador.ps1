@@ -260,7 +260,13 @@ if ([string]::IsNullOrWhiteSpace($launch) -or $launch.ToUpper() -eq "S") {
     Write-Host ""
     Write-Host "Iniciando a Fabrica de Cortes... O navegador abrira em http://localhost:7860" -ForegroundColor Cyan
     $runBat = Join-Path $projectRoot "INICIAR_FABRICA_DE_CORTES.bat"
-    Start-Process -FilePath $runBat
+    $hiddenLauncher = Join-Path $projectRoot "scripts\LAUNCH_HIDDEN.vbs"
+    if (Test-Path $hiddenLauncher) {
+        # Abre sem janela: o atalho e o pos-instalacao nao mostram console.
+        Start-Process -FilePath "wscript.exe" -ArgumentList @("//nologo", $hiddenLauncher) -WindowStyle Hidden
+    } else {
+        Start-Process -FilePath $runBat
+    }
 } else {
     Write-Host "Tudo pronto. Voce pode iniciar quando quiser pelo atalho na Area de Trabalho!" -ForegroundColor White
 }

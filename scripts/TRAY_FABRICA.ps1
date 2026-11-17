@@ -73,7 +73,8 @@ function Start-Server {
         return $false
     }
 
-    $deadline = (Get-Date).AddSeconds(90)
+    # Primeira execucao carrega Gradio, CUDA e modelos: pode passar de 2 minutos.
+    $deadline = (Get-Date).AddSeconds(180)
     while ((Get-Date) -lt $deadline) {
         if (Test-Port 7860 250) {
             Write-TrayLog "Servidor pronto na porta 7860."
@@ -84,6 +85,10 @@ function Start-Server {
             return $false
         }
         Start-Sleep -Milliseconds 500
+    }
+    if (Test-Port 7860 1500) {
+        Write-TrayLog "Servidor pronto na porta 7860 (inicializacao lenta)."
+        return $true
     }
     Write-TrayLog "Tempo esgotado aguardando a porta 7860."
     return $false

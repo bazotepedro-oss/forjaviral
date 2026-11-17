@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.21 - inicio 100% oculto
+
+### Correcoes
+- O atalho da Area de Trabalho nao abre mais janela de console nem item de PowerShell na barra. Ele inicia o aplicativo por um lancador oculto (wscript + VBS).
+- O aviso de que o servidor nao iniciou aparecia cedo demais na primeira execucao. O tempo de espera subiu de 90 para 180 segundos, porque a primeira abertura carrega Gradio, CUDA e os modelos.
+- Se a porta abrir depois do tempo, a bandeja reconhece o servidor em vez de mostrar erro.
+
 ## 1.3.20 — Diagnóstico e recuperação do servidor
 
 ### Correções
