@@ -134,14 +134,30 @@ if (Test-Path $venvPython) {
     & $venvPython -c "import sys" 2>$null
     if ($LASTEXITCODE -eq 0) {
         $venvOk = $true
-        # Instalacao anterior interrompida pode deixar pacote sem RECORD
-        # (foi o que travou o ctranslate2.dll em uso).
-        & $venvPython -c "import gradio" 2>$null
-        if ($LASTEXITCODE -eq 0) {
-            & $venvPython -c "import ctranslate2" 2>$null
-            if ($LASTEXITCODE -ne 0) {
-                Write-Host " - Ambiente com pacote corrompido (ctranslate2); recriando do zero..." -ForegroundColor Yellow
+
+        # Uma instalacao interrompida deixa pacotes sem METADATA/RECORD e o uv
+        # para de conseguir ler o ambiente. Detecta e recria.
+        $sitePackages = Join-Path $projectRoot ".venv\Lib\site-packages"
+        if (Test-Path $sitePackages) {
+            $quebrados = @(Get-ChildItem -LiteralPath $sitePackages -Directory -Filter '*.dist-info' -ErrorAction SilentlyContinue | Where-Object {
+                -not (Test-Path (Join-Path $_.FullName 'METADATA')) -or -not (Test-Path (Join-Path $_.FullName 'RECORD'))
+            })
+            if ($quebrados.Count -gt 0) {
+                $nomes = ($quebrados | Select-Object -First 3 | ForEach-Object { $_.Name }) -join ', '
+                Write-Host " - Pacotes incompletos encontrados: $nomes" -ForegroundColor Yellow
+                Write-Host " - Recriando o ambiente do zero..." -ForegroundColor Yellow
                 $venvOk = $false
+            }
+        }
+
+        if ($venvOk) {
+            & $venvPython -c "import gradio" 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                & $venvPython -c "import ctranslate2" 2>$null
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Host " - Ambiente com pacote corrompido (ctranslate2); recriando do zero..." -ForegroundColor Yellow
+                    $venvOk = $false
+                }
             }
         }
     }

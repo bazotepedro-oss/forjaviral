@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.30 - instalador detecta ambiente corrompido
+
+### Instalador
+- Detecta pacotes com METADATA ou RECORD faltando (instalacao interrompida) e recria o ambiente sozinho.
+- Corrige o erro "Failed to read metadata for ctranslate2" que impedia qualquer nova tentativa.
+
 ## 1.3.29 - instalador fecha o app antes de atualizar
 
 ### Instalador
