@@ -22,6 +22,22 @@ function Stop-InstallError {
     exit 1
 }
 
+# Fecha o app e a bandeja para liberar DLLs (ctranslate2.dll, torch, etc).
+function Stop-RunningApp {
+    $alvos = Get-CimInstance Win32_Process | Where-Object {
+        $_.ProcessId -ne $PID -and $_.CommandLine -and (
+            (($_.Name -eq 'python.exe' -or $_.Name -eq 'pythonw.exe') -and $_.CommandLine -like "*$projectRoot*") -or
+            ($_.Name -eq 'powershell.exe' -and $_.CommandLine -like '*TRAY_FABRICA.ps1*')
+        )
+    }
+    if (-not $alvos) { return }
+    foreach ($p in $alvos) {
+        try { & taskkill.exe /PID $p.ProcessId /T /F | Out-Null } catch {}
+    }
+    Write-Host " - Aplicativo aberto foi fechado para liberar os arquivos." -ForegroundColor Yellow
+    Start-Sleep -Seconds 3
+}
+
 Clear-Host
 Write-Host "==================================================================" -ForegroundColor DarkYellow
 Write-Host "                FABRICA DE CORTES - INSTALADOR OFICIAL           " -ForegroundColor Yellow
@@ -114,12 +130,26 @@ Write-Host "[Passo 3/6] Criando ambiente virtual isolado (.venv)..." -Foreground
 $venvPython = Join-Path $projectRoot ".venv\Scripts\python.exe"
 $venvOk = $false
 if (Test-Path $venvPython) {
+    Stop-RunningApp
     & $venvPython -c "import sys" 2>$null
-    if ($LASTEXITCODE -eq 0) { $venvOk = $true }
+    if ($LASTEXITCODE -eq 0) {
+        $venvOk = $true
+        # Instalacao anterior interrompida pode deixar pacote sem RECORD
+        # (foi o que travou o ctranslate2.dll em uso).
+        & $venvPython -c "import gradio" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            & $venvPython -c "import ctranslate2" 2>$null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host " - Ambiente com pacote corrompido (ctranslate2); recriando do zero..." -ForegroundColor Yellow
+                $venvOk = $false
+            }
+        }
+    }
 }
 if (-not $venvOk) {
+    Stop-RunningApp
     if (Test-Path (Join-Path $projectRoot ".venv")) {
-        Write-Host " - Ambiente virtual invalido/copiado de outro PC; recriando..." -ForegroundColor Yellow
+        Write-Host " - Recriando o ambiente virtual..." -ForegroundColor Yellow
         Remove-Item -LiteralPath (Join-Path $projectRoot ".venv") -Recurse -Force -ErrorAction SilentlyContinue
     }
     & uv venv .venv --python 3.10
@@ -142,6 +172,7 @@ Write-Host ""
 
 # Passo 5: PyTorch
 Write-Host "[Passo 5/6] Instalando PyTorch e aceleradores de IA..." -ForegroundColor Cyan
+Stop-RunningApp
 if ($choice -eq "1") {
     Write-Host " - Modo GPU: Instalando PyTorch com aceleracao CUDA 12.1..." -ForegroundColor Yellow
     & uv pip install --python $venvPython --link-mode=copy torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
@@ -178,13 +209,25 @@ if (-not (Test-Path -LiteralPath $constraintsFile)) {
 }
 # Caminhos relativos e Python explicito: funcionam mesmo quando a pasta do
 # aplicativo tem espacos ou fica dentro da pasta do usuario.
+Stop-RunningApp
 if ($choice -eq "1") {
     & uv pip install --python $venvPython --link-mode=copy -r "requirements.txt" -c "constraints.txt" --extra-index-url https://download.pytorch.org/whl/cu121
 } else {
     & uv pip install --python $venvPython --link-mode=copy -r "requirements.txt" -c "constraints.txt" --extra-index-url https://download.pytorch.org/whl/cpu
 }
 if ($LASTEXITCODE -ne 0) {
+    # Causa mais comum: o app estava aberto e o Windows travou uma DLL.
+    Write-Host " - A instalacao falhou. Fechando o aplicativo e tentando de novo..." -ForegroundColor Yellow
+    Stop-RunningApp
+    if ($choice -eq "1") {
+        & uv pip install --python $venvPython --link-mode=copy -r "requirements.txt" -c "constraints.txt" --extra-index-url https://download.pytorch.org/whl/cu121
+    } else {
+        & uv pip install --python $venvPython --link-mode=copy -r "requirements.txt" -c "constraints.txt" --extra-index-url https://download.pytorch.org/whl/cpu
+    }
+}
+if ($LASTEXITCODE -ne 0) {
     Write-Host "[DICA] Se o erro citar um caminho que nao existe, confira se o ZIP foi extraido por completo em uma pasta local (evite OneDrive/Downloads temporarios)." -ForegroundColor Yellow
+    Write-Host "[DICA] Se o erro citar arquivo em uso, reinicie o PC e rode o instalador de novo." -ForegroundColor Yellow
     Stop-InstallError "instalar as dependencias do aplicativo (Gradio, WhisperX, etc.)"
 }
 Write-Host " [OK] Todas as dependencias foram instaladas!" -ForegroundColor Green

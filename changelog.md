@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.29 - instalador fecha o app antes de atualizar
+
+### Instalador
+- O instalador agora fecha o aplicativo e a bandeja antes de instalar as dependencias. Era a causa do erro "ctranslate2.dll esta sendo usado por outro processo".
+- Se a instalacao falhar, ele fecha o app e tenta mais uma vez automaticamente.
+- Ambiente com pacote corrompido (sem RECORD) e recriado do zero em vez de ser reaproveitado.
+- Mensagem clara quando o problema for arquivo em uso.
+
 ## 1.3.28 - bandeja com uma aba so
 
 ### Bandeja
