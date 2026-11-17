@@ -57,7 +57,7 @@ $Files = @(
     "prompt_best_moments.txt",
     "prompt_best_moments_rescue.txt",
     "version.json",
-    "ViralCutter.ipynb",
+    "FabricaDosCortes.ipynb",
     "changelog.md"
 )
 

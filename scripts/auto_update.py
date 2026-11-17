@@ -100,7 +100,7 @@ CLIENT_ROOT_FILES = {
     "prompt_best_moments.txt",
     "prompt_best_moments_rescue.txt",
     "version.json",
-    "ViralCutter.ipynb",
+    "FabricaDosCortes.ipynb",
     "changelog.md",
 }
 CLIENT_DIRS = {"webui", "scripts", "branding", "i18n", "models"}

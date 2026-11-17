@@ -1,6 +1,6 @@
 @echo off
 setlocal
-title ViralCutter
+title Fabrica dos Cortes
 
 cd /d "%~dp0"
 call .venv\Scripts\activate.bat

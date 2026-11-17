@@ -4,7 +4,7 @@ import re
 import subprocess
 import gradio as gr
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-WORKING_DIR = os.path.dirname(CURRENT_DIR) # ViralCutter root
+WORKING_DIR = os.path.dirname(CURRENT_DIR) # Fabrica dos Cortes root
 import sys
 sys.path.append(WORKING_DIR)
 from i18n.i18n import I18nAuto

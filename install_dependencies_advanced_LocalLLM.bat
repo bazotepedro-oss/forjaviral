@@ -48,6 +48,6 @@ uv pip install -r "%~dp0requirements.txt"
 
 echo.
 echo ==========================================
-echo Concluido! O ViralCutter esta pronto para rodar Modelos Locais.
+echo Concluido! A Fabrica dos Cortes esta pronta para rodar Modelos Locais.
 echo ==========================================
 pause

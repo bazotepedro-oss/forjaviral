@@ -214,7 +214,7 @@ def create_premiere_graphics_payload(text, font_name="Arial", font_size=84, fill
         },
         "mUseLegacyTextBox": False,
         "mVersion": 1,
-        "mCreator": "ViralCutter XML Generator"
+        "mCreator": "Fabrica dos Cortes XML Generator"
     }
     
     json_str = json.dumps(data, separators=(',', ':'))

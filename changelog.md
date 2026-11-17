@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.24 - Fabrica dos Cortes e suporte no WhatsApp
+
+### Marca
+- Notebook renomeado de ViralCutter.ipynb para FabricaDosCortes.ipynb.
+- Nome antigo removido dos titulos, comentarios, readme e do XML exportado.
+- Referencias a Discord removidas do projeto e do notebook.
+
+### Suporte
+- WhatsApp oficial: (18) 98122-3199 - https://wa.me/5518981223199
+- Grupo de alunos: https://chat.whatsapp.com/G0yGg1Rl0K3J8OUEChfc4s
+
 ## 1.3.23 - Colab atualizado e erro visivel
 
 ### Colab

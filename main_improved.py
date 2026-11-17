@@ -100,7 +100,7 @@ def interactive_input_int(prompt_text):
 
 def main():
     # Configuração de Argumentos via Linha de Comando (CLI)
-    parser = argparse.ArgumentParser(description="ViralCutter CLI")
+    parser = argparse.ArgumentParser(description="Fabrica dos Cortes CLI")
     parser.add_argument("--url", help="YouTube Video URL")
     parser.add_argument("--cookies-file", help="Netscape-format cookies.txt file for the YouTube download")
     parser.add_argument("--segments", type=int, help="Number of segments to create")
