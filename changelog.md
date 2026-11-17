@@ -11,6 +11,12 @@
 - **Prompt do Melhores Momentos separado do prompt dos cortes**: agora existe um prompt próprio para compilados longos (`prompt_best_moments.txt`) e um prompt de resgate próprio. Os cortes curtos continuam usando o `prompt.txt` de sempre.
 - **Bandeja do Windows**: o app inicia sem deixar o CMD aberto. O ícone fica na área de notificação (setinha) com menu para abrir, abrir logs, reiniciar o servidor ou sair. O servidor é reiniciado automaticamente se cair.
 
+### Licença sem HWID
+
+- As chaves deixaram de ficar presas a um computador. A validação de HWID foi removida do servidor de licenças: a mesma chave funciona em qualquer PC, sem pedir liberação.
+- Nenhuma ação é necessária para as chaves já emitidas. Elas passam a funcionar em outra máquina automaticamente.
+- O HWID continua aparecendo no painel apenas como informação histórica; ele não bloqueia mais nada.
+
 ### Correções no erro "sem segmentos virais"
 
 - O prompt dos cortes deixou de exigir um pico de emoção em todo corte. Agora são aceitos quatro tipos de momento: emoção, conflito, insight e história completa. Explicações calmas e opiniões bem argumentadas passaram a valer.

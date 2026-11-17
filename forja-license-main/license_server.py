@@ -186,8 +186,7 @@ def _validate_row(row: Dict[str, Any], hwid: str) -> Optional[str]:
         return "blocked"
     if int(row["exp"]) <= _now():
         return "expired"
-    if row.get("hwid") and row["hwid"] != hwid:
-        return "hwid_mismatch"
+    # HWID nao e mais verificado: a chave funciona em qualquer computador.
     return None
 
 
@@ -214,7 +213,7 @@ def health() -> JSONResponse:
 def check(data: Dict[str, Any]) -> JSONResponse:
     license_key = str((data or {}).get("license_key") or "").strip()
     hwid = str((data or {}).get("hwid") or "").strip()
-    if not license_key or not hwid:
+    if not license_key:
         return _reason("missing_fields")
 
     try:
@@ -228,12 +227,7 @@ def check(data: Dict[str, Any]) -> JSONResponse:
                 if reason:
                     return _reason(reason)
 
-                if not row.get("hwid"):
-                    cur.execute(
-                        "UPDATE licenses SET hwid=%s, updated_at=NOW() WHERE license_key=%s",
-                        (hwid, license_key),
-                    )
-                    row["hwid"] = hwid
+                # HWID nao e mais gravado na licenca.
 
         return _issue_token(row, hwid)
     except Exception as e:
@@ -260,7 +254,7 @@ def consume_n(data: Dict[str, Any], idempotency_key: Optional[str] = Header(defa
         n = int((data or {}).get("n") or 0)
     except (TypeError, ValueError):
         return _reason("bad_request")
-    if not license_key or not hwid or not operation_id or n <= 0 or n > 5000:
+    if not license_key or not operation_id or n <= 0 or n > 5000:
         return _reason("missing_fields")
     if len(operation_id) > 128 or not re.fullmatch(r"[A-Za-z0-9._:-]+", operation_id):
         return _reason("bad_request")
@@ -286,12 +280,7 @@ def consume_n(data: Dict[str, Any], idempotency_key: Optional[str] = Header(defa
                         return _reason("idempotency_conflict")
                     return _issue_token(row, hwid)
 
-                if not row.get("hwid"):
-                    cur.execute(
-                        "UPDATE licenses SET hwid=%s, updated_at=NOW() WHERE license_key=%s",
-                        (hwid, license_key),
-                    )
-                    row["hwid"] = hwid
+                # HWID nao e mais gravado na licenca.
 
                 credits = int(row.get("credits") or 0)
                 if credits < n:
@@ -328,7 +317,7 @@ def refund_n(data: Dict[str, Any], idempotency_key: Optional[str] = Header(defau
         n = int((data or {}).get("n") or 0)
     except (TypeError, ValueError):
         return _reason("bad_request")
-    if not license_key or not hwid or not operation_id or not refund_operation_id or n <= 0 or n > 5000:
+    if not license_key or not operation_id or not refund_operation_id or n <= 0 or n > 5000:
         return _reason("missing_fields")
     if any(len(value) > 128 or not re.fullmatch(r"[A-Za-z0-9._:-]+", value) for value in (operation_id, refund_operation_id)):
         return _reason("bad_request")
@@ -341,8 +330,7 @@ def refund_n(data: Dict[str, Any], idempotency_key: Optional[str] = Header(defau
                     return _reason("not_found")
                 # A refund is settlement of an already accepted debit; it remains valid
                 # if the license expires or is blocked while local rendering is running.
-                if row.get("hwid") and row["hwid"] != hwid:
-                    return _reason("hwid_mismatch")
+                # HWID nao e mais verificado no estorno.
 
                 cur.execute(
                     "SELECT operation_id, license_key, amount, refunded FROM consumption_operations WHERE operation_id=%s FOR UPDATE",
@@ -390,7 +378,7 @@ def consume(data: Dict[str, Any], idempotency_key: Optional[str] = Header(defaul
     # debit exactly 1 (safe fallback)
     license_key = str((data or {}).get("license_key") or "").strip()
     hwid = str((data or {}).get("hwid") or "").strip()
-    if not license_key or not hwid:
+    if not license_key:
         return _reason("missing_fields")
     # route to consume_n by creating a new local dict
     operation_id = idempotency_key or str((data or {}).get("operation_id") or "")

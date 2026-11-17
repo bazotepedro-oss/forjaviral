@@ -134,8 +134,7 @@ def _validate_row(row: Dict[str, Any], hwid: str, client_ver: str) -> Optional[s
         return "blocked"
     if int(row["exp"]) <= _now():
         return "expired"
-    if row.get("hwid") and row["hwid"] != hwid:
-        return "hwid_mismatch"
+    # HWID nao e mais verificado: a chave funciona em qualquer computador.
     min_ver = row.get("min_version") or DEFAULT_MIN_VERSION
     if client_ver and not _version_ok(client_ver, min_ver):
         return "version_blocked"
@@ -156,7 +155,7 @@ async def check(req: Request) -> JSONResponse:
     license_key = str((data or {}).get("license_key") or "").strip()
     hwid = str((data or {}).get("hwid") or "").strip()
     client_ver = str((data or {}).get("ver") or "").strip() or "0.0.0"
-    if not license_key or not hwid:
+    if not license_key:
         return _reason("missing_fields")
     try:
         with _db() as con:
@@ -223,7 +222,7 @@ async def consume(req: Request) -> JSONResponse:
     license_key = str((data or {}).get("license_key") or "").strip()
     hwid = str((data or {}).get("hwid") or "").strip()
     ver = str((data or {}).get("ver") or "").strip() or "0.0.0"
-    if not license_key or not hwid:
+    if not license_key:
         return _reason("missing_fields")
     class _FakeReq:
         async def json(self):
