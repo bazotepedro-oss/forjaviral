@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.26 - fallback pytubefix sem cookies
+
+### YouTube
+- Quando o YouTube responde "not a bot", o app tenta automaticamente o pytubefix com token proprio, sem precisar de cookies.
+- Ordem das tentativas: yt-dlp normal, clientes alternativos, pytubefix e, por ultimo, cookies.
+- O notebook voltou ao padrao de instalacao original (whisperx do GitHub + requirements), mantendo Python 3.11.
+
 ## 1.3.25 - YouTube no Colab com cookies
 
 ### Download do YouTube
