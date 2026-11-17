@@ -7,7 +7,15 @@ i18n = I18nAuto()
 
 BROWSERS = ('chrome', 'edge', 'firefox', 'brave', 'opera', 'vivaldi', 'chromium', 'whale')
 IS_HEADLESS_LINUX = sys.platform.startswith('linux')
-PLAYER_CLIENTS = ('tv', 'android_vr', 'web_safari', 'mweb')
+PLAYER_CLIENTS = (
+    'tv',
+    'android_vr',
+    'web_safari',
+    'mweb',
+    'ios',
+    'android',
+    'tv_embedded',
+)
 
 BOT_CHECK_HINTS = (
     "sign in to confirm",
@@ -32,6 +40,21 @@ def _with_client(options, client):
 def _attempt_download(url, options):
     with yt_dlp.YoutubeDL(options) as ydl:
         ydl.download([url])
+
+def _default_cookies_file():
+    """cookies.txt na raiz do aplicativo e usado automaticamente.
+
+    No Colab, a celula 3 do notebook salva o arquivo nesse caminho.
+    """
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    candidate = os.path.join(project_root, 'cookies.txt')
+    try:
+        if os.path.isfile(candidate) and os.path.getsize(candidate) > 100:
+            return candidate
+    except OSError:
+        pass
+    return None
+
 
 def get_aria2c_path():
     """Retorna o caminho do executavel aria2c se disponivel."""
@@ -173,6 +196,10 @@ def _extract_title(url, cookies_file=None):
 
 
 def download(url, base_root="VIRALS", download_subs=True, quality="best", cookies_file=None):
+    # cookies.txt na raiz do app entra automaticamente (Colab e Windows).
+    cookies_file = cookies_file or _default_cookies_file()
+    if cookies_file:
+        print(f"[YouTube] Usando cookies de: {cookies_file}")
     # 1. Extrair informacoes do video para pegar o titulo
     print(i18n("Extracting video information..."))
     title = _extract_title(url, cookies_file)
@@ -326,8 +353,8 @@ def download(url, base_root="VIRALS", download_subs=True, quality="best", cookie
                 raise
         elif "sign in to confirm" in error_str.lower() or "not a bot" in error_str.lower():
             print("\n[ERRO YOUTUBE] O YouTube pediu verificacao (bot check) para este IP.")
-            print("No Colab, envie o arquivo cookies.txt do seu navegador na celula de cookies do notebook.")
-            print("No Windows, mantenha-se logado no YouTube; o app tenta os cookies do navegador automaticamente.")
+            print("No Colab: pare esta execucao, rode a celula 3 (cookies) e inicie de novo.")
+            print("No Windows: mantenha-se logado no YouTube; o app tenta os cookies do navegador automaticamente.")
             raise
         elif "is not a valid URL" in error_str:
              print(i18n("Error: the entered link is not valid."))

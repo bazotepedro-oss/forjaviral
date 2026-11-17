@@ -407,6 +407,15 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
         if video_quality: cmd.extend(["--video-quality", video_quality])
         # Pass Subtitle Option (if False, we skip)
         if not use_youtube_subs: cmd.append("--skip-youtube-subs")
+
+        # cookies.txt na raiz do app (enviado pela celula 3 do Colab) evita o bot check.
+        cookies_path = os.path.join(WORKING_DIR, "cookies.txt")
+        try:
+            if os.path.isfile(cookies_path) and os.path.getsize(cookies_path) > 100:
+                cmd.extend(["--cookies-file", cookies_path])
+                print(f"[YouTube] cookies.txt encontrado em {cookies_path}")
+        except OSError:
+            pass
         
     # Translation
     if translate_target and translate_target != "None":

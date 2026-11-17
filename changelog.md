@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.25 - YouTube no Colab com cookies
+
+### Download do YouTube
+- O YouTube bloqueia downloads de IPs de servidor com a mensagem "not a bot". O app agora aceita cookies.txt e usa automaticamente quando o arquivo esta na raiz do aplicativo.
+- O aplicativo repassa o cookies.txt para o download quando o video vem de link.
+- Foram adicionados mais clientes do YouTube (ios, android, tv_embedded) para aumentar as chances de baixar sem cookies.
+- No Windows nada muda: o app continua tentando os cookies do navegador.
+
+### Colab
+- Nova celula 3 no notebook: envio do cookies.txt. Basta parar a celula 2, rodar a 3 e iniciar de novo.
+
 ## 1.3.24 - Fabrica dos Cortes e suporte no WhatsApp
 
 ### Marca
