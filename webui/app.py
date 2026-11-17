@@ -33,6 +33,7 @@ import uvicorn
 
 
 import re
+from html import escape as _html_escape
 import library # Module for Library Logic
 import studio # Biblioteca de cortes (galeria, estilos, música)
 import best_moments # Compilador de destaques longos (5/10 min)
@@ -734,7 +735,23 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
     if project_folder_path and os.path.exists(project_folder_path):
         html_output = library.generate_project_gallery(project_folder_path, is_full_path=True)
     else:
-        html_output = "<h3>Não foi possível localizar a pasta do projeto.</h3>"
+        # Sem pasta do projeto: mostrar o motivo real em vez de so "pasta nao encontrada".
+        ansi_pattern = re.compile(r"\x1b\[[0-9;]*m")
+        tail_lines = [
+            ansi_pattern.sub("", line)
+            for line in str(logs).strip().splitlines()
+        ][-30:]
+        tail_text = "\n".join(tail_lines) if tail_lines else "Sem saida do processamento."
+        html_output = (
+            "<h3>Nenhum corte foi gerado.</h3>"
+            "<p style='color:#a3a3a3;font-size:13px;margin:6px 0 10px;'>"
+            "Ultimas linhas do processamento (o motivo do erro esta aqui):</p>"
+            "<pre style='white-space:pre-wrap;background:#0d0d0d;border:1px solid #2a2a2a;"
+            "border-radius:10px;padding:12px;font-size:12px;line-height:1.5;color:#d4d4d4;"
+            "max-height:320px;overflow:auto;'>"
+            + _html_escape(tail_text)
+            + "</pre>"
+        )
     final_progress = (
         _render_progress_html(100, "Cortes prontos!")
         if actual_cuts > 0

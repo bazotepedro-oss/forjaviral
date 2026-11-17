@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.23 - Colab atualizado e erro visivel
+
+### Colab
+- Notebook reescrito para a versao atual: instalacao com checagens, ambiente reaproveitando o PyTorch do Colab e mensagens claras em cada etapa.
+- O notebook agora avisa quando uma biblioteca falha e mostra o link .gradio.live no lugar certo.
+
+### Diagnostico
+- Quando nenhum corte e gerado, a tela mostra as ultimas 30 linhas do processamento em vez de dizer apenas que a pasta do projeto nao foi encontrada. O motivo real aparece ali.
+
 ## 1.3.22 - atalho sem cmd
 
 ### Quantidade de cortes
