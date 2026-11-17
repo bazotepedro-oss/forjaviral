@@ -4882,7 +4882,18 @@ if __name__ == "__main__":
         if os.path.isdir(FONTS_DIR):
             app.mount("/fonts", StaticFiles(directory=FONTS_DIR), name="fonts")
         print(f"Mounted /virals to {VIRALS_DIR}")
-        
+
+        print("\n" + "=" * 64)
+        if share_url:
+            print("LINK PUBLICO DA FABRICA DOS CORTES:")
+            print(share_url)
+        else:
+            print("[AVISO] O Gradio nao conseguiu criar o link publico (.gradio.live).")
+            print("Motivo comum: a rede do Colab esta bloqueando o servico de share.")
+            print(f"Link local: {local_url}")
+        print("=" * 64 + "\n")
+        sys.stdout.flush()
+
         demo.block_thread()
     else:
         # Check environment
