@@ -3,8 +3,6 @@
 **100% Free, Local, and Unlimited Open-Source Alternative to Opus Clip**  
 Turn long YouTube videos into viral shorts optimized for TikTok, Instagram Reels, and YouTube Shorts – with state-of-the-art AI, dynamic captions, precise *face tracking*, and automatic translation. All running on your machine.
 
-[![Stars](https://img.shields.io/github/stars/RafaelGodoyEbert/Fábrica dos Cortes?style=social)](https://github.com/RafaelGodoyEbert/Fábrica dos Cortes/stargazers)
-[![Forks](https://img.shields.io/github/forks/RafaelGodoyEbert/Fábrica dos Cortes?style=social)](https://github.com/RafaelGodoyEbert/Fábrica dos Cortes/network/members)
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1UZKzeqjIeEyvq9nPx7s_4mU6xlkZQn_R?usp=sharing)
 
 [English](README_en.md) • [Português](README.md)

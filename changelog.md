@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.27 - creditos do projeto
+
+### Marca
+- Removida a mencao ao autor original no notebook, no readme e nos arquivos de idioma.
+- O notebook passa a creditar apenas a Fabrica dos Cortes.
+- Pastas antigas de build com o nome anterior foram apagadas do computador.
+
 ## 1.3.26 - fallback pytubefix sem cookies
 
 ### YouTube
