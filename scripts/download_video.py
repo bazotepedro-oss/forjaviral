@@ -44,15 +44,26 @@ def _attempt_download(url, options):
 def _default_cookies_file():
     """cookies.txt na raiz do aplicativo e usado automaticamente.
 
-    No Colab, a celula 3 do notebook salva o arquivo nesse caminho.
+    Procura tambem variacoes do nome (cookies (1).txt) e a pasta /content,
+    porque o upload do Colab pode cair em locais diferentes.
     """
+    import glob
+
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    candidate = os.path.join(project_root, 'cookies.txt')
-    try:
-        if os.path.isfile(candidate) and os.path.getsize(candidate) > 100:
-            return candidate
-    except OSError:
-        pass
+    candidates = [
+        os.path.join(project_root, 'cookies.txt'),
+        os.path.join(project_root, '..', 'cookies.txt'),
+        '/content/cookies.txt',
+    ]
+    candidates += sorted(glob.glob(os.path.join(project_root, 'cookies*.txt')))
+    candidates += sorted(glob.glob('/content/cookies*.txt'))
+
+    for candidate in candidates:
+        try:
+            if os.path.isfile(candidate) and os.path.getsize(candidate) > 100:
+                return os.path.abspath(candidate)
+        except OSError:
+            continue
     return None
 
 
@@ -199,7 +210,9 @@ def download(url, base_root="VIRALS", download_subs=True, quality="best", cookie
     # cookies.txt na raiz do app entra automaticamente (Colab e Windows).
     cookies_file = cookies_file or _default_cookies_file()
     if cookies_file:
-        print(f"[YouTube] Usando cookies de: {cookies_file}")
+        print(f"[YouTube] Usando cookies de: {cookies_file}", flush=True)
+    else:
+        print("[YouTube] Nenhum cookies.txt encontrado; tentando sem cookies.", flush=True)
     # 1. Extrair informacoes do video para pegar o titulo
     print(i18n("Extracting video information..."))
     title = _extract_title(url, cookies_file)
