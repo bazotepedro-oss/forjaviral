@@ -28,7 +28,7 @@ if errorlevel 1 (
 )
 echo        OK
 
-echo [2/4] Baixando o aplicativo (aprox. 10,5 MB)...
+echo [2/4] Baixando o aplicativo (aprox. 16,3 MB)...
 if exist "%ZIP%" del /f /q "%ZIP%" >nul 2>&1
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%URL%' -OutFile '%ZIP%' -UseBasicParsing"
 if not exist "%ZIP%" (
