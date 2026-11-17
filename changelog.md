@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.28 - bandeja com uma aba so
+
+### Bandeja
+- Clicar duas vezes no atalho nao abre mais abas extras: a segunda instancia sai sem abrir navegador.
+- A bandeja espera ate 300 segundos e abre o navegador sozinha quando o servidor fica pronto, mesmo em maquina lenta.
+- Log registra quando o navegador foi aberto.
+
+### Colab
+- Notebook v4: torch e torchaudio fixados na mesma versao, teste real do WhisperX antes de abrir o app e celula de diagnostico.
+
 ## 1.3.27 - creditos do projeto
 
 ### Marca

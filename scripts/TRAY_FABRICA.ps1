@@ -36,11 +36,8 @@ function Test-Port {
 # Impede duas bandejas ao clicar duas vezes no atalho durante a inicializacao.
 $script:mutex = New-Object System.Threading.Mutex($false, "FabricaDosCortesTray")
 if (-not $script:mutex.WaitOne(0)) {
-    $deadline = (Get-Date).AddSeconds(90)
-    while ((Get-Date) -lt $deadline -and -not (Test-Port 7860 250)) {
-        Start-Sleep -Milliseconds 500
-    }
-    Start-Process $url
+    # A instancia que ja esta rodando cuida de abrir o navegador. Nao abrir outra aba.
+    Write-TrayLog "Bandeja ja em execucao; saindo sem abrir outra aba."
     exit
 }
 
@@ -51,6 +48,7 @@ if (-not (Test-Path $pythonw)) {
 $script:server = $null
 $script:quitting = $false
 $script:restarts = 0
+$script:autoOpened = $false
 
 function Start-Server {
     if (Test-Port 7860 300) {
@@ -73,8 +71,7 @@ function Start-Server {
         return $false
     }
 
-    # Primeira execucao carrega Gradio, CUDA e modelos: pode passar de 2 minutos.
-    $deadline = (Get-Date).AddSeconds(180)
+    $deadline = (Get-Date).AddSeconds(300)
     while ((Get-Date) -lt $deadline) {
         if (Test-Port 7860 250) {
             Write-TrayLog "Servidor pronto na porta 7860."
@@ -103,7 +100,14 @@ function Stop-Server {
 }
 
 function Open-App {
+    Write-TrayLog "Abrindo navegador."
     Start-Process $url
+}
+
+function Open-AppOnce {
+    if ($script:autoOpened) { return }
+    $script:autoOpened = $true
+    Open-App
 }
 
 function Open-Logs {
@@ -165,6 +169,14 @@ $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 3000
 $timer.Add_Tick({
     if ($script:quitting) { return }
+
+    # Servidor demorou a subir: abre o navegador uma unica vez quando a porta responder.
+    if (-not $script:autoOpened) {
+        if (Test-Port 7860 200) {
+            Open-AppOnce
+        }
+    }
+
     if ($script:server -and $script:server.HasExited) {
         Write-TrayLog "O servidor encerrou inesperadamente."
         if ($script:restarts -lt 3) {
@@ -185,9 +197,9 @@ $timer.Start()
 Write-TrayLog "Bandeja iniciada."
 if (Start-Server) {
     $script:icon.ShowBalloonTip(4000, "Fabrica dos Cortes", "Rodando em segundo plano. Clique no icone para abrir.", [System.Windows.Forms.ToolTipIcon]::Info)
-    Open-App
+    Open-AppOnce
 } else {
-    $script:icon.ShowBalloonTip(8000, "Fabrica dos Cortes", "Nao foi possivel iniciar. Abra a pasta de logs.", [System.Windows.Forms.ToolTipIcon]::Error)
+    $script:icon.ShowBalloonTip(8000, "Fabrica dos Cortes", "O servidor ainda esta iniciando. O navegador abre sozinho quando ficar pronto.", [System.Windows.Forms.ToolTipIcon]::Warning)
 }
 
 [System.Windows.Forms.Application]::Run()
