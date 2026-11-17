@@ -27,6 +27,13 @@ COMO USAR NO DIA A DIA:
 - Seu navegador abrirá em http://localhost:7860.
 - Para atualizar no futuro sem perder seus vídeos: execute ATUALIZAR.bat.
 
+COMO O PROGRAMA ABRE AGORA:
+- O programa roda em segundo plano. Nao deixa janela preta aberta.
+- O icone fica na bandeja do Windows (na setinha perto do relogio).
+- Para abrir: clique no icone e escolha "Abrir Fabrica dos Cortes".
+- Para encerrar: botao direito no icone > Sair.
+- Os logs ficam na pasta "logs" do programa.
+
 Área de Membros e Suporte:
 https://membros.fabricadecortes.com
 ==============================================================

@@ -38,6 +38,12 @@ except ImportError:
 LAST_AI_ERROR = ""
 
 
+def _set_last_ai_error(message):
+    """Define o motivo da falha sem exigir 'global' nas funções chamadoras."""
+    global LAST_AI_ERROR
+    LAST_AI_ERROR = str(message or "")
+
+
 def _set_ai_error(message):
     global LAST_AI_ERROR
     LAST_AI_ERROR = str(message or "").strip()
@@ -846,7 +852,7 @@ def process_segments(raw_segments, transcript_segments, min_duration, max_durati
     return final_result
 
 
-def create(num_segments, viral_mode, themes, tempo_minimo, tempo_maximo, ai_mode="manual", api_key=None, project_folder="tmp", chunk_size_arg=None, model_name_arg=None, extra_instruction="", progress_callback=None, ask_amount_override=None):
+def create(num_segments, viral_mode, themes, tempo_minimo, tempo_maximo, ai_mode="manual", api_key=None, project_folder="tmp", chunk_size_arg=None, model_name_arg=None, extra_instruction="", progress_callback=None, ask_amount_override=None, prompt_template_override=None, task_instruction_override=None, rescue_prompt_override=None):
     quantidade_de_virals = num_segments
 
     # 1. Load Transcript
@@ -919,7 +925,11 @@ def create(num_segments, viral_mode, themes, tempo_minimo, tempo_maximo, ai_mode
         return {"segments": []}
 
     system_prompt_template = ""
-    if os.path.exists(prompt_path):
+    prompt_override = str(prompt_template_override or "").strip()
+    if prompt_override:
+        system_prompt_template = prompt_override
+        print("[PROMPT] Usando prompt específico do Melhores Momentos.")
+    elif os.path.exists(prompt_path):
         with open(prompt_path, 'r', encoding='utf-8') as f:
             system_prompt_template = f.read()
     else:
@@ -947,7 +957,7 @@ OUTPUT JSON ONLY:
                         "title": "Short headline, max 70 chars, NO hashtags, same language as transcript",
                         "hashtags": "#tag1 #tag2 #tag3",
                         "reasoning": "Why this cut works, in the same language as the transcript",
-                        "emotion": "laughter|shock|emotion|conflict|revelation|inspiration",
+                        "emotion": "laughter|shock|emotion|conflict|revelation|insight|story|inspiration",
                         "score": "Integer 0-100, honest and varied (90+ only for exceptional cuts)"
                     }
                 ]
@@ -967,7 +977,8 @@ OUTPUT JSON ONLY:
     else:
         chunk_size = int(current_chunk_size)
         # Overlap generoso (minimo de 4.000 caracteres ou 20%) para que nenhuma historia de 60s a 120s fique cortada na borda
-        overlap_size = max(4000, int(chunk_size * 0.20))
+        # Nunca maior que metade do chunk: overlap >= chunk travava o laco avancando 1 caractere por vez.
+        overlap_size = min(max(4000, int(chunk_size * 0.20)), max(0, chunk_size // 2))
         chunks = []
         start = 0
         print(f"[DEBUG] Chunking content (Tamanho: {content_len}) com Chunk Size: {chunk_size} e Overlap: {overlap_size}")
@@ -1000,7 +1011,18 @@ OUTPUT JSON ONLY:
             ask_amount = max(quantidade_de_virals + 3, int(quantidade_de_virals * 1.6) + 1)
     else:
         ask_amount = max(quantidade_de_virals + 3, int(quantidade_de_virals * 1.6) + 1)
-    if viral_mode:
+    task_override = str(task_instruction_override or "").strip()
+    if task_override:
+        try:
+            virality_instruction = task_override.format(
+                amount=ask_amount,
+                keep=quantidade_de_virals,
+                min_duration=tempo_minimo,
+                max_duration=tempo_maximo,
+            )
+        except (KeyError, IndexError):
+            virality_instruction = task_override
+    elif viral_mode:
         virality_instruction = f"""analyze the segment for potential virality and identify {ask_amount} candidate viral segments from the transcript (aiming for at least {quantidade_de_virals} top quality cuts)"""
     else:
         virality_instruction = f"""analyze the segment for potential virality and identify {ask_amount} the best parts based on the list of themes {themes}."""
@@ -1009,8 +1031,7 @@ OUTPUT JSON ONLY:
     if feedback_instruction:
         virality_instruction += "\n\n" + feedback_instruction
 
-    # Instrução específica de quem chamou (por exemplo, compilado horizontal).
-    # Mantém o prompt base compartilhado e evita duplicar um segundo prompt.txt.
+    # Regras adicionais específicas de quem chamou (compatibilidade).
     if str(extra_instruction or "").strip():
         virality_instruction += "\n\nTASK-SPECIFIC EDITORIAL RULES:\n" + str(extra_instruction).strip()
 
@@ -1199,27 +1220,110 @@ OUTPUT JSON ONLY:
         except Exception as e:
             print(f"Erro desconhecido ao processar chunk: {e}")
 
-    # MODO DE RESGATE ADAPTATIVO: se nenhum segmento foi encontrado pelos chunks normais
-    if not all_raw_segments:
-        print("\n" + "="*60)
-        print("[MODO DE RESGATE] Nenhum corte detectado nos chunks iniciais.")
-        print("[MODO DE RESGATE] Ativando analise adaptativa de alta sensibilidade...")
-        print("="*60 + "\n")
-        
-        # Usa um trecho representativo (ate 180.000 caracteres)
-        rescue_chunk = content[:180000] if len(content) > 180000 else content
-        
-        rescue_prompt = f"""You are a senior short-form editor.
-Analyze this transcript with timestamps (XXs) and identify {ask_amount} candidate moments that work as complete, standalone stories (the best {quantidade_de_virals} will be kept).
+    # ------------------------------------------------------------------
+    # RESGATE: cobre a transcricao inteira, em janelas, com dois niveis.
+    # ------------------------------------------------------------------
+    def _save_ai_log(kind, content_to_save):
+        try:
+            logs_dir = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs"
+            )
+            os.makedirs(logs_dir, exist_ok=True)
+            stamp = time.strftime("%Y%m%d_%H%M%S")
+            filename = f"ai_{kind}_{stamp}_{int(time.time() * 1000) % 1000:03d}.txt"
+            with open(os.path.join(logs_dir, filename), "w", encoding="utf-8") as fh:
+                fh.write(content_to_save)
+        except Exception as log_err:
+            print(f"[WARN] Nao foi possivel gravar o log da IA: {log_err}")
+
+    def _rescue_windows(raw_text, size=120000, max_windows=6):
+        """Janelas espalhadas pela transcricao inteira, nao so no comeco."""
+        if len(raw_text) <= size:
+            return [raw_text]
+        parts = (len(raw_text) + size - 1) // size
+        count = min(max_windows, max(1, parts))
+        if count == 1:
+            return [raw_text[:size]]
+        step = max(1, (len(raw_text) - size) // (count - 1))
+        windows = []
+        for index in range(count):
+            begin = index * step
+            windows.append(raw_text[begin:min(len(raw_text), begin + size)])
+        return windows
+
+    def _ask_ai(prompt_text):
+        # O resgate tem orçamento próprio: o deadline global dos chunks pode já ter vencido.
+        rescue_deadline = time.time() + 180
+        if ai_mode == "gemini":
+            return call_gemini(prompt_text, api_key, model_name=model_name, deadline=rescue_deadline) or ""
+        if ai_mode == "g4f":
+            return call_g4f(prompt_text, model_name=model_name) or ""
+        if ai_mode == "local" and local_llm_instance:
+            out = local_llm_instance.create_chat_completion(
+                messages=[{"role": "user", "content": prompt_text}],
+                max_tokens=4096,
+                temperature=0.7,
+            )
+            return out["choices"][0]["message"]["content"]
+        return ""
+
+    rescue_started = time.time()
+    rescue_budget = 480  # segundos no total, para não travar a geração
+
+    def _run_rescue(windows, prompt_builder, level_name):
+        collected = []
+        for index, window in enumerate(windows):
+            if time.time() - rescue_started > rescue_budget:
+                print("[RESGATE] Orcamento de tempo esgotado; seguindo com o que ja foi encontrado.")
+                break
+            prompt_text = prompt_builder(window)
+            _save_ai_log(f"{level_name}_prompt_{index + 1}", prompt_text)
+            response = ""
+            try:
+                response = _ask_ai(prompt_text)
+            except Exception as call_err:
+                print(f"[RESGATE] Falha na chamada ({level_name} parte {index + 1}): {call_err}")
+            if not response:
+                continue
+            _save_ai_log(f"{level_name}_resp_{index + 1}", response)
+            try:
+                data = clean_json_response(response)
+                segments = data.get("segments", []) or []
+            except Exception as parse_err:
+                print(f"[RESGATE] JSON invalido ({level_name} parte {index + 1}): {parse_err}")
+                continue
+            if segments:
+                print(f"[RESGATE] {level_name} parte {index + 1}: {len(segments)} candidato(s).")
+                collected.extend(segments)
+        return collected
+
+    rescue_override = str(rescue_prompt_override or "").strip()
+
+    def _build_rescue_prompt(window):
+        if rescue_override:
+            prompt_text = rescue_override
+            for key, value in {
+                "amount": ask_amount,
+                "keep": quantidade_de_virals,
+                "min_duration": tempo_minimo,
+                "max_duration": tempo_maximo,
+                "rescue_chunk": window,
+            }.items():
+                prompt_text = prompt_text.replace("{" + key + "}", str(value))
+            return prompt_text
+
+        return f"""You are a senior short-form editor.
+Analyze this transcript excerpt with timestamps (XXs) and identify up to {ask_amount} candidate moments that work as complete, standalone ideas (the best {quantidade_de_virals} will be kept).
 Each segment must be between {tempo_minimo}s and {tempo_maximo}s.
-CRITICAL: Do NOT return an empty list. If there is no explosive moment, pick the clearest story, insight or argument.
+A moment qualifies if it delivers emotion, conflict, insight or a complete story. A calm explanation or a well-argued opinion is valid.
+CRITICAL: Do NOT return an empty list. If there is no explosive moment, pick the clearest story, insight or argument in this excerpt.
 Start on the first word of a complete sentence that names its subject, and end on the last word of a sentence that delivers the payoff. Never start or end mid-sentence.
 start_text must be the first 8-15 words of the opening sentence, copied exactly. end_text must be the last 8-15 words of the closing sentence, copied exactly.
 hook_line must be the exact opening sentence of the cut, copied from the transcript, not a headline.
 Output title, hook_line and reasoning in the same language as the transcript.
 
 TRANSCRIPT:
-{rescue_chunk}
+{window}
 
 OUTPUT VALID JSON ONLY:
 {{
@@ -1237,46 +1341,93 @@ OUTPUT VALID JSON ONLY:
     }}
   ]
 }}"""
-        rescue_resp = ""
-        try:
-            if ai_mode == "gemini":
-                rescue_resp = call_gemini(rescue_prompt, api_key, model_name=model_name, deadline=ai_deadline)
-            elif ai_mode == "g4f":
-                rescue_resp = call_g4f(rescue_prompt, model_name=model_name)
-            elif ai_mode == "local" and local_llm_instance:
-                out = local_llm_instance.create_chat_completion(
-                    messages=[{"role": "user", "content": rescue_prompt}],
-                    max_tokens=4096,
-                    temperature=0.7
-                )
-                rescue_resp = out['choices'][0]['message']['content']
-        except Exception as e_res:
-            print(f"[MODO DE RESGATE] Erro na chamada da IA: {e_res}")
 
-        if rescue_resp:
-            rescue_data = clean_json_response(rescue_resp)
-            rescued_segs = rescue_data.get("segments", [])
-            if rescued_segs:
-                print(f"[MODO DE RESGATE] Sucesso! Recuperados {len(rescued_segs)} corte(s)!")
-                all_raw_segments.extend(rescued_segs)
+    def _build_permissive_prompt(window):
+        return f"""You are a senior short-form editor working with a difficult transcript.
+Read this excerpt with timestamps (XXs) and return up to {max(1, min(3, int(ask_amount)))} moments that can stand alone as a complete idea.
+Each moment must be between {tempo_minimo}s and {tempo_maximo}s.
+Be permissive. Any coherent passage with a clear beginning and a clear conclusion qualifies: a calm explanation, a lesson, an opinion, a story, a piece of advice.
+Start on the first word of a complete sentence that names its subject. End on the last word of a sentence that closes the idea.
+Copy start_text, end_text and hook_line exactly from the transcript.
+Do NOT return an empty list. If nothing stands out, return the clearest complete passage in this excerpt.
 
-    # Se a IA não retornou nada, NÃO gera cortes aleatórios.
-    # O fallback antigo cortava o vídeo em pontos fixos e entregava conteúdo desconexo.
+TRANSCRIPT:
+{window}
+
+OUTPUT VALID JSON ONLY:
+{{
+  "segments": [
+    {{
+      "start_time_ref": "(XXs)",
+      "end_time_ref": "(XXs)",
+      "start_text": "First 8-15 words of the opening sentence, copied exactly",
+      "end_text": "Last 8-15 words of the closing sentence, copied exactly",
+      "hook_line": "Exact opening sentence, copied from the transcript",
+      "title": "Short headline, max 70 chars, no hashtags",
+      "hashtags": "#tag1 #tag2 #tag3",
+      "reasoning": "Why this cut works",
+      "score": "Integer 0-100, honest and varied"
+    }}
+  ]
+}}"""
+
+    rescue_windows = _rescue_windows(content)
+    used_permissive = False
+    original_chunk_count = len(all_raw_segments)
+
     if not all_raw_segments:
+        print("\n" + "=" * 60)
+        print("[MODO DE RESGATE] Nenhum corte detectado nos chunks iniciais.")
+        print(f"[MODO DE RESGATE] Analisando {len(rescue_windows)} janela(s) da transcricao inteira...")
+        print("=" * 60 + "\n")
+
+        all_raw_segments.extend(_run_rescue(rescue_windows, _build_rescue_prompt, "resgate"))
+
+        if not all_raw_segments:
+            print("[MODO DE RESGATE] Nivel 1 sem resultado. Tentando nivel permissivo...")
+            used_permissive = True
+            all_raw_segments.extend(
+                _run_rescue(rescue_windows, _build_permissive_prompt, "resgate_permissivo")
+            )
+
+    # Se a IA retornou algo mas nada sobreviveu a validacao, tenta o nivel permissivo
+    # antes de desistir, em vez de devolver lista vazia.
+    result = process_segments(
+        all_raw_segments,
+        transcript_segments,
+        tempo_minimo,
+        tempo_maximo,
+        output_count=quantidade_de_virals,
+    )
+
+    if not result.get("segments") and not used_permissive and original_chunk_count > 0:
+        print("[MODO DE RESGATE] Os candidatos iniciais nao sobreviveram a validacao.")
+        print("[MODO DE RESGATE] Tentando o nivel permissivo...")
+        used_permissive = True
+        rescued = _run_rescue(rescue_windows, _build_permissive_prompt, "resgate_permissivo")
+        if rescued:
+            all_raw_segments.extend(rescued)
+            result = process_segments(
+                all_raw_segments,
+                transcript_segments,
+                tempo_minimo,
+                tempo_maximo,
+                output_count=quantidade_de_virals,
+            )
+
+    if not result.get("segments"):
         print("\n" + "=" * 60)
         print("[ERRO] A IA nao retornou nenhum corte valido.")
         print("[ERRO] Nenhum corte sera gerado para nao entregar videos desconexos.")
         if LAST_AI_ERROR:
             print(f"[ERRO IA] {LAST_AI_ERROR}")
-        print("[DICA] Verifique a chave e o modelo da IA (Gemini/G4F) e tente novamente.")
+        print(f"[DICA] Transcricao com {len(content)} caracteres analisada em {len(rescue_windows)} janela(s).")
+        print("[DICA] Verifique se a transcricao tem texto suficiente e se a chave da IA esta valida.")
+        print("[DICA] Os prompts e respostas brutas foram salvos em logs\\ai_*.txt")
         print("=" * 60 + "\n")
-        return {"segments": []}
+        if not LAST_AI_ERROR:
+            _set_last_ai_error(
+                "A IA respondeu, mas nenhum trecho passou na validacao de duracao e frases completas."
+            )
 
-    # Call the alignment / processing logic
-    return process_segments(
-        all_raw_segments, 
-        transcript_segments, 
-        tempo_minimo, 
-        tempo_maximo, 
-        output_count=quantidade_de_virals
-    )
+    return result

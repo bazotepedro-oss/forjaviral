@@ -40,19 +40,24 @@ WHAT MAKES A CUT WORTH IT (in priority order)
 2. Conflict, contrast or contradiction.
 3. Concrete details: numbers, names, facts, dates.
 4. Emotional charge: loss, fear, regret, pride, relief.
-5. Something the audience will want to agree or disagree with in the comments.
+5. A clear insight: an explanation, a rule, a lesson or a strong opinion the audience will want to agree or disagree with in the comments.
 Avoid: introductions, transitions, rambling, repeated ideas, pure information with no tension, jokes that need prior context, lists without a conclusion.
 
-EMOTION PEAK (MANDATORY)
-Every cut must contain a visible reaction peak: laughter, applause, shock, outrage, a confession, a twist, or a strong disagreement. The peak must happen inside the cut, ideally in the last third, and the cut must end shortly after it.
-Reject any moment that is only explanation, information, or a calm opinion, even if the sentences are complete.
-Signals in the transcript: "[risadas]", "haha", "gargalhada", "aplausos", "nossa", "caraca", "inacreditável", "não acredito", "chorando", "emocionado", "polêmica", "briga", "discordância", "olha isso", "presta atenção", "eu tô passando mal".
+FOUR KINDS OF CUT ARE ACCEPTED (pick the kind that fits the moment)
+A cut qualifies if it delivers at least one of these:
+1. EMOTION: laughter, shock, outrage, confession, emotion. Signals in the transcript: "[risadas]", "haha", "gargalhada", "aplausos", "nossa", "caraca", "inacreditável", "não acredito", "chorando", "emocionado".
+2. CONFLICT: disagreement, provocation, contradiction, a strong "no" to something, a fight, a controversial opinion defended out loud.
+3. INSIGHT: an explanation, a rule, a lesson, a number that reframes the subject, a clear how-to, a strong opinion with reasoning.
+4. STORY: a beginning, a turn and a conclusion. Someone did something, something happened, there was a result.
+
+A calm explanation or a well-argued opinion is a valid cut. Do NOT reject a complete, coherent moment just because nobody laughed or shouted.
+Never return an empty list when the transcript contains at least one complete idea. If there is no explosive moment, pick the clearest story, argument or insight you can find.
 
 REFERENCE STRUCTURE (follow this rhythm)
 1. Hook: the strongest or most unexpected sentence in the first 3 seconds.
 2. Setup: only the context needed to understand the stake.
 3. Escalation: a concrete detail, number, contradiction or confession.
-4. Payoff: the laugh, the shock, the confession or the punchline in the last 3 to 8 seconds.
+4. Payoff: the laugh, the shock, the confession, the insight or the conclusion in the last 3 to 8 seconds.
 5. Stop right after the payoff. Never add a closing explanation.
 
 FIELDS
@@ -63,8 +68,8 @@ FIELDS
 - end_text: the last 8 to 15 words of the closing sentence, copied exactly from the transcript.
 - start_time_ref / end_time_ref: the (XXs) tag closest to the first and to the last word of the cut.
 - reasoning: one or two sentences explaining why this cut works, in the same language as the transcript.
-- emotion: the dominant reaction of the cut. Use one of: laughter, shock, emotion, conflict, revelation, inspiration.
-- score: an honest integer from 0 to 100, based on how likely this cut is to stop the scroll and generate comments. Do not repeat the same score for every cut: 90 or more only for exceptional cuts, 70 to 89 for good cuts, below 70 for weak ones. A cut without a clear emotion peak must score below 75.
+- emotion: the dominant value of the cut. Use one of: laughter, shock, emotion, conflict, revelation, insight, story, inspiration.
+- score: an honest integer from 0 to 100, based on how likely this cut is to stop the scroll and generate comments. Do not repeat the same score for every cut: 90 or more only for exceptional cuts, 70 to 89 for good cuts, below 70 for weak ones. Judge the cut by how strong it is within its own kind: a sharp insight or a well-told story can score 90 just like a big reaction.
 
 COPY THE TEXT EXACTLY
 Every text field must be copied from the transcript with the same words and the same language. Never translate, paraphrase or correct the transcript.

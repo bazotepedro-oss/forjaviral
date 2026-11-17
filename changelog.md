@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.3.20 — Diagnóstico e recuperação do servidor
+
+### Correções
+- O iniciador agora grava toda a saída do servidor em `logs\app.log`, inclusive falhas nativas.
+- Cada geração também cria um log detalhado em `logs\render_*.log`, com a saída do FFmpeg e do processamento.
+- Se o servidor encerrar inesperadamente, o iniciador reinicia automaticamente (até 3 tentativas) em vez de deixar o navegador sem conexão.
+- Aviso na janela do terminal para não fechá-la durante a geração.
+- O app bloqueia a geração quando há menos de 600 MB de memória livre e orienta fechar o navegador/outros programas.
+- **Prompt do Melhores Momentos separado do prompt dos cortes**: agora existe um prompt próprio para compilados longos (`prompt_best_moments.txt`) e um prompt de resgate próprio. Os cortes curtos continuam usando o `prompt.txt` de sempre.
+- **Bandeja do Windows**: o app inicia sem deixar o CMD aberto. O ícone fica na área de notificação (setinha) com menu para abrir, abrir logs, reiniciar o servidor ou sair. O servidor é reiniciado automaticamente se cair.
+
+### Correções no erro "sem segmentos virais"
+
+- O prompt dos cortes deixou de exigir um pico de emoção em todo corte. Agora são aceitos quatro tipos de momento: emoção, conflito, insight e história completa. Explicações calmas e opiniões bem argumentadas passaram a valer.
+- O prompt passou a instruir a IA a nunca devolver lista vazia quando existir pelo menos uma ideia completa na transcrição.
+- O modo de resgate agora varre a transcrição inteira em janelas, em vez de olhar apenas os primeiros 180 mil caracteres. O final de podcasts longos passou a ser analisado.
+- Criado um segundo nível de resgate, mais permissivo, usado quando o primeiro não encontra nada ou quando os candidatos não passam na validação.
+- O resgate tem orçamento de tempo próprio e não é mais cancelado pelo limite global da análise.
+- Todas as chamadas de resgate gravam prompt e resposta em `logs\ai_*.txt`, para diagnóstico.
+- Corrigido um laço que podia travar a análise quando o tamanho de bloco era pequeno: o overlap agora nunca passa da metade do bloco.
+- A mensagem final de erro agora mostra o motivo real da falha e indica a pasta de logs, em vez de apenas "nenhum segmento viral".
+- Padronizado o limite de duração do compilado em 300 segundos entre o prompt e a validação (antes a validação usava 240).
+
+## 1.3.19 — Marca d'água e vídeo da ferramenta
+
+### Novidades
+- **Marca d'água opcional** no canto superior direito dos cortes e dos Melhores Momentos.
+- **Vídeo da ferramenta no final**: o encerramento de 11,8 s é anexado automaticamente ao fim de cada vídeo.
+- As duas opções aparecem em **Criar Cortes** e em **Melhores Momentos**, ativadas por padrão e podem ser desligadas antes de gerar.
+- Nos cortes verticais, a marca é aplicada antes da legenda queimada, então continua visível mesmo depois de editar o estilo da legenda na Biblioteca.
+- Nos compilados 16:9, o encerramento vertical é centralizado sobre um fundo desfocado do próprio vídeo, sem barras pretas.
+- O encerramento entra depois dos momentos e antes do fim do arquivo, com fade suave.
+
 ## 1.3.18 — Instalador corrigido em pastas do usuário
 
 ### Correções

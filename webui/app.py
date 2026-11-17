@@ -12,6 +12,7 @@ def get_saved_gemini_key():
         pass
     return ""
 import base64
+import faulthandler
 import gradio as gr
 import subprocess
 import os
@@ -42,6 +43,17 @@ import subtitle_editor as editor # Module for Editor Logic
 MAIN_SCRIPT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "main_improved.py")
 WORKING_DIR = os.path.dirname(MAIN_SCRIPT_PATH)
 sys.path.append(WORKING_DIR)
+LOG_DIR = os.path.join(WORKING_DIR, "logs")
+try:
+    os.makedirs(LOG_DIR, exist_ok=True)
+except OSError:
+    pass
+# Em caso de falha nativa, o traceback também vai para o stderr (redirecionado
+# para logs/app.log pelo INICIAR_FABRICA_DE_CORTES.bat).
+try:
+    faulthandler.enable()
+except Exception:
+    pass
 
 from i18n.i18n import I18nAuto
 i18n = I18nAuto()
@@ -345,7 +357,8 @@ def apply_experimental_preset(preset_name):
 def run_viral_cutter(input_source, project_name, url, video_file, segments, viral, themes, min_duration, max_duration, model, ai_backend, api_key, ai_model_name, chunk_size, workflow, face_model, face_mode, face_detect_interval, no_face_mode, 
                      face_filter_thresh, face_two_thresh, face_conf_thresh, face_dead_zone, focus_active_speaker, active_speaker_mar, active_speaker_score_diff, include_motion, active_speaker_motion_threshold, active_speaker_motion_sensitivity, active_speaker_decay,
                      use_custom_subs, font_name, font_size, font_color, highlight_color, outline_color, outline_thickness, shadow_color, shadow_size, is_bold, is_italic, is_uppercase, vertical_pos, alignment,
-                     h_size, w_block, gap, mode, under, strike, border_s, remove_punc, video_quality, use_youtube_subs, translate_target):
+                     h_size, w_block, gap, mode, under, strike, border_s, remove_punc, video_quality, use_youtube_subs, translate_target,
+                     watermark=True, promo_outro=True):
     
     global current_process
     process_start_time = time.time()
@@ -427,6 +440,10 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
 
     workflow_map = {"Full": "1", "Cut Only": "2", "Subtitles Only": "3"}
     cmd.extend(["--workflow", workflow_map.get(workflow, "1")])
+    if watermark:
+        cmd.append("--watermark")
+    if promo_outro:
+        cmd.append("--promo-outro")
     cmd.extend(["--face-model", face_model])
     cmd.extend(["--face-mode", face_mode])
     if face_detect_interval: cmd.extend(["--face-detect-interval", str(face_detect_interval)])
@@ -481,6 +498,24 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
+
+    # Evita iniciar uma renderização que provavelmente vai derrubar o PC por
+    # falta de memória (Chrome + modelos de IA + FFmpeg).
+    try:
+        available_mb = psutil.virtual_memory().available / (1024 * 1024)
+        if available_mb < 600:
+            yield (
+                f"Memória livre baixa ({available_mb:.0f} MB). Feche o navegador ou outros programas e tente novamente.",
+                gr.update(value="Gerar Cortes", interactive=True),
+                gr.update(visible=False),
+                None,
+                gr.update(),
+                _render_progress_html(0, "Memória insuficiente para gerar."),
+            )
+            return
+    except Exception:
+        pass
+
     if not processing_lock.acquire(blocking=False):
         yield "Já existe um processamento ativo. Aguarde ou cancele a execução atual.", gr.update(value="Gerar Cortes", interactive=True), gr.update(visible=False), None, gr.update(), _render_progress_html(0, "Já existe um processamento ativo.")
         return
@@ -493,6 +528,18 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
     asked_segments = int(segments or 1)
     to_debit = 0
     settlement_ok = False
+    job_log = None
+    try:
+        job_log_path = os.path.join(LOG_DIR, f"render_{time.strftime('%Y%m%d_%H%M%S')}.log")
+        job_log = open(job_log_path, "a", encoding="utf-8", buffering=1)
+        job_log.write(
+            f"[inicio] {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"origem={input_source} projeto={project_name or '-'} cortes={asked_segments} "
+            f"workflow={workflow} marca={bool(watermark)} encerramento={bool(promo_outro)}\n"
+        )
+    except OSError:
+        job_log = None
+
     try:
         current_process = subprocess.Popen(
             cmd,
@@ -537,7 +584,14 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
                     break
                 time.sleep(0.05)
                 continue
-            
+
+            if job_log is not None:
+                try:
+                    job_log.write(line)
+                    job_log.flush()
+                except OSError:
+                    pass
+
             clean_line = line.strip('\r\n')
             if not clean_line or clean_line.isspace():
                 continue
@@ -635,6 +689,17 @@ def run_viral_cutter(input_source, project_name, url, video_file, segments, vira
             logs += f"\n[AVISO CRÉDITOS] Falha ao liquidar reserva: {settlement_error}\n"
         finally:
             processing_lock.release()
+        if job_log is not None:
+            try:
+                job_log.write(
+                    f"\n[fim] return_code={return_code} cortes={actual_cuts} "
+                    f"creditos={to_debit} liquidado={settlement_ok}\n"
+                )
+                job_log.flush()
+                job_log.close()
+            except OSError:
+                pass
+            job_log = None
     
     # Wait to ensure filesystem flush
     time.sleep(1.0)
@@ -2170,6 +2235,20 @@ footer {
     color: #ff8a4c;
 }
 
+#best-moments-panel .bm-extras {
+    gap: 10px !important;
+    margin: 2px 0 12px !important;
+    padding: 10px 12px;
+    border-radius: 13px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(0, 0, 0, 0.22);
+}
+
+#best-moments-panel .bm-extras label {
+    color: #d8c6b9 !important;
+    font-size: 11px !important;
+}
+
 #best_moments_btn {
     width: 100% !important;
     min-height: 58px !important;
@@ -3446,6 +3525,19 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                  with gr.Column(min_width=160, elem_classes="fdc-card"):
                      gr.HTML(_card_head("clock", "Duração máxima", "Em segundos"))
                      max_dur_input = gr.Number(value=90, show_label=False, container=False)
+             with gr.Column(elem_classes="fdc-card"):
+                 gr.HTML(_card_head("badge-check", "Extras de publicação", "Marca d'água e divulgação no fim do vídeo"))
+                 with gr.Column():
+                     watermark_input = gr.Checkbox(
+                         label="Marca d'água da Fábrica dos Cortes no canto",
+                         value=True,
+                         elem_classes="fdc-switch",
+                     )
+                     promo_input = gr.Checkbox(
+                         label="Adicionar o vídeo da ferramenta no final",
+                         value=True,
+                         elem_classes="fdc-switch",
+                     )
              viral_input = gr.Checkbox(value=True, visible=False)
              themes_input = gr.Textbox(visible=False)
              ai_backend_input = gr.Dropdown(choices=[(i18n("Gemini"), "gemini")], value="gemini", visible=False)
@@ -3638,7 +3730,8 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                  # New Inputs
                  highlight_size_input, words_per_block_input, gap_limit_input, mode_input, 
                  underline_input, strikeout_input, border_style_input, remove_punc_input,
-                 video_quality_input, use_youtube_subs_input, translate_input
+                 video_quality_input, use_youtube_subs_input, translate_input,
+                 watermark_input, promo_input
              ], outputs=[logs_output, start_btn, stop_btn, results_html, topbar_html, progress_html])
 
         with gr.Tab(i18n("Library")):
@@ -4347,6 +4440,17 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                             "A cobrança só é confirmada quando o vídeo fica pronto; "
                             "em caso de falha, os créditos voltam automaticamente.</div>"
                         )
+                        with gr.Column(elem_classes="bm-extras"):
+                            comp_watermark = gr.Checkbox(
+                                label="Marca d'água no canto",
+                                value=True,
+                                elem_classes="fdc-switch",
+                            )
+                            comp_promo = gr.Checkbox(
+                                label="Vídeo da ferramenta no final",
+                                value=True,
+                                elem_classes="fdc-switch",
+                            )
                         comp_button = gr.Button("Montar Melhores Momentos · 10 créditos", variant="primary", elem_id="best_moments_btn")
                         comp_status = gr.HTML(
                             _comp_initial_status,
@@ -4383,6 +4487,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                 gr.HTML(
                     '<div class="bm-fineprint">O compilado analisa o podcast inteiro, evita repetir o mesmo assunto '
                     "e monta o vídeo em 1920×1080, 30 FPS, com áudio AAC 192 kbps. "
+                    "Com os extras ativados, o vídeo recebe a marca d’água no canto e o encerramento da ferramenta. "
                     "Se não houver material suficiente para a duração escolhida, nada é entregue e os 10 créditos são devolvidos.</div>",
                     elem_classes="fdc-bare",
                 )
@@ -4449,7 +4554,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                 except Exception as exc:
                     return f"Não consegui baixar/transcrever: {exc}", gr.update()
 
-            def _run_best_moments(project, target_minutes, api_key):
+            def _run_best_moments(project, target_minutes, api_key, watermark=True, promo_outro=True):
                 def _output(message, tone="run", percent=None, player=None, downloads="", details=""):
                     return (
                         _comp_status_card(message, tone=tone, percent=percent),
@@ -4486,6 +4591,8 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                             progress=lambda amount, description: events.put(
                                 ("progress", max(0.0, min(1.0, float(amount))), str(description))
                             ),
+                            watermark=bool(watermark),
+                            promo_outro=bool(promo_outro),
                         )
                     except BaseException as exc:  # repassado para a interface
                         outcome["error"] = exc
@@ -4572,7 +4679,7 @@ with gr.Blocks(title="Fábrica dos Cortes", theme=gr.themes.Default(primary_hue=
                     _run_best_moments,
                     lambda args, kwargs: 10,
                 ),
-                inputs=[comp_project, comp_length, api_key_input],
+                inputs=[comp_project, comp_length, api_key_input, comp_watermark, comp_promo],
                 outputs=[comp_status, comp_player, comp_downloads, comp_details, topbar_html],
                 show_progress="hidden",
             )

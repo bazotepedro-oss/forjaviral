@@ -130,3 +130,6 @@ _update_backup/
 .update.lock
 temp_update*
 
+
+# Vídeo de divulgação usado como encerramento dos cortes
+!webui/assets/promo/ferramenta.mp4

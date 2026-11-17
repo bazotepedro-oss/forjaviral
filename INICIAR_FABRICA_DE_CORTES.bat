@@ -42,22 +42,23 @@ echo ==============================================================
 echo.
 echo           INICIANDO FABRICA DE CORTES - EDICAO DE VIDEOS
 echo.
-echo  Carregando modelos de IA e CUDA na placa de video...
-echo  (Na primeira inicializacao pode levar de 20 a 30 segundos)
+echo  O programa vai iniciar em segundo plano e ficar na bandeja
+echo  do Windows (na setinha perto do relogio).
 echo.
-echo  Aguarde... Seu navegador abrira automaticamente:
-echo  --^> http://localhost:7860
+echo  Para abrir: clique no icone da Fabrica dos Cortes.
+echo  Para encerrar: botao direito no icone ^> Sair.
 echo.
-echo  Para fechar o programa, feche esta janela do terminal.
+echo  Aguarde alguns segundos... o navegador abrira sozinho.
 echo ==============================================================
 echo.
 
-rem Não encerra processos desconhecidos que possam usar a porta 7860.
+if not exist "%~dp0logs" mkdir "%~dp0logs" >nul 2>&1
+
+rem Se ja existe uma instancia, apenas abre o navegador.
 netstat -aon 2>nul | findstr ":7860" | findstr "LISTENING" >nul
 if %ERRORLEVEL% EQU 0 (
-    echo [AVISO] A porta 7860 já está em uso. Feche a instância anterior da Fábrica dos Cortes e tente novamente.
-    pause
-    exit /b 1
+    start "" "http://localhost:7860"
+    exit /b 0
 )
 
 rem Garante que o atalho oficial com ícone esteja na Área de Trabalho
@@ -65,12 +66,6 @@ if exist "%~dp0scripts\create_shortcut.ps1" (
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\create_shortcut.ps1" >nul 2>&1
 )
 
-call ".venv\Scripts\activate.bat"
-python "webui\app.py"
-
-if %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo [ERRO] Ocorreu um problema ao executar a ferramenta.
-    echo Se faltar alguma dependencia, execute novamente o INSTALADOR.bat
-    pause
-)
+echo Iniciando em segundo plano na bandeja do Windows...
+start "" powershell.exe -NoProfile -Sta -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0scripts\TRAY_FABRICA.ps1"
+exit /b 0

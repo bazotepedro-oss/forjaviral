@@ -54,6 +54,8 @@ $Files = @(
     "api_config.json",
     "temp_subtitle_config.json",
     "prompt.txt",
+    "prompt_best_moments.txt",
+    "prompt_best_moments_rescue.txt",
     "version.json",
     "ViralCutter.ipynb",
     "changelog.md"

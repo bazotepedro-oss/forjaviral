@@ -119,6 +119,8 @@ def main():
 
     parser.add_argument("--project-path", help="Path to existing project folder (overrides URL/Latest)")
     parser.add_argument("--workflow", choices=["1", "2", "3"], default="1", help="Workflow choice: 1=Full, 2=Cut Only, 3=Subtitles Only")
+    parser.add_argument("--watermark", action="store_true", help="Aplicar a marca d'água da Fábrica dos Cortes no canto")
+    parser.add_argument("--promo-outro", action="store_true", help="Acrescentar o vídeo da ferramenta no final de cada corte")
     parser.add_argument("--face-model", choices=["insightface", "mediapipe"], default="insightface", help="Face detection model")
     parser.add_argument("--face-mode", choices=["auto", "1", "2"], default="auto", help="Face tracking mode: auto, 1, 2")
     parser.add_argument("--subtitle-config", help="Path to subtitle configuration JSON file")
@@ -485,9 +487,15 @@ def main():
                     )
                 
                 if not viral_segments or not viral_segments.get("segments"):
+                    print("=" * 60)
                     print(i18n("Error: No viral segments were generated."))
+                    ai_reason = str(getattr(create_viral_segments, "LAST_AI_ERROR", "") or "").strip()
+                    if ai_reason:
+                        print(f"[MOTIVO] {ai_reason}")
                     print(i18n("Possible reasons: API error, Model not found, or empty response."))
+                    print(r"[DICA] Prompts e respostas da IA foram salvos em logs\ai_*.txt")
                     print(i18n("Stopping execution."))
+                    print("=" * 60)
                     sys.exit(1)
                 
                 save_json.save_viral_segments(viral_segments, project_folder=project_folder) 
@@ -580,7 +588,9 @@ def main():
                 active_speaker_motion_sensitivity=args.active_speaker_motion_sensitivity,
                 active_speaker_decay=args.active_speaker_decay,
                 segments_data=viral_segments.get("segments", []) if viral_segments else None,
-                no_face_mode=args.no_face_mode
+                no_face_mode=args.no_face_mode,
+                watermark=bool(args.watermark),
+                promo_outro=bool(args.promo_outro)
             )
 
 

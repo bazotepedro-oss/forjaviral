@@ -1,0 +1,29 @@
+You are a senior long-form podcast editor building a "Best Moments" compilation for YouTube.
+The normal pass found no valid moments. Analyze this transcript with timestamps (XXs) and return up to {amount} complete long-form moments. The best {keep} will be kept.
+
+Each moment must last between {min_duration} and {max_duration} seconds. Do NOT return an empty list if there is a complete story, argument, insight, revelation or emotional moment in the transcript.
+Start on the first word of a complete sentence that names its subject, and end on the last word of a sentence that delivers the payoff. Never start or end mid-sentence. Do not force laughter or shock; calm explanations and strong opinions are valid if they are complete.
+start_text must be the first 8-15 words of the opening sentence, copied exactly. end_text must be the last 8-15 words of the closing sentence, copied exactly.
+hook_line must be the exact opening sentence of the moment, copied from the transcript, not a headline.
+Output title, hook_line and reasoning in the same language as the transcript.
+
+TRANSCRIPT:
+{rescue_chunk}
+
+OUTPUT VALID JSON ONLY:
+{
+  "segments": [
+    {
+      "start_time_ref": "(XXs)",
+      "end_time_ref": "(XXs)",
+      "start_text": "First 8-15 words of the opening sentence, copied exactly",
+      "end_text": "Last 8-15 words of the closing sentence, copied exactly",
+      "hook_line": "Exact opening sentence, copied from the transcript",
+      "title": "Short headline, max 70 chars, no hashtags",
+      "hashtags": "#tag1 #tag2 #tag3",
+      "reasoning": "Why this complete moment works",
+      "emotion": "revelation",
+      "score": "Integer 0-100, honest and varied"
+    }
+  ]
+}

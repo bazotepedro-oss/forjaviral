@@ -20,6 +20,20 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import create_viral_segments  # noqa: E402
+try:
+    import branding  # noqa: E402
+except ImportError:
+    branding = None
+
+BEST_PROMPT_PATH = APP_ROOT / "prompt_best_moments.txt"
+BEST_RESCUE_PATH = APP_ROOT / "prompt_best_moments_rescue.txt"
+
+
+def _read_prompt(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8-sig").strip()
+    except OSError:
+        return ""
 
 
 def list_compilations(project_dir: str | Path) -> list[dict]:
@@ -54,7 +68,9 @@ def list_compilations(project_dir: str | Path) -> list[dict]:
     return items
 
 
-def _safe_segment(seg: dict, video_duration: float, max_clip_seconds: float = 240) -> dict | None:
+def _safe_segment(seg: dict, video_duration: float, max_clip_seconds: float = 300) -> dict | None:
+    # 300 s é o mesmo teto informado no prompt do compilado. Manter valores
+    # diferentes aqui fazia o modelo devolver um trecho válido e a validação recusar.
     try:
         start = float(seg.get("start_time", 0))
         end = float(seg.get("end_time", 0))
@@ -114,7 +130,7 @@ def select_compilation_segments(
     video_duration: float,
     cold_open: bool = True,
     min_score: int = 70,
-    max_clip_seconds: float = 240,
+    max_clip_seconds: float = 300,
 ) -> list[dict]:
     """Select complete, non-overlapping and topic-diverse clips.
 
@@ -272,12 +288,26 @@ def _write_compilation_srt(transcript: list[dict], clips: list[dict], path: Path
     return chapters
 
 
-def _concat_command(video: Path, clips: list[dict], output: Path, encoder: str) -> list[str]:
+def _concat_command(
+    video: Path,
+    clips: list[dict],
+    output: Path,
+    encoder: str,
+    promo: Path | None = None,
+    watermark: Path | None = None,
+) -> list[str]:
     command = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
     for clip in clips:
         start = float(clip["start_time"])
         duration = float(clip["duration"])
         command.extend(["-ss", f"{start:.3f}", "-t", f"{duration:.3f}", "-i", str(video)])
+
+    promo_index = len(clips)
+    if promo:
+        command.extend(["-i", str(promo)])
+    watermark_index = len(clips) + (1 if promo else 0)
+    if watermark:
+        command.extend(["-i", str(watermark)])
 
     filters: list[str] = []
     concat_inputs = []
@@ -295,7 +325,30 @@ def _concat_command(video: Path, clips: list[dict], output: Path, encoder: str) 
             f"afade=t=in:st=0:d=0.15,afade=t=out:st={audio_fade_out:.3f}:d=0.20[a{index}]"
         )
         concat_inputs.extend([f"[v{index}]", f"[a{index}]"])
-    filters.append(f"{''.join(concat_inputs)}concat=n={len(clips)}:v=1:a=1[vout][aout]")
+
+    if promo:
+        # O vídeo da ferramenta é vertical. No compilado 16:9 ele fica centralizado
+        # sobre um fundo desfocado do próprio vídeo, sem barras pretas.
+        filters.append(
+            f"[{promo_index}:v]setpts=PTS-STARTPTS,scale=-2:1080:flags=lanczos,"
+            f"pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=#080605,fps=30,"
+            f"format=yuv420p,setsar=1,fade=t=in:st=0:d=0.35[vpromo]"
+        )
+        filters.append(
+            f"[{promo_index}:a]asetpts=PTS-STARTPTS,aresample=48000,"
+            f"aformat=sample_fmts=fltp:channel_layouts=stereo,"
+            f"afade=t=in:st=0:d=0.35[apromo]"
+        )
+        concat_inputs.extend(["[vpromo]", "[apromo]"])
+
+    total_segments = len(clips) + (1 if promo else 0)
+    filters.append(f"{''.join(concat_inputs)}concat=n={total_segments}:v=1:a=1[vcat][acat]")
+    if watermark:
+        filters.append(f"[{watermark_index}:v]scale=380:-1[wm]")
+        filters.append("[vcat][wm]overlay=W-w-48:48:format=auto[vout]")
+    else:
+        filters.append("[vcat]null[vout]")
+    filters.append("[acat]anull[aout]")
     command.extend(["-filter_complex", ";".join(filters), "-map", "[vout]", "-map", "[aout]"])
     if encoder == "h264_nvenc":
         command.extend(["-c:v", "h264_nvenc", "-preset", "p4", "-cq", "23", "-b:v", "0"])
@@ -368,6 +421,8 @@ def create_compilation(
     api_key: str,
     cold_open: bool = True,
     progress: Callable[[float, str], None] | None = None,
+    watermark: bool = True,
+    promo_outro: bool = True,
 ) -> dict:
     project_dir = Path(project_dir).resolve()
     target_minutes = max(0, int(target_minutes or 0))
@@ -418,6 +473,9 @@ def create_compilation(
     if progress:
         progress(0.04, "Analisando o podcast inteiro e procurando os melhores momentos...")
 
+    prompt_template = _read_prompt(BEST_PROMPT_PATH)
+    rescue_prompt = _read_prompt(BEST_RESCUE_PATH)
+
     result = create_viral_segments.create(
         candidate_count,
         True,
@@ -432,19 +490,17 @@ def create_compilation(
         chunk_size_arg=120000,
         model_name_arg="gemini-2.5-flash",
         ask_amount_override=ask_amount,
-        extra_instruction=(
-            "THIS IS A LONG BEST-OF COMPILATION, not a set of Shorts. "
-            "PRIORITIZE FEWER, LONGER AND COMPLETE MOMENTS. Each selected moment should last "
-            "60 to 300 seconds and contain the FULL setup, explanation, examples, tension and conclusion. "
-            "Do NOT return 20-40 second fragments. If the same story, explanation or argument continues "
-            "into the next paragraph, INCLUDE THE CONTINUATION in the same moment instead of creating two "
-            "small cuts. NEVER start or end in the middle of an explanation; only stop after the idea is "
-            "fully delivered. Merge adjacent parts about the same subject into ONE long moment. "
-            "Return every strong complete moment the transcript supports, but quality and context are more "
-            "important than quantity. Vary the subjects, guests and emotional tones. The strongest complete "
-            "moment will OPEN the compilation. Complete explanations, strong opinions and surprising facts "
-            "are valuable even when they are not jokes; do not force a laugh or shock into every moment."
+        # Prompt próprio do compilado longo. O prompt.txt dos cortes curtos
+        # continua sendo usado apenas na aba Criar Cortes.
+        prompt_template_override=prompt_template or None,
+        rescue_prompt_override=rescue_prompt or None,
+        task_instruction_override=(
+            "Select up to {amount} complete long-form moments from this part of the podcast. "
+            "The {keep} strongest complete moments will be kept for the final 16:9 compilation. "
+            "Prioritize complete stories, arguments, insights and strong opinions over short viral fragments. "
+            "Merge adjacent parts about the same subject into one longer moment."
         ),
+        extra_instruction="",
         progress_callback=(
             (lambda amount, text: progress(0.04 + float(amount) * 0.56, text))
             if progress else None
@@ -492,12 +548,17 @@ def create_compilation(
                 "Nada foi cobrado; tente novamente para a IA refazer a seleção."
             )
 
+    use_watermark = bool(watermark and branding is not None and branding.watermark_available())
+    use_promo = bool(promo_outro and branding is not None and branding.promo_available())
+    promo_seconds = branding.promo_duration() if use_promo else 0.0
+    render_seconds = total_seconds + promo_seconds
+
     if progress:
         progress(0.62, f"Selecionados {len(clips)} momentos completos ({total_seconds/60:.1f} min). Preparando o vídeo 16:9...")
 
     # Evita encher o disco em compilações automáticas muito longas. O bitrate
     # de saída fica perto de 0,5 MB/s; usamos 0,6 MB/s como margem.
-    estimated_bytes = int(total_seconds * 0.6 * 1024 * 1024) + 200 * 1024 * 1024
+    estimated_bytes = int(render_seconds * 0.6 * 1024 * 1024) + 200 * 1024 * 1024
     free_bytes = shutil.disk_usage(output_dir).free
     if free_bytes < estimated_bytes:
         raise RuntimeError(
@@ -516,9 +577,18 @@ def create_compilation(
         ["ffmpeg", "-hide_banner", "-encoders"], capture_output=True, text=True, timeout=20
     ).stdout
     encoder = "h264_nvenc" if "h264_nvenc" in encoder_list else "libx264"
-    command = _concat_command(video, clips, out_video, encoder)
+    promo_path = branding.PROMO_PATH if use_promo else None
+    watermark_path = branding.WATERMARK_PATH if use_watermark else None
+    command = _concat_command(
+        video,
+        clips,
+        out_video,
+        encoder,
+        promo=promo_path,
+        watermark=watermark_path,
+    )
     rendered_code, rendered_log = _render_with_progress(
-        command, total_seconds, progress
+        command, render_seconds, progress
     )
     if rendered_code != 0 and encoder == "h264_nvenc":
         if progress:
@@ -527,9 +597,16 @@ def create_compilation(
             out_video.unlink()
         except OSError:
             pass
-        command = _concat_command(video, clips, out_video, "libx264")
+        command = _concat_command(
+            video,
+            clips,
+            out_video,
+            "libx264",
+            promo=promo_path,
+            watermark=watermark_path,
+        )
         rendered_code, rendered_log = _render_with_progress(
-            command, total_seconds, progress
+            command, render_seconds, progress
         )
     if rendered_code != 0 or not out_video.exists() or out_video.stat().st_size < 100_000:
         detail = rendered_log[-1200:].strip() or f"FFmpeg retornou o código {rendered_code}."
@@ -546,21 +623,32 @@ def create_compilation(
             f"O compilado saiu em {media['fps']:.2f} FPS em vez de 30 FPS. "
             "O arquivo não foi entregue; os créditos serão devolvidos."
         )
-    if auto_mode:
-        if media["duration"] < 180:
+    if use_promo and promo_seconds > 0.5:
+        expected_total = total_seconds + promo_seconds
+        if media["duration"] < expected_total - 1.0:
             raise RuntimeError(
-                f"O vídeo final ficou com {media['duration']/60:.1f} min, curto demais para um compilado automático. "
+                "O encerramento não foi anexado depois do compilado "
+                f"({total_seconds/60:.1f} min de conteúdo + {promo_seconds:.1f}s de encerramento; "
+                f"o arquivo saiu com {media['duration']/60:.1f} min). "
+                "Os créditos serão devolvidos."
+            )
+    # O encerramento promocional não conta como conteúdo do compilado.
+    content_duration = max(0.0, media["duration"] - promo_seconds)
+    if auto_mode:
+        if content_duration < 180:
+            raise RuntimeError(
+                f"O compilado ficou com {content_duration/60:.1f} min, curto demais para o modo automático. "
                 "Os créditos serão devolvidos."
             )
     else:
-        if media["duration"] < target_seconds * 0.85:
+        if content_duration < target_seconds * 0.85:
             raise RuntimeError(
-                f"O vídeo final ficou com {media['duration']/60:.1f} min, abaixo do mínimo seguro para {target_minutes} min. "
+                f"O compilado ficou com {content_duration/60:.1f} min, abaixo do mínimo seguro para {target_minutes} min. "
                 "Os créditos serão devolvidos."
             )
-        if media["duration"] > target_seconds * 1.15:
+        if content_duration > target_seconds * 1.15:
             raise RuntimeError(
-                f"O vídeo final ficou com {media['duration']/60:.1f} min, acima do limite para {target_minutes} min. "
+                f"O compilado ficou com {content_duration/60:.1f} min, acima do limite para {target_minutes} min. "
                 "Os créditos serão devolvidos."
             )
 

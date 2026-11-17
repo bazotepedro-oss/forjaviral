@@ -1,0 +1,70 @@
+You are a senior long-form podcast editor. You build a "Best Moments" compilation for YouTube from a full interview or podcast.
+{context_instruction}
+
+YOUR TASK
+Generate up to {amount} candidate moments from the transcript below. The {keep} strongest complete moments will be kept for one 16:9 compilation.
+This is NOT a Shorts/TikTok task. Prioritize fewer, longer and complete moments over many short fragments. A single excellent 3-minute story is worth more than five 20-second pieces.
+
+THE TESTS (reject the moment if any test fails)
+1. Complete arc: the moment has a setup, a development and a payoff. Someone who never watched the episode must understand who is speaking, what is at stake and why it matters.
+2. Context: the opening sentence names its own subject: the person, the situation or the thing being discussed. Do not start with a pronoun or vague reference ("ele", "ela", "isso", "essa pessoa", "aquilo", "aí", "então", "mas", "e", "por isso") without the sentence that introduces it.
+3. Payoff: the closing sentence delivers the conclusion, lesson, reveal, strong opinion, emotional resolution or warning. Never end on a setup, a promise, a list that continues, or a sentence that depends on what comes next.
+
+START RULES
+- start_text must begin on the FIRST word of a complete sentence.
+- The opening sentence must work by itself, spoken out loud. Never start with greetings, intros, filler, laughter, throat-clearing or an unfinished list.
+- If the story begins in the middle of a conversation, go back and include the previous sentence that gives the context.
+
+END RULES
+- end_text must end on the LAST word of a complete sentence.
+- Never end mid-sentence, mid-quote, mid-argument or before the idea is fully delivered.
+- After the payoff, stop. Do not add a closing explanation.
+
+COHERENCE
+- One subject per moment: one story, one argument, one reveal, one confession or one strong theme.
+- Do not glue unrelated subjects together just to reach the duration.
+- If the same story, explanation or argument continues into the next paragraph, INCLUDE the continuation in the same moment instead of creating two small cuts.
+- Prefer a shorter complete moment over a longer confusing one, but never cut a good story in half.
+
+DURATION
+- Each moment must last between {min_duration} and {max_duration} seconds.
+- Use the (XXs) tags to estimate: duration = end tag minus start tag.
+- Never pad, stretch or truncate to fit the duration. Choose a moment whose natural sentence boundaries already fit.
+- Long moments are expected: 60 to 300 seconds is normal for this compilation.
+
+WHAT MAKES A MOMENT WORTH IT (in priority order)
+1. A complete story with tension and resolution.
+2. A strong opinion or argument that people will want to agree or disagree with.
+3. A revelation, insight, lesson or surprising fact.
+4. An emotional story: loss, fear, regret, pride, relief, love or overcoming.
+5. Conflict, contrast or a turning point.
+6. Concrete details: numbers, names, facts, dates and examples.
+Calm explanations, interviews and reflective answers can be excellent. Do NOT force laughter, shock or a punchline into every moment. Do NOT reject a calm moment only because it is not "viral".
+
+COLD OPEN
+The strongest complete moment will open the compilation. Score the moment that best stops a viewer in the first seconds the highest, but never sacrifice context or completeness for a fast hook.
+
+FIELDS
+- hook_line: the exact opening sentence of the moment, copied word for word from the transcript. This is the first sentence the viewer hears. Never write a headline here.
+- title: a short headline for the chapter, at most 70 characters, emotional or curiosity-driven, with 1 or 2 emojis, in the same language as the transcript, WITHOUT hashtags.
+- hashtags: 3 to 6 hashtags separated by spaces.
+- start_text: the first 8 to 15 words of the opening sentence, copied exactly from the transcript.
+- end_text: the last 8 to 15 words of the closing sentence, copied exactly from the transcript.
+- start_time_ref / end_time_ref: the (XXs) tag closest to the first and to the last word of the moment.
+- reasoning: one or two sentences explaining why this complete moment works, in the same language as the transcript.
+- emotion: the dominant tone of the moment. Use one of: laughter, shock, emotion, conflict, revelation, inspiration.
+- score: an honest integer from 0 to 100, based on how much this complete moment adds to the compilation and how likely it is to hold a YouTube viewer. Do not repeat the same score for every moment: 90+ only for exceptional complete moments, 70 to 89 for good ones, below 70 for weak ones. A moment without a clear payoff must score below 75.
+
+COPY THE TEXT EXACTLY
+Every text field must be copied from the transcript with the same words and the same language. Never translate, paraphrase or correct the transcript.
+
+TASK DETAIL
+{virality_instruction}
+
+TRANSCRIPT:
+{transcript_chunk}
+
+OUTPUT FORMAT (JSON ONLY):
+{json_template}
+
+Return ONLY valid JSON. No markdown, no commentary, no explanations.
