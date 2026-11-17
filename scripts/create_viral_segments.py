@@ -1415,6 +1415,68 @@ OUTPUT VALID JSON ONLY:
                 output_count=quantidade_de_virals,
             )
 
+    # COMPLEMENTO: completa a quantidade pedida quando a IA entrega menos cortes.
+    # Sem isso, pedir 10 e receber 9 deixava o cliente sem o video que pagou.
+    topup_attempts = 0
+    while len(result.get("segments") or []) < quantidade_de_virals and topup_attempts < 2:
+        topup_attempts += 1
+        missing_count = quantidade_de_virals - len(result.get("segments") or [])
+        used_lines = []
+        for chosen in (result.get("segments") or [])[:20]:
+            used_lines.append(
+                "- " + str(chosen.get("title") or "")[:60]
+                + f" ({float(chosen.get('start_time') or 0):.0f}s-{float(chosen.get('end_time') or 0):.0f}s)"
+            )
+        used_block = "\n".join(used_lines) if used_lines else "- (nenhum)"
+
+        def _build_topup_prompt(window, missing=missing_count, used=used_block):
+            return f"""You are a senior short-form editor.
+The previous selection was incomplete. Find exactly {missing} additional moment(s) in this excerpt.
+Each moment must be between {tempo_minimo}s and {tempo_maximo}s.
+A moment qualifies if it delivers emotion, conflict, insight or a complete story.
+CRITICAL: return exactly {missing} segment(s). If there are not enough explosive moments, use the next best complete moments so the list reaches {missing}.
+Do not reuse any of these already selected moments:
+{used}
+Start on the first word of a complete sentence that names its subject, and end on the last word of a sentence that delivers the payoff.
+start_text must be the first 8-15 words of the opening sentence, copied exactly. end_text must be the last 8-15 words of the closing sentence, copied exactly.
+hook_line must be the exact opening sentence, copied from the transcript.
+Output title and reasoning in the same language as the transcript.
+
+TRANSCRIPT:
+{window}
+
+OUTPUT VALID JSON ONLY:
+{{
+  "segments": [
+    {{
+      "start_time_ref": "(XXs)",
+      "end_time_ref": "(XXs)",
+      "start_text": "First 8-15 words of the opening sentence, copied exactly",
+      "end_text": "Last 8-15 words of the closing sentence, copied exactly",
+      "hook_line": "Exact opening sentence, copied from the transcript",
+      "title": "Short headline, max 70 chars, no hashtags",
+      "hashtags": "#tag1 #tag2 #tag3",
+      "reasoning": "Why this cut works",
+      "score": "Integer 0-100, honest and varied"
+    }}
+  ]
+}}"""
+
+        print(f"[COMPLEMENTO] Faltam {missing_count} corte(s); pedindo mais a IA (tentativa {topup_attempts}).")
+        extra_segments = _run_rescue(rescue_windows, _build_topup_prompt, f"complemento_{topup_attempts}")
+        if not extra_segments:
+            print("[COMPLEMENTO] A IA nao retornou candidatos extras.")
+            break
+        all_raw_segments.extend(extra_segments)
+        result = process_segments(
+            all_raw_segments,
+            transcript_segments,
+            tempo_minimo,
+            tempo_maximo,
+            output_count=quantidade_de_virals,
+        )
+        print(f"[COMPLEMENTO] Agora com {len(result.get('segments') or [])} de {quantidade_de_virals} corte(s).")
+
     if not result.get("segments"):
         print("\n" + "=" * 60)
         print("[ERRO] A IA nao retornou nenhum corte valido.")

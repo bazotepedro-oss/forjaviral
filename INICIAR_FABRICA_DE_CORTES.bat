@@ -2,6 +2,14 @@
 title Fabrica de Cortes - IA de Videos
 cd /d "%~dp0"
 
+rem Atalho e duplo clique rodam ocultos. Use --visible para diagnostico.
+if /i not "%~1"=="--visible" (
+    if exist "%~dp0scripts\LAUNCH_HIDDEN.vbs" (
+        wscript.exe //nologo "%~dp0scripts\LAUNCH_HIDDEN.vbs"
+        exit /b 0
+    )
+)
+
 set "PATH=%~dp0.venv\Scripts;%USERPROFILE%\.local\bin;%PATH%"
 
 if not exist ".venv\Scripts\python.exe" (

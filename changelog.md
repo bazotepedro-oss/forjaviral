@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.3.22 - atalho sem cmd
+
+### Quantidade de cortes
+
+- Pedir 10 cortes e receber 9 nao acontece mais. Quando a IA entrega menos do que o solicitado, o aplicativo pede os cortes que faltam automaticamente e junta com os ja aprovados.
+- O prompt principal agora pede exatamente a quantidade solicitada, usando os proximos melhores momentos completos quando nao houver tantos picos.
+- A cobranca continua sendo feita apenas sobre os cortes realmente entregues.
+
+
+
+### Correcoes
+- O atalho nao abre mais nenhuma janela de cmd. O Windows Terminal abria uma janela mesmo com o modo oculto quando o alvo era um arquivo .bat.
+- O lancador oculto agora chama direto o pythonw (atualizacao) e o powershell oculto (bandeja), sem passar por cmd.exe.
+- Se o aplicativo ainda nao estiver instalado, aparece uma caixa de aviso em vez de uma janela preta vazia.
+
 ## 1.3.21 - inicio 100% oculto
 
 ### Correcoes
