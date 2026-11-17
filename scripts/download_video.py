@@ -41,6 +41,33 @@ def _attempt_download(url, options):
     with yt_dlp.YoutubeDL(options) as ydl:
         ydl.download([url])
 
+
+def _download_with_pytubefix(url, output_path_base):
+    """Alternativa ao bot check do YouTube, sem cookies.
+
+    O pytubefix gera o token automaticamente (use_po_token) e costuma passar
+    em IPs de servidor onde o yt-dlp recebe "Sign in to confirm you're not a bot".
+    """
+    from pytubefix import YouTube
+
+    yt = YouTube(url, use_po_token=True)
+    stream = (
+        yt.streams.filter(progressive=True, file_extension="mp4")
+        .order_by("resolution")
+        .desc()
+        .first()
+    )
+    if stream is None:
+        stream = yt.streams.get_highest_resolution()
+    if stream is None:
+        raise RuntimeError("pytubefix nao encontrou nenhum stream de video")
+
+    target_dir = os.path.dirname(output_path_base)
+    filename = os.path.basename(output_path_base) + ".mp4"
+    os.makedirs(target_dir, exist_ok=True)
+    stream.download(output_path=target_dir, filename=filename)
+    return os.path.join(target_dir, filename)
+
 def _default_cookies_file():
     """cookies.txt na raiz do aplicativo e usado automaticamente.
 
@@ -366,9 +393,15 @@ def download(url, base_root="VIRALS", download_subs=True, quality="best", cookie
                 raise
         elif "sign in to confirm" in error_str.lower() or "not a bot" in error_str.lower():
             print("\n[ERRO YOUTUBE] O YouTube pediu verificacao (bot check) para este IP.")
-            print("No Colab: pare esta execucao, rode a celula 3 (cookies) e inicie de novo.")
-            print("No Windows: mantenha-se logado no YouTube; o app tenta os cookies do navegador automaticamente.")
-            raise
+            print("[YouTube] Tentando baixar pelo pytubefix, com token automatico (sem cookies)...")
+            try:
+                baixado = _download_with_pytubefix(url, output_path_base)
+                print(f"[YouTube] pytubefix concluiu: {baixado}")
+            except Exception as pb_error:
+                print(f"[YouTube] pytubefix tambem falhou: {pb_error}")
+                print("No Colab: pare esta execucao, rode a celula 3 (cookies) e inicie de novo.")
+                print("No Windows: mantenha-se logado no YouTube; o app tenta os cookies do navegador automaticamente.")
+                raise
         elif "is not a valid URL" in error_str:
              print(i18n("Error: the entered link is not valid."))
              raise 
