@@ -193,14 +193,10 @@ if ($choice -eq "1") {
     Write-Host " - Modo GPU: Instalando PyTorch com aceleracao CUDA 12.1..." -ForegroundColor Yellow
     & uv pip install --python $venvPython --link-mode=copy torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
     if ($LASTEXITCODE -ne 0) { Stop-InstallError "instalar o PyTorch (GPU/CUDA)" }
-    & uv pip install --python $venvPython --link-mode=copy onnxruntime-gpu
-    if ($LASTEXITCODE -ne 0) { Stop-InstallError "instalar o onnxruntime-gpu" }
 } else {
     Write-Host " - Modo CPU: Instalando PyTorch para processador..." -ForegroundColor Yellow
     & uv pip install --python $venvPython --link-mode=copy torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
     if ($LASTEXITCODE -ne 0) { Stop-InstallError "instalar o PyTorch (CPU)" }
-    & uv pip install --python $venvPython --link-mode=copy onnxruntime
-    if ($LASTEXITCODE -ne 0) { Stop-InstallError "instalar o onnxruntime" }
 }
 Write-Host " [OK] PyTorch instalado com sucesso!" -ForegroundColor Green
 Write-Host ""
@@ -249,6 +245,24 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host " [OK] Todas as dependencias foram instaladas!" -ForegroundColor Green
 Write-Host ""
 
+# Passo 6.1: onnxruntime-gpu por ULTIMO. O requirements instala o onnxruntime
+# comum (CPU) por causa do insightface e ele sobrescreve o pacote de GPU.
+if ($choice -eq "1") {
+    Write-Host "[Passo 6.1] Ativando GPU na deteccao de rosto..." -ForegroundColor Cyan
+    & uv pip uninstall --python $venvPython onnxruntime 2>$null | Out-Null
+    $ortDir = Join-Path $projectRoot ".venv\Lib\site-packages\onnxruntime"
+    if (Test-Path $ortDir) {
+        Remove-Item -LiteralPath $ortDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    & uv pip install --python $venvPython --link-mode=copy onnxruntime-gpu==1.23.2
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host " [AVISO] onnxruntime-gpu falhou; a deteccao de rosto usara a CPU." -ForegroundColor Yellow
+    } else {
+        Write-Host " [OK] onnxruntime-gpu instalado!" -ForegroundColor Green
+    }
+    Write-Host ""
+}
+
 # Passo 6.1: CTranslate2 novo (cuDNN 9 do PyTorch). O WhisperX pede uma versao
 # antiga, mas o runtime funciona com a nova; instalamos sem deps para nao conflitar.
 Write-Host "[Passo 6.1] Ajustando o CTranslate2 para usar o cuDNN do PyTorch..." -ForegroundColor Cyan
@@ -259,7 +273,7 @@ Write-Host ""
 
 # Verificacao real: so declara sucesso se o app conseguir importar as bibliotecas
 Write-Host "[Verificacao] Conferindo Gradio, WhisperX, PyTorch e CTranslate2..." -ForegroundColor Cyan
-& $venvPython -c "import gradio, whisperx, torch, ctranslate2; print('ctranslate2', ctranslate2.__version__)"
+& $venvPython -c "import gradio, whisperx, torch, ctranslate2, onnxruntime; print('ctranslate2', ctranslate2.__version__); print('onnxruntime', onnxruntime.__version__, onnxruntime.get_available_providers())"
 if ($LASTEXITCODE -ne 0) {
     Stop-InstallError "verificar as dependencias (Gradio/WhisperX/PyTorch/CTranslate2)"
 }

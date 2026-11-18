@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.31 - GPU na deteccao de rosto
+
+### Desempenho
+- O onnxruntime comum (CPU) era instalado depois do onnxruntime-gpu e sobrescrevia a versao de GPU. Agora o pacote CUDA e instalado por ultimo.
+- Resultado: a deteccao de rosto passa a usar a placa de video em vez do processador, ficando de 3 a 8 vezes mais rapida.
+- A verificacao final mostra os provedores disponiveis (CUDAExecutionProvider).
+
+### Colab
+- Notebook padronizado com a estrutura do Colab do cliente (Drive + cookies + versoes travadas) e a correcao do onnxruntime-gpu.
+
 ## 1.3.30 - instalador detecta ambiente corrompido
 
 ### Instalador

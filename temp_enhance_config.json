@@ -1,0 +1,22 @@
+{
+    "color_grade_intensity": 0.45,
+    "zoom_punch_intensity": 0.55,
+    "shake_impact_intensity": 0.40,
+    "glow_impact_intensity": 0.30,
+    "denoise_strength": 0.35,
+    "sharpen_strength": 0.50,
+    "upscale_enabled": false,
+    "upscale_target_height": 1920,
+    "audio_normalize": true,
+    "audio_compress": true,
+    "audio_echo_reduction": false,
+    "variation_seed": 42,
+    "variation_enabled": true,
+    "color_tint": 0.0,
+    "contrast_boost": 0.0,
+    "saturation_boost": 0.0,
+    "target_folder": "final",
+    "process_subfolders": true,
+    "output_suffix": "_enhanced",
+    "overwrite": false
+}
